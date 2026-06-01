@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { resolveImageSource } from "@/constants/seedImages";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -70,7 +71,10 @@ export default function PieceDetailScreen() {
     try {
       const available = await Sharing.isAvailableAsync();
       if (available) {
-        await Sharing.shareAsync(piece.imageUri, { dialogTitle: piece.title, mimeType: "image/jpeg" });
+        await Sharing.shareAsync(piece.imageUri, {
+          dialogTitle: piece.title,
+          mimeType: "image/jpeg",
+        });
       }
     } catch {
       // silent
@@ -105,14 +109,14 @@ export default function PieceDetailScreen() {
       {/* Floating controls */}
       <View style={[styles.topBar, { top: insets.top + 10 }]}>
         <Pressable
-          style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.88)" }]}
+          style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
           onPress={() => router.back()}
         >
           <Feather name="arrow-left" size={18} color={colors.foreground} />
         </Pressable>
         <View style={styles.topRight}>
           <Pressable
-            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.88)" }]}
+            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
             onPress={handleFavorite}
           >
             <Feather
@@ -122,7 +126,7 @@ export default function PieceDetailScreen() {
             />
           </Pressable>
           <Pressable
-            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.88)" }]}
+            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
             onPress={handleShare}
             disabled={sharing}
           >
@@ -131,10 +135,13 @@ export default function PieceDetailScreen() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
+      >
         {/* Hero image */}
         <Image
-          source={{ uri: piece.imageUri }}
+          source={resolveImageSource(piece.imageUri)}
           style={styles.heroImage}
           contentFit="cover"
           transition={200}
@@ -142,8 +149,16 @@ export default function PieceDetailScreen() {
 
         {/* Content */}
         <View style={styles.content}>
-          <Text style={[styles.date, { color: colors.mutedForeground }]}>{formattedDate}</Text>
+          {/* Eyebrow */}
+          <Text style={[styles.eyebrow, { color: colors.cobalt }]}>GlazeVault</Text>
+
+          {/* Title */}
           <Text style={[styles.title, { color: colors.foreground }]}>{piece.title}</Text>
+
+          {/* Date */}
+          <Text style={[styles.date, { color: colors.mutedForeground }]}>
+            Recorded {formattedDate}
+          </Text>
 
           {/* Info rows */}
           <View style={[styles.infoCard, { borderColor: colors.border }]}>
@@ -151,26 +166,39 @@ export default function PieceDetailScreen() {
             <InfoRow label="Glaze" value={piece.glaze} accent={colors.emerald} />
             <InfoRow label="Firing" value={piece.firing} accent={colors.primary} />
             {piece.dimensions ? (
-              <InfoRow label="Dimensions" value={piece.dimensions} accent={colors.mutedForeground} />
+              <InfoRow
+                label="Dimensions"
+                value={piece.dimensions}
+                accent={colors.mutedForeground}
+              />
             ) : null}
           </View>
 
           {/* Notes */}
           {piece.notes ? (
             <View style={styles.notesSection}>
-              <Text style={[styles.notesLabel, { color: colors.mutedForeground }]}>Notes</Text>
-              <Text style={[styles.notesText, { color: colors.foreground }]}>{piece.notes}</Text>
+              <Text style={[styles.notesLabel, { color: colors.mutedForeground }]}>
+                Studio Notes
+              </Text>
+              <Text style={[styles.notesText, { color: colors.foreground }]}>
+                {piece.notes}
+              </Text>
             </View>
           ) : null}
 
           {/* Actions */}
           <View style={styles.actions}>
             <Pressable
-              style={[styles.editBtn, { borderColor: colors.border, borderRadius: colors.radius }]}
+              style={[
+                styles.editBtn,
+                { borderColor: colors.border, borderRadius: colors.radius },
+              ]}
               onPress={() => router.push(`/piece/edit/${piece.id}`)}
             >
               <Feather name="edit-2" size={14} color={colors.mutedForeground} />
-              <Text style={[styles.editBtnText, { color: colors.mutedForeground }]}>Edit Piece</Text>
+              <Text style={[styles.editBtnText, { color: colors.mutedForeground }]}>
+                Edit Piece
+              </Text>
             </Pressable>
 
             <Pressable style={styles.deleteLink} onPress={handleDelete}>
@@ -210,14 +238,26 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  heroImage: { width: "100%", aspectRatio: 4 / 5 },
-  content: { padding: 28, gap: 0 },
-  date: { fontSize: 11, fontFamily: "Poppins_400Regular", letterSpacing: 0.5, marginBottom: 8 },
+  heroImage: { width: "100%", aspectRatio: 3 / 4 },
+  content: { paddingHorizontal: 28, paddingTop: 28 },
+  eyebrow: {
+    fontSize: 10,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 2.8,
+    textTransform: "uppercase",
+    marginBottom: 10,
+  },
   title: {
-    fontSize: 30,
+    fontSize: 32,
     fontFamily: "PlayfairDisplay_400Regular",
     letterSpacing: 0.3,
-    lineHeight: 38,
+    lineHeight: 40,
+    marginBottom: 6,
+  },
+  date: {
+    fontSize: 11,
+    fontFamily: "Poppins_300Light",
+    letterSpacing: 0.4,
     marginBottom: 28,
   },
   infoCard: {
@@ -240,7 +280,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_500Medium",
     letterSpacing: 1.5,
     textTransform: "uppercase",
-    width: 80,
+    width: 88,
   },
   infoValue: {
     fontSize: 14,
@@ -248,7 +288,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "right",
   },
-  notesSection: { marginBottom: 32, gap: 10 },
+  notesSection: { marginBottom: 36, gap: 10 },
   notesLabel: {
     fontSize: 10,
     fontFamily: "Poppins_500Medium",
@@ -258,21 +298,31 @@ const styles = StyleSheet.create({
   notesText: {
     fontSize: 15,
     fontFamily: "PlayfairDisplay_400Regular_Italic",
-    lineHeight: 26,
+    lineHeight: 27,
     letterSpacing: 0.2,
   },
-  actions: { gap: 20, alignItems: "center" },
+  actions: { gap: 20, alignItems: "center", paddingBottom: 8 },
   editBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     borderWidth: 1,
     paddingHorizontal: 24,
-    paddingVertical: 13,
+    paddingVertical: 14,
     width: "100%",
     justifyContent: "center",
   },
-  editBtnText: { fontSize: 12, fontFamily: "Poppins_500Medium", letterSpacing: 1.5, textTransform: "uppercase" },
+  editBtnText: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.8,
+    textTransform: "uppercase",
+  },
   deleteLink: { paddingVertical: 4 },
-  deleteLinkText: { fontSize: 12, fontFamily: "Poppins_300Light", letterSpacing: 0.3, textDecorationLine: "underline" },
+  deleteLinkText: {
+    fontSize: 12,
+    fontFamily: "Poppins_300Light",
+    letterSpacing: 0.3,
+    textDecorationLine: "underline",
+  },
 });

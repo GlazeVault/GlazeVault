@@ -12,3 +12,9 @@ id = "_ds_YU-3OwJGQ03YMKppf"
 uri = "file://artifacts/mobile/assets/images/placeholder1.png"
 type = "image"
 title = "generated_image"
+
+[[generated]]
+id = "yrbW2Hv4GUynCq5163YQl"
+uri = "file://artifacts/mobile/assets/images/blue-mug.png"
+type = "image"
+title = "generated_image"

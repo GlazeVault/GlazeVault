@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { resolveImageSource } from "@/constants/seedImages";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -38,7 +39,7 @@ export function PotteryCard({ piece }: PotteryCardProps) {
     >
       <View style={{ borderRadius: colors.radius, overflow: "hidden" }}>
         <Image
-          source={{ uri: piece.imageUri }}
+          source={resolveImageSource(piece.imageUri)}
           style={styles.image}
           contentFit="cover"
           transition={300}

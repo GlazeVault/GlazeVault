@@ -25,21 +25,41 @@ interface PotteryContextType {
 
 const PotteryContext = createContext<PotteryContextType | undefined>(undefined);
 
-const STORAGE_KEY = "@glazevault_pieces";
+const STORAGE_KEY = "@glazevault_pieces_v2";
+
+const SEED_PIECES: PotteryPiece[] = [
+  {
+    id: "seed-blue-mug",
+    title: "Blue Mug",
+    notes:
+      "A quiet morning piece. The turquoise matt glaze pools gently at the foot, revealing the warm stoneware body beneath. Thrown on the wheel in a single session.",
+    clay: "Stoneware",
+    glaze: "Turquoise Matt",
+    firing: "Gas Reduction",
+    dimensions: "9 cm H × 8 cm W",
+    imageUri: "@seed/blue-mug",
+    createdAt: new Date("2026-05-12").toISOString(),
+    isFavorite: false,
+  },
+];
 
 export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const [pieces, setPieces] = useState<PotteryPiece[]>([]);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((data) => {
-      if (data) {
-        try {
+    (async () => {
+      try {
+        const data = await AsyncStorage.getItem(STORAGE_KEY);
+        if (data) {
           setPieces(JSON.parse(data));
-        } catch {
-          setPieces([]);
+        } else {
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_PIECES));
+          setPieces(SEED_PIECES);
         }
+      } catch {
+        setPieces(SEED_PIECES);
       }
-    });
+    })();
   }, []);
 
   const persist = useCallback(async (updated: PotteryPiece[]) => {
