@@ -166,7 +166,7 @@ export function ShareSheet({ visible, onClose, pieceTitle }: ShareSheetProps) {
           </View>
 
           {/* Divider */}
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <View style={[styles.divider, { backgroundColor: "rgba(120, 110, 100, 0.1)" }]} />
 
           {/* Copy Link */}
           <Pressable
@@ -182,18 +182,24 @@ export function ShareSheet({ visible, onClose, pieceTitle }: ShareSheetProps) {
             <View
               style={[
                 styles.copyIcon,
-                { backgroundColor: colors.secondary, borderColor: colors.border },
+                {
+                  backgroundColor: "rgba(240, 235, 228, 0.7)",
+                  borderColor: "rgba(120, 110, 100, 0.12)",
+                  borderWidth: 0.75,
+                },
               ]}
             >
               <Feather name="link" size={18} color={colors.foreground} />
             </View>
             <View style={styles.copyText}>
-              <Text style={[styles.copyLabel, { color: colors.foreground }]}>Copy Link</Text>
+              <Text style={[styles.copyLabel, { color: "rgba(45, 45, 42, 0.72)" }]}>
+                Copy Link
+              </Text>
               <Text style={[styles.copySub, { color: colors.mutedForeground }]}>
                 Share a link to this piece
               </Text>
             </View>
-            <Feather name="chevron-right" size={16} color={colors.border} />
+            <Feather name="chevron-right" size={16} color={colors.border} style={{ opacity: 0.2 }} />
           </Pressable>
 
           {/* Cancel */}
@@ -288,8 +294,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
     marginBottom: 4,
   },
   copyIcon: {
