@@ -75,7 +75,7 @@ export function PotteryCard({ piece }: PotteryCardProps) {
 const styles = StyleSheet.create({
   card: {
     overflow: "visible",
-    marginBottom: 32,
+    marginBottom: 44,
   },
   image: {
     width: "100%",
