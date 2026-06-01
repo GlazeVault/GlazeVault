@@ -17,6 +17,7 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -70,6 +71,7 @@ function ChipSelector({
 export default function AddScreen() {
   const colors = useColors();
   const { addPiece } = usePottery();
+  const { collections } = useCollections();
   const insets = useSafeAreaInsets();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -78,6 +80,7 @@ export default function AddScreen() {
   const [glaze, setGlaze] = useState("");
   const [firing, setFiring] = useState("");
   const [dimensions, setDimensions] = useState("");
+  const [collectionId, setCollectionId] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -139,9 +142,9 @@ export default function AddScreen() {
       return;
     }
     setSaving(true);
-    await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing, dimensions: dimensions.trim(), imageUri });
+    await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing, dimensions: dimensions.trim(), imageUri, collectionId });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setImageUri(null); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setFiring(""); setDimensions("");
+    setImageUri(null); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setFiring(""); setDimensions(""); setCollectionId(undefined);
     setSaving(false);
     router.replace("/");
   };
@@ -232,6 +235,52 @@ export default function AddScreen() {
 
         <Label text="Dimensions" />
         <Field value={dimensions} onChange={setDimensions} placeholder="e.g. 9 cm H × 11 cm W" />
+
+        {collections.length > 0 && (
+          <>
+            <Label text="Collection" />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.chipRow}>
+                <Pressable
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: !collectionId ? colors.cobalt : "transparent",
+                      borderColor: !collectionId ? colors.cobalt : colors.border,
+                      borderRadius: 24,
+                    },
+                  ]}
+                  onPress={() => setCollectionId(undefined)}
+                >
+                  <Text style={[styles.chipText, { color: !collectionId ? "#FFFFFF" : colors.mutedForeground }]}>
+                    None
+                  </Text>
+                </Pressable>
+                {collections.map((col) => {
+                  const selected = collectionId === col.id;
+                  return (
+                    <Pressable
+                      key={col.id}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: selected ? colors.cobalt : "transparent",
+                          borderColor: selected ? colors.cobalt : colors.border,
+                          borderRadius: 24,
+                        },
+                      ]}
+                      onPress={() => setCollectionId(selected ? undefined : col.id)}
+                    >
+                      <Text style={[styles.chipText, { color: selected ? "#FFFFFF" : colors.mutedForeground }]}>
+                        {col.title}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </>
+        )}
 
         <Pressable
           style={({ pressed }) => [
