@@ -30,7 +30,7 @@ function InfoRow({
   const colors = useColors();
   if (!value) return null;
   return (
-    <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+    <View style={[styles.infoRow, { borderBottomColor: "rgba(120, 110, 100, 0.14)" }]}>
       <View style={[styles.infoAccent, { backgroundColor: accent }]} />
       <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>{label}</Text>
       <Text style={[styles.infoValue, { color: colors.foreground }]}>{value}</Text>
@@ -90,7 +90,7 @@ export default function PieceDetailScreen() {
           style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
           onPress={() => router.back()}
         >
-          <Feather name="arrow-left" size={18} color={colors.foreground} />
+          <Feather name="arrow-left" size={18} color="#8A7B6C" />
         </Pressable>
         <View style={styles.topRight}>
           <Pressable
@@ -107,7 +107,7 @@ export default function PieceDetailScreen() {
             style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
             onPress={() => setShareVisible(true)}
           >
-            <Feather name="share-2" size={18} color={colors.mutedForeground} />
+            <Feather name="share-2" size={18} color="#8A7B6C" />
           </Pressable>
         </View>
       </View>
@@ -133,7 +133,7 @@ export default function PieceDetailScreen() {
           </Text>
 
           {/* Info rows */}
-          <View style={[styles.infoCard, { borderColor: colors.border }]}>
+          <View style={[styles.infoCard, { borderColor: "rgba(120, 110, 100, 0.14)" }]}>
             <InfoRow label="Clay" value={piece.clay} accent={colors.cobalt} />
             <InfoRow label="Glaze" value={piece.glaze} accent={colors.emerald} />
             <InfoRow label="Firing" value={piece.firing} accent={colors.primary} />
