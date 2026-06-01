@@ -5,16 +5,20 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ShareSheet } from "@/components/ShareSheet";
 import { resolveImageSource } from "@/constants/seedImages";
+import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -40,11 +44,14 @@ function InfoRow({
 
 export default function PieceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPiece, toggleFavorite, deletePiece } = usePottery();
+  const { getPiece, updatePiece, toggleFavorite, deletePiece } = usePottery();
+  const { collections } = useCollections();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const piece = getPiece(id);
   const [shareVisible, setShareVisible] = useState(false);
+  const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
+  const [updatingCollection, setUpdatingCollection] = useState(false);
 
   if (!piece) {
     return (
@@ -55,6 +62,8 @@ export default function PieceDetailScreen() {
       </View>
     );
   }
+
+  const currentCollection = collections.find((c) => c.id === piece.collectionId) ?? null;
 
   const handleFavorite = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -74,6 +83,14 @@ export default function PieceDetailScreen() {
         },
       },
     ]);
+  };
+
+  const handleSelectCollection = async (collectionId: string | undefined) => {
+    setUpdatingCollection(true);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await updatePiece(piece.id, { collectionId });
+    setUpdatingCollection(false);
+    setCollectionPickerVisible(false);
   };
 
   const formattedDate = new Date(piece.createdAt).toLocaleDateString("en-US", {
@@ -141,6 +158,39 @@ export default function PieceDetailScreen() {
               </View>
             )}
           </View>
+
+          {/* Collection row */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.collectionRow,
+              {
+                backgroundColor: pressed ? colors.secondary : "transparent",
+                borderColor: "rgba(120, 110, 100, 0.14)",
+                borderRadius: 10,
+              },
+            ]}
+            onPress={() => setCollectionPickerVisible(true)}
+          >
+            <View style={[styles.collectionAccent, { backgroundColor: colors.cobalt, opacity: currentCollection ? 1 : 0.35 }]} />
+            <Feather
+              name="layers"
+              size={13}
+              color={currentCollection ? colors.cobalt : colors.mutedForeground}
+              style={{ opacity: currentCollection ? 1 : 0.7 }}
+            />
+            <Text
+              style={[
+                styles.collectionRowText,
+                {
+                  color: currentCollection ? colors.cobalt : colors.mutedForeground,
+                  fontFamily: currentCollection ? "Poppins_400Regular" : "Poppins_300Light",
+                },
+              ]}
+            >
+              {currentCollection ? `Collection · ${currentCollection.title}` : "Add to Collection"}
+            </Text>
+            <Feather name="chevron-right" size={13} color={colors.mutedForeground} style={{ opacity: 0.5 }} />
+          </Pressable>
 
           {/* Info rows */}
           <View style={[styles.infoCard, { borderColor: "rgba(120, 110, 100, 0.14)" }]}>
@@ -223,6 +273,158 @@ export default function PieceDetailScreen() {
         </View>
       </ScrollView>
 
+      {/* Collection picker modal */}
+      <Modal
+        visible={collectionPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCollectionPickerVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setCollectionPickerVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View
+                style={[
+                  styles.modalSheet,
+                  {
+                    backgroundColor: colors.background,
+                    paddingBottom: Math.max(insets.bottom, 24),
+                  },
+                ]}
+              >
+                {/* Handle bar */}
+                <View style={[styles.handle, { backgroundColor: "rgba(120,110,100,0.2)" }]} />
+
+                <Text style={[styles.sheetTitle, { color: colors.foreground }]}>
+                  Add to Collection
+                </Text>
+                <Text style={[styles.sheetSub, { color: colors.mutedForeground }]}>
+                  {collections.length === 0
+                    ? "Create a collection first from the Collections tab."
+                    : "Choose a collection for this piece."}
+                </Text>
+
+                <View style={[styles.sheetDivider, { backgroundColor: "rgba(120,110,100,0.1)" }]} />
+
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  style={{ maxHeight: 320 }}
+                  bounces={false}
+                >
+                  {/* None option */}
+                  {piece.collectionId && (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.collectionOption,
+                        {
+                          backgroundColor: pressed ? colors.secondary : "transparent",
+                          borderColor: "rgba(120,110,100,0.1)",
+                        },
+                      ]}
+                      onPress={() => handleSelectCollection(undefined)}
+                      disabled={updatingCollection}
+                    >
+                      <View style={[styles.optionIconCircle, { backgroundColor: colors.secondary }]}>
+                        <Feather name="x" size={14} color={colors.mutedForeground} />
+                      </View>
+                      <View style={styles.optionLabels}>
+                        <Text style={[styles.optionTitle, { color: colors.mutedForeground }]}>
+                          Remove from collection
+                        </Text>
+                      </View>
+                    </Pressable>
+                  )}
+
+                  {/* Existing collections */}
+                  {collections.map((col) => {
+                    const isSelected = piece.collectionId === col.id;
+                    return (
+                      <Pressable
+                        key={col.id}
+                        style={({ pressed }) => [
+                          styles.collectionOption,
+                          {
+                            backgroundColor: isSelected
+                              ? "rgba(107,127,163,0.08)"
+                              : pressed
+                              ? colors.secondary
+                              : "transparent",
+                            borderColor: isSelected
+                              ? "rgba(107,127,163,0.18)"
+                              : "rgba(120,110,100,0.1)",
+                          },
+                        ]}
+                        onPress={() => handleSelectCollection(col.id)}
+                        disabled={updatingCollection || isSelected}
+                      >
+                        <View
+                          style={[
+                            styles.optionIconCircle,
+                            {
+                              backgroundColor: isSelected
+                                ? "rgba(107,127,163,0.12)"
+                                : colors.secondary,
+                            },
+                          ]}
+                        >
+                          <Feather
+                            name="layers"
+                            size={14}
+                            color={isSelected ? colors.cobalt : colors.mutedForeground}
+                          />
+                        </View>
+                        <View style={styles.optionLabels}>
+                          <Text
+                            style={[
+                              styles.optionTitle,
+                              { color: isSelected ? colors.cobalt : colors.foreground },
+                            ]}
+                          >
+                            {col.title}
+                          </Text>
+                          {col.intro ? (
+                            <Text
+                              style={[styles.optionSub, { color: colors.mutedForeground }]}
+                              numberOfLines={1}
+                            >
+                              {col.intro}
+                            </Text>
+                          ) : null}
+                        </View>
+                        {isSelected && (
+                          <Feather name="check" size={15} color={colors.cobalt} />
+                        )}
+                      </Pressable>
+                    );
+                  })}
+
+                  {collections.length === 0 && (
+                    <View style={styles.emptyCollections}>
+                      <Feather name="layers" size={20} color={colors.mutedForeground} style={{ opacity: 0.35 }} />
+                      <Text style={[styles.emptyCollectionsText, { color: colors.mutedForeground }]}>
+                        No collections yet
+                      </Text>
+                    </View>
+                  )}
+                </ScrollView>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sheetCancel,
+                    { opacity: pressed ? 0.6 : 1 },
+                  ]}
+                  onPress={() => setCollectionPickerVisible(false)}
+                >
+                  <Text style={[styles.sheetCancelText, { color: colors.mutedForeground }]}>
+                    Cancel
+                  </Text>
+                </Pressable>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       <ShareSheet
         visible={shareVisible}
         onClose={() => setShareVisible(false)}
@@ -276,7 +478,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 24,
+    marginBottom: 16,
     flexWrap: "wrap",
   },
   date: {
@@ -297,6 +499,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: "Poppins_500Medium",
     letterSpacing: 0.5,
+  },
+  collectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 0.75,
+    marginBottom: 20,
+  },
+  collectionAccent: { width: 2.5, height: 14, borderRadius: 2 },
+  collectionRowText: {
+    flex: 1,
+    fontSize: 13,
+    letterSpacing: 0.2,
   },
   infoCard: {
     borderWidth: 0.75,
@@ -354,5 +571,89 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_300Light",
     textDecorationLine: "underline",
     letterSpacing: 0.2,
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(45,45,42,0.45)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 14,
+    paddingHorizontal: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontFamily: "PlayfairDisplay_400Regular",
+    letterSpacing: 0.3,
+    marginBottom: 6,
+  },
+  sheetSub: {
+    fontSize: 12,
+    fontFamily: "Poppins_300Light",
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  sheetDivider: { height: 1, marginBottom: 12 },
+  collectionOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 0.75,
+    marginBottom: 8,
+  },
+  optionIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  optionLabels: { flex: 1 },
+  optionTitle: {
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    letterSpacing: 0.1,
+  },
+  optionSub: {
+    fontSize: 11,
+    fontFamily: "Poppins_300Light",
+    marginTop: 2,
+  },
+  emptyCollections: {
+    alignItems: "center",
+    paddingVertical: 28,
+    gap: 10,
+  },
+  emptyCollectionsText: {
+    fontSize: 13,
+    fontFamily: "Poppins_300Light",
+  },
+  sheetCancel: {
+    alignItems: "center",
+    paddingVertical: 16,
+    marginTop: 4,
+  },
+  sheetCancelText: {
+    fontSize: 13,
+    fontFamily: "Poppins_400Regular",
+    letterSpacing: 0.3,
   },
 });
