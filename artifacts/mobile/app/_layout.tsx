@@ -20,6 +20,8 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { CollectionsProvider } from "@/context/CollectionsContext";
+import { ProfileProvider } from "@/context/ProfileContext";
 import { PotteryProvider } from "@/context/PotteryContext";
 
 SplashScreen.preventAutoHideAsync();
@@ -52,21 +54,33 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <PotteryProvider>
-            <GestureHandlerRootView>
-              <KeyboardProvider>
-                <Stack screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen
-                    name="piece/[id]"
-                    options={{ presentation: "card" }}
-                  />
-                  <Stack.Screen
-                    name="piece/edit/[id]"
-                    options={{ presentation: "modal" }}
-                  />
-                </Stack>
-              </KeyboardProvider>
-            </GestureHandlerRootView>
+            <CollectionsProvider>
+              <ProfileProvider>
+                <GestureHandlerRootView>
+                  <KeyboardProvider>
+                    <Stack screenOptions={{ headerShown: false }}>
+                      <Stack.Screen name="(tabs)" />
+                      <Stack.Screen
+                        name="piece/[id]"
+                        options={{ presentation: "card" }}
+                      />
+                      <Stack.Screen
+                        name="piece/edit/[id]"
+                        options={{ presentation: "modal" }}
+                      />
+                      <Stack.Screen
+                        name="collection/[id]"
+                        options={{ presentation: "card" }}
+                      />
+                      <Stack.Screen
+                        name="collection/new"
+                        options={{ presentation: "modal" }}
+                      />
+                    </Stack>
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </ProfileProvider>
+            </CollectionsProvider>
           </PotteryProvider>
         </QueryClientProvider>
       </ErrorBoundary>

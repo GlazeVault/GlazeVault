@@ -16,13 +16,17 @@ function NativeTabLayout() {
         <Icon sf={{ default: "archivebox", selected: "archivebox.fill" }} />
         <Label>Archive</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="collections">
+        <Icon sf={{ default: "rectangle.stack", selected: "rectangle.stack.fill" }} />
+        <Label>Collections</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="add">
         <Icon sf={{ default: "plus.circle", selected: "plus.circle.fill" }} />
         <Label>Add Piece</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="favorites">
-        <Icon sf={{ default: "heart", selected: "heart.fill" }} />
-        <Label>Favourites</Label>
+      <NativeTabs.Trigger name="profile">
+        <Icon sf={{ default: "person", selected: "person.fill" }} />
+        <Label>Profile</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -78,6 +82,18 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="collections"
+        options={{
+          title: "Collections",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="rectangle.stack" tintColor={color} size={22} />
+            ) : (
+              <Feather name="layers" size={20} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
         name="add"
         options={{
           title: "Add Piece",
@@ -90,17 +106,18 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="favorites"
+        name="profile"
         options={{
-          title: "Favourites",
+          title: "Profile",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="heart" tintColor={color} size={22} />
+              <SymbolView name="person" tintColor={color} size={22} />
             ) : (
-              <Feather name="heart" size={20} color={color} />
+              <Feather name="feather" size={20} color={color} />
             ),
         }}
       />
+      <Tabs.Screen name="favorites" options={{ href: null }} />
     </Tabs>
   );
 }

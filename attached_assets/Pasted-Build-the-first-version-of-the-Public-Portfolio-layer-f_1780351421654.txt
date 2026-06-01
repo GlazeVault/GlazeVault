@@ -1,0 +1,161 @@
+Build the first version of the Public Portfolio layer for GlazeVault.
+
+The goal is to make GlazeVault feel like a living ceramic portfolio platform, not just an archive app.
+
+Extend the current visual system and preserve the calm editorial ceramic aesthetic already established throughout the app.
+
+--------------------------------------------------
+1. Artist Profile Page
+--------------------------------------------------
+
+Create a public-facing artist profile page.
+
+Include:
+- profile image
+- artist name
+- short bio
+- artist statement
+- featured works section
+- collections section
+- website link
+- Instagram link
+
+Design direction:
+- contemporary gallery
+- calm editorial layout
+- generous breathing room
+- warm neutral background
+- minimal but emotional presentation
+
+Avoid:
+- social media profile feeling
+- follower-focused UI
+- noisy stats
+- tech startup dashboard aesthetics
+
+--------------------------------------------------
+2. Public Piece Page Structure
+--------------------------------------------------
+
+Create public URL routing structure for individual works.
+
+Example:
+glazevault.com/p/passage
+
+Each public piece page should include:
+- hero image
+- title
+- year/date
+- clay
+- glaze
+- firing
+- studio notes
+- related works
+- share actions
+
+Maintain:
+- elegant typography
+- soft borders
+- quiet spacing
+- gallery-like presentation
+
+The experience should feel like:
+- a ceramic catalog
+- a contemporary artist archive
+- an editorial portfolio page
+
+--------------------------------------------------
+3. Collection System
+--------------------------------------------------
+
+Add collection/grouping functionality.
+
+Examples:
+- Passage Series
+- White Slip Works
+- 2026 Archive
+- Soda Fired
+
+Each collection page should:
+- feel curated
+- behave like a gallery exhibition grouping
+- support:
+  - cover image
+  - collection title
+  - short intro text
+
+Maintain the same calm visual rhythm and tactile softness used elsewhere in the app.
+
+--------------------------------------------------
+4. Portfolio Navigation
+--------------------------------------------------
+
+Add a clean portfolio-style navigation structure.
+
+Suggested sections:
+- Archive
+- Collections
+- About
+
+Navigation should feel:
+- calm
+- minimal
+- editorial
+- warm
+- non-techy
+
+Avoid:
+- dashboard feeling
+- app-heavy navigation
+- marketplace aesthetics
+
+--------------------------------------------------
+5. Visibility System (MVP Only)
+--------------------------------------------------
+
+Keep visibility settings extremely simple for now:
+
+- Public
+- Private
+
+Do not build:
+- advanced permissions
+- collaborators
+- drafts
+- password protection
+- publishing workflows
+- complex privacy systems
+
+The goal is simply:
+- save privately
+- optionally publish publicly
+- share beautiful portfolio pages easily
+
+--------------------------------------------------
+6. Design Requirements
+--------------------------------------------------
+
+Keep all existing visual language:
+- cream / warm neutral palette
+- muted cobalt accents
+- warm gray typography
+- tactile softness
+- quiet contemporary ceramic mood
+
+Do not redesign the app.
+
+Only extend the current system consistently.
+
+Focus on:
+- beautiful presentation
+- emotional calmness
+- living archive feeling
+- elegant documentation
+- ceramic portfolio identity
+
+Avoid:
+- social feed feeling
+- productivity app feeling
+- noisy interactions
+- marketplace UI
+- generic startup aesthetics

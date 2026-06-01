@@ -12,11 +12,13 @@ export interface PotteryPiece {
   imageUri: string;
   createdAt: string;
   isFavorite: boolean;
+  isPublic: boolean;
+  collectionId?: string;
 }
 
 interface PotteryContextType {
   pieces: PotteryPiece[];
-  addPiece: (piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite">) => Promise<void>;
+  addPiece: (piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite" | "isPublic">) => Promise<void>;
   updatePiece: (id: string, updates: Partial<PotteryPiece>) => Promise<void>;
   deletePiece: (id: string) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
@@ -40,8 +42,24 @@ const SEED_PIECES: PotteryPiece[] = [
     imageUri: "@seed/blue-mug",
     createdAt: new Date("2026-05-12").toISOString(),
     isFavorite: false,
+    isPublic: false,
   },
 ];
+
+function normalizePiece(p: Partial<PotteryPiece> & Pick<PotteryPiece, "id">): PotteryPiece {
+  return {
+    notes: "",
+    clay: "",
+    glaze: "",
+    firing: "",
+    dimensions: "",
+    imageUri: "",
+    createdAt: new Date().toISOString(),
+    isFavorite: false,
+    isPublic: false,
+    ...p,
+  } as PotteryPiece;
+}
 
 export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const [pieces, setPieces] = useState<PotteryPiece[]>([]);
@@ -51,7 +69,8 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
       try {
         const data = await AsyncStorage.getItem(STORAGE_KEY);
         if (data) {
-          setPieces(JSON.parse(data));
+          const parsed = JSON.parse(data) as Array<Partial<PotteryPiece> & Pick<PotteryPiece, "id">>;
+          setPieces(parsed.map(normalizePiece));
         } else {
           await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_PIECES));
           setPieces(SEED_PIECES);
@@ -68,12 +87,13 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addPiece = useCallback(
-    async (piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite">) => {
+    async (piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite" | "isPublic">) => {
       const newPiece: PotteryPiece = {
         ...piece,
         id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
         createdAt: new Date().toISOString(),
         isFavorite: false,
+        isPublic: false,
       };
       await persist([newPiece, ...pieces]);
     },

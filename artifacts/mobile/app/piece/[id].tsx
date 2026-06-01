@@ -128,9 +128,19 @@ export default function PieceDetailScreen() {
         <View style={styles.content}>
           <Text style={[styles.eyebrow, { color: colors.cobalt }]}>GlazeVault</Text>
           <Text style={[styles.title, { color: colors.foreground }]}>{piece.title}</Text>
-          <Text style={[styles.date, { color: "#8A7B6C" }]}>
-            Recorded {formattedDate}
-          </Text>
+
+          {/* Date + visibility */}
+          <View style={styles.metaRow}>
+            <Text style={[styles.date, { color: "#8A7B6C" }]}>
+              Recorded {formattedDate}
+            </Text>
+            {piece.isPublic && (
+              <View style={[styles.publicBadge, { backgroundColor: "rgba(107,139,122,0.12)" }]}>
+                <View style={[styles.publicDot, { backgroundColor: colors.emerald }]} />
+                <Text style={[styles.publicBadgeText, { color: colors.emerald }]}>Public</Text>
+              </View>
+            )}
+          </View>
 
           {/* Info rows */}
           <View style={[styles.infoCard, { borderColor: "rgba(120, 110, 100, 0.14)" }]}>
@@ -198,7 +208,13 @@ export default function PieceDetailScreen() {
               </Pressable>
             </View>
 
-            <Pressable style={styles.deleteLink} onPress={handleDelete}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.deleteLink,
+                { opacity: pressed ? 0.5 : 0.7 },
+              ]}
+              onPress={handleDelete}
+            >
               <Text style={[styles.deleteLinkText, { color: colors.mutedForeground }]}>
                 Remove from archive
               </Text>
@@ -221,18 +237,17 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   topBar: {
     position: "absolute",
-    left: 16,
-    right: 16,
-    zIndex: 10,
+    left: 20,
+    right: 20,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    zIndex: 10,
   },
   topRight: { flexDirection: "row", gap: 8 },
   floatBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -246,93 +261,98 @@ const styles = StyleSheet.create({
   eyebrow: {
     fontSize: 10,
     fontFamily: "Poppins_500Medium",
-    letterSpacing: 2.8,
+    letterSpacing: 2.5,
     textTransform: "uppercase",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   title: {
     fontSize: 32,
     fontFamily: "PlayfairDisplay_400Regular",
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
     lineHeight: 40,
-    marginBottom: 6,
+    marginBottom: 10,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 24,
+    flexWrap: "wrap",
   },
   date: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Poppins_300Light",
-    letterSpacing: 0.4,
-    marginBottom: 28,
+    letterSpacing: 0.3,
+  },
+  publicBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  publicDot: { width: 5, height: 5, borderRadius: 3 },
+  publicBadgeText: {
+    fontSize: 10,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.5,
   },
   infoCard: {
-    borderWidth: 1,
-    borderRadius: 12,
+    borderWidth: 0.75,
+    borderRadius: 14,
     overflow: "hidden",
-    marginBottom: 28,
+    marginBottom: 24,
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
+    paddingVertical: 13,
+    borderBottomWidth: 0.75,
     gap: 12,
   },
-  infoAccent: { width: 3, height: 18, borderRadius: 2, opacity: 0.7 },
+  infoAccent: { width: 3, height: 16, borderRadius: 2 },
   infoLabel: {
     fontSize: 10,
     fontFamily: "Poppins_500Medium",
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
     textTransform: "uppercase",
-    width: 88,
+    width: 72,
   },
-  infoValue: {
-    fontSize: 14,
-    fontFamily: "Poppins_300Light",
-    flex: 1,
-    textAlign: "right",
-  },
-  notesSection: { marginBottom: 36, gap: 10 },
+  infoValue: { flex: 1, fontSize: 14, fontFamily: "Poppins_300Light" },
+  notesSection: { marginBottom: 28 },
   notesLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: "Poppins_500Medium",
-    letterSpacing: 1.5,
+    letterSpacing: 1.8,
     textTransform: "uppercase",
+    marginBottom: 10,
   },
   notesText: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "PlayfairDisplay_400Regular_Italic",
-    lineHeight: 27,
+    lineHeight: 24,
     letterSpacing: 0.2,
   },
-  actions: { gap: 16, alignItems: "center", paddingBottom: 8 },
-  actionRow: {
-    flexDirection: "row",
-    gap: 10,
-    width: "100%",
-  },
+  actions: { gap: 16 },
+  actionRow: { flexDirection: "row", gap: 10 },
   actionBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
-    borderWidth: 1,
-    paddingVertical: 14,
+    paddingVertical: 13,
+    borderWidth: 0.75,
   },
-  shareBtn: {
-    backgroundColor: "transparent",
-  },
-  actionBtnText: {
-    fontSize: 11,
-    fontFamily: "Poppins_500Medium",
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
-  },
-  deleteLink: { paddingVertical: 4 },
+  shareBtn: { borderWidth: 0 },
+  actionBtnText: { fontSize: 13, fontFamily: "Poppins_400Regular", letterSpacing: 0.3 },
+  deleteLink: { alignItems: "center", paddingVertical: 4 },
   deleteLinkText: {
     fontSize: 12,
     fontFamily: "Poppins_300Light",
-    letterSpacing: 0.3,
     textDecorationLine: "underline",
+    letterSpacing: 0.2,
   },
 });
