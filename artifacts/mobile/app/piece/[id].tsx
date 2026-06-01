@@ -2,11 +2,9 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import * as Sharing from "expo-sharing";
 import React, { useState } from "react";
 import {
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ShareSheet } from "@/components/ShareSheet";
 import { resolveImageSource } from "@/constants/seedImages";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -45,7 +44,7 @@ export default function PieceDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const piece = getPiece(id);
-  const [sharing, setSharing] = useState(false);
+  const [shareVisible, setShareVisible] = useState(false);
 
   if (!piece) {
     return (
@@ -60,27 +59,6 @@ export default function PieceDetailScreen() {
   const handleFavorite = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await toggleFavorite(piece.id);
-  };
-
-  const handleShare = async () => {
-    if (Platform.OS === "web") {
-      Alert.alert("Sharing", "Available on mobile devices.");
-      return;
-    }
-    setSharing(true);
-    try {
-      const available = await Sharing.isAvailableAsync();
-      if (available) {
-        await Sharing.shareAsync(piece.imageUri, {
-          dialogTitle: piece.title,
-          mimeType: "image/jpeg",
-        });
-      }
-    } catch {
-      // silent
-    } finally {
-      setSharing(false);
-    }
   };
 
   const handleDelete = () => {
@@ -127,8 +105,7 @@ export default function PieceDetailScreen() {
           </Pressable>
           <Pressable
             style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
-            onPress={handleShare}
-            disabled={sharing}
+            onPress={() => setShareVisible(true)}
           >
             <Feather name="share-2" size={18} color={colors.mutedForeground} />
           </Pressable>
@@ -149,13 +126,8 @@ export default function PieceDetailScreen() {
 
         {/* Content */}
         <View style={styles.content}>
-          {/* Eyebrow */}
           <Text style={[styles.eyebrow, { color: colors.cobalt }]}>GlazeVault</Text>
-
-          {/* Title */}
           <Text style={[styles.title, { color: colors.foreground }]}>{piece.title}</Text>
-
-          {/* Date */}
           <Text style={[styles.date, { color: colors.mutedForeground }]}>
             Recorded {formattedDate}
           </Text>
@@ -188,18 +160,43 @@ export default function PieceDetailScreen() {
 
           {/* Actions */}
           <View style={styles.actions}>
-            <Pressable
-              style={[
-                styles.editBtn,
-                { borderColor: colors.border, borderRadius: colors.radius },
-              ]}
-              onPress={() => router.push(`/piece/edit/${piece.id}`)}
-            >
-              <Feather name="edit-2" size={14} color={colors.mutedForeground} />
-              <Text style={[styles.editBtnText, { color: colors.mutedForeground }]}>
-                Edit Piece
-              </Text>
-            </Pressable>
+            <View style={styles.actionRow}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  {
+                    borderColor: colors.border,
+                    borderRadius: colors.radius,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+                onPress={() => router.push(`/piece/edit/${piece.id}`)}
+              >
+                <Feather name="edit-2" size={14} color={colors.mutedForeground} />
+                <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>
+                  Edit Piece
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  styles.shareBtn,
+                  {
+                    backgroundColor: pressed ? colors.secondary : colors.foreground,
+                    borderColor: colors.foreground,
+                    borderRadius: colors.radius,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+                onPress={() => setShareVisible(true)}
+              >
+                <Feather name="share-2" size={14} color={colors.background} />
+                <Text style={[styles.actionBtnText, { color: colors.background }]}>
+                  Share
+                </Text>
+              </Pressable>
+            </View>
 
             <Pressable style={styles.deleteLink} onPress={handleDelete}>
               <Text style={[styles.deleteLinkText, { color: colors.mutedForeground }]}>
@@ -209,6 +206,12 @@ export default function PieceDetailScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <ShareSheet
+        visible={shareVisible}
+        onClose={() => setShareVisible(false)}
+        pieceTitle={piece.title}
+      />
     </View>
   );
 }
@@ -301,21 +304,28 @@ const styles = StyleSheet.create({
     lineHeight: 27,
     letterSpacing: 0.2,
   },
-  actions: { gap: 20, alignItems: "center", paddingBottom: 8 },
-  editBtn: {
+  actions: { gap: 16, alignItems: "center", paddingBottom: 8 },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    width: "100%",
+  },
+  actionBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    borderWidth: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    width: "100%",
     justifyContent: "center",
+    gap: 7,
+    borderWidth: 1,
+    paddingVertical: 14,
   },
-  editBtnText: {
+  shareBtn: {
+    backgroundColor: "transparent",
+  },
+  actionBtnText: {
     fontSize: 11,
     fontFamily: "Poppins_500Medium",
-    letterSpacing: 1.8,
+    letterSpacing: 1.5,
     textTransform: "uppercase",
   },
   deleteLink: { paddingVertical: 4 },
