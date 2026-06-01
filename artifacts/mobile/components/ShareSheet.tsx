@@ -19,6 +19,7 @@ interface ShareOption {
   label: string;
   icon: React.ReactNode;
   accent: string;
+  iconScale?: number;
 }
 
 interface ShareSheetProps {
@@ -70,12 +71,14 @@ export function ShareSheet({ visible, onClose, pieceTitle }: ShareSheetProps) {
       label: "Pinterest",
       icon: <FontAwesome name="pinterest" size={22} color={colors.foreground} />,
       accent: colors.primary,
+      iconScale: 0.95,
     },
     {
       id: "etsy",
       label: "Etsy",
       icon: <FontAwesome name="etsy" size={22} color={colors.foreground} />,
       accent: "#C8A06A",
+      iconScale: 0.92,
     },
   ];
 
@@ -125,24 +128,39 @@ export function ShareSheet({ visible, onClose, pieceTitle }: ShareSheetProps) {
                 key={opt.id}
                 style={({ pressed }) => [
                   styles.platformCell,
-                  { opacity: pressed ? 0.7 : 1 },
+                  { transform: [{ scale: pressed ? 0.97 : 1 }] },
                 ]}
                 onPress={() => handleOption(opt.label)}
               >
-                <View
-                  style={[
-                    styles.iconCircle,
-                    {
-                      backgroundColor: colors.secondary,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  {opt.icon}
-                </View>
-                <Text style={[styles.platformLabel, { color: colors.mutedForeground }]}>
-                  {opt.label}
-                </Text>
+                {({ pressed }) => (
+                  <>
+                    <View
+                      style={[
+                        styles.iconCircle,
+                        {
+                          backgroundColor: pressed
+                            ? "rgba(160, 145, 130, 0.06)"
+                            : colors.secondary,
+                          borderColor: "rgba(120, 110, 100, 0.12)",
+                          borderWidth: 0.75,
+                        },
+                      ]}
+                    >
+                      <View
+                        style={
+                          opt.iconScale
+                            ? { transform: [{ scale: opt.iconScale }] }
+                            : undefined
+                        }
+                      >
+                        {opt.icon}
+                      </View>
+                    </View>
+                    <Text style={[styles.platformLabel, { color: colors.mutedForeground }]}>
+                      {opt.label}
+                    </Text>
+                  </>
+                )}
               </Pressable>
             ))}
           </View>
@@ -246,7 +264,7 @@ const styles = StyleSheet.create({
   },
   platformCell: {
     alignItems: "center",
-    gap: 8,
+    gap: 12,
     flex: 1,
   },
   iconCircle: {
