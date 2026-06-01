@@ -18,11 +18,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent: string;
+}) {
   const colors = useColors();
   if (!value) return null;
   return (
     <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+      <View style={[styles.infoAccent, { backgroundColor: accent }]} />
       <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>{label}</Text>
       <Text style={[styles.infoValue, { color: colors.foreground }]}>{value}</Text>
     </View>
@@ -54,44 +63,35 @@ export default function PieceDetailScreen() {
 
   const handleShare = async () => {
     if (Platform.OS === "web") {
-      Alert.alert("Sharing", "Sharing is available on mobile devices.");
+      Alert.alert("Sharing", "Available on mobile devices.");
       return;
     }
     setSharing(true);
     try {
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(piece.imageUri, {
-          dialogTitle: piece.title,
-          mimeType: "image/jpeg",
-        });
-      } else {
-        Alert.alert("Sharing not available", "Your device doesn't support sharing.");
+      const available = await Sharing.isAvailableAsync();
+      if (available) {
+        await Sharing.shareAsync(piece.imageUri, { dialogTitle: piece.title, mimeType: "image/jpeg" });
       }
     } catch {
-      Alert.alert("Error", "Could not share this piece.");
+      // silent
     } finally {
       setSharing(false);
     }
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      "Delete Piece",
-      `Remove "${piece.title}" from your gallery?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            await deletePiece(piece.id);
-            router.back();
-          },
+    Alert.alert("Remove Piece", `Remove "${piece.title}" from your archive?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: async () => {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          await deletePiece(piece.id);
+          router.back();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const formattedDate = new Date(piece.createdAt).toLocaleDateString("en-US", {
@@ -102,77 +102,82 @@ export default function PieceDetailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Floating back button */}
-      <View style={[styles.topBar, { top: insets.top + 8 }]}>
+      {/* Floating controls */}
+      <View style={[styles.topBar, { top: insets.top + 10 }]}>
         <Pressable
-          style={[styles.iconBtn, { backgroundColor: "rgba(0,0,0,0.4)" }]}
+          style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.88)" }]}
           onPress={() => router.back()}
         >
-          <Feather name="arrow-left" size={20} color="#FFFFFF" />
+          <Feather name="arrow-left" size={18} color={colors.foreground} />
         </Pressable>
-        <View style={styles.topActions}>
+        <View style={styles.topRight}>
           <Pressable
-            style={[styles.iconBtn, { backgroundColor: "rgba(0,0,0,0.4)" }]}
+            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.88)" }]}
             onPress={handleFavorite}
           >
             <Feather
               name="heart"
-              size={20}
-              color={piece.isFavorite ? "#FF6B6B" : "#FFFFFF"}
+              size={18}
+              color={piece.isFavorite ? colors.primary : colors.mutedForeground}
             />
           </Pressable>
           <Pressable
-            style={[styles.iconBtn, { backgroundColor: "rgba(0,0,0,0.4)" }]}
+            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.88)" }]}
             onPress={handleShare}
             disabled={sharing}
           >
-            <Feather name="share-2" size={20} color="#FFFFFF" />
-          </Pressable>
-          <Pressable
-            style={[styles.iconBtn, { backgroundColor: "rgba(0,0,0,0.4)" }]}
-            onPress={handleDelete}
-          >
-            <Feather name="trash-2" size={20} color="#FFFFFF" />
+            <Feather name="share-2" size={18} color={colors.mutedForeground} />
           </Pressable>
         </View>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}>
+        {/* Hero image */}
         <Image
           source={{ uri: piece.imageUri }}
           style={styles.heroImage}
           contentFit="cover"
+          transition={200}
         />
 
+        {/* Content */}
         <View style={styles.content}>
+          <Text style={[styles.date, { color: colors.mutedForeground }]}>{formattedDate}</Text>
           <Text style={[styles.title, { color: colors.foreground }]}>{piece.title}</Text>
-          <Text style={[styles.date, { color: colors.mutedForeground }]}>
-            Added {formattedDate}
-          </Text>
 
-          {piece.description ? (
-            <Text style={[styles.description, { color: colors.foreground }]}>
-              {piece.description}
-            </Text>
+          {/* Info rows */}
+          <View style={[styles.infoCard, { borderColor: colors.border }]}>
+            <InfoRow label="Clay" value={piece.clay} accent={colors.cobalt} />
+            <InfoRow label="Glaze" value={piece.glaze} accent={colors.emerald} />
+            <InfoRow label="Firing" value={piece.firing} accent={colors.primary} />
+            {piece.dimensions ? (
+              <InfoRow label="Dimensions" value={piece.dimensions} accent={colors.mutedForeground} />
+            ) : null}
+          </View>
+
+          {/* Notes */}
+          {piece.notes ? (
+            <View style={styles.notesSection}>
+              <Text style={[styles.notesLabel, { color: colors.mutedForeground }]}>Notes</Text>
+              <Text style={[styles.notesText, { color: colors.foreground }]}>{piece.notes}</Text>
+            </View>
           ) : null}
 
-          <View
-            style={[
-              styles.infoCard,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                borderRadius: colors.radius,
-              },
-            ]}
-          >
-            <InfoRow label="Technique" value={piece.technique} />
-            <InfoRow label="Materials" value={piece.materials} />
-            <InfoRow label="Glaze" value={piece.glaze} />
-            <InfoRow label="Dimensions" value={piece.dimensions} />
+          {/* Actions */}
+          <View style={styles.actions}>
+            <Pressable
+              style={[styles.editBtn, { borderColor: colors.border, borderRadius: colors.radius }]}
+              onPress={() => router.push(`/piece/edit/${piece.id}`)}
+            >
+              <Feather name="edit-2" size={14} color={colors.mutedForeground} />
+              <Text style={[styles.editBtnText, { color: colors.mutedForeground }]}>Edit Piece</Text>
+            </Pressable>
+
+            <Pressable style={styles.deleteLink} onPress={handleDelete}>
+              <Text style={[styles.deleteLinkText, { color: colors.mutedForeground }]}>
+                Remove from archive
+              </Text>
+            </Pressable>
           </View>
         </View>
       </ScrollView>
@@ -192,61 +197,82 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  topActions: { flexDirection: "row", gap: 8 },
-  iconBtn: {
+  topRight: { flexDirection: "row", gap: 8 },
+  floatBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  heroImage: {
-    width: "100%",
-    aspectRatio: 3 / 4,
-  },
-  content: {
-    padding: 20,
-    gap: 8,
-  },
+  heroImage: { width: "100%", aspectRatio: 4 / 5 },
+  content: { padding: 28, gap: 0 },
+  date: { fontSize: 11, fontFamily: "Poppins_400Regular", letterSpacing: 0.5, marginBottom: 8 },
   title: {
-    fontSize: 26,
-    fontFamily: "Poppins_700Bold",
-    lineHeight: 32,
-  },
-  date: {
-    fontSize: 13,
-    fontFamily: "Poppins_400Regular",
-    marginBottom: 4,
-  },
-  description: {
-    fontSize: 15,
-    fontFamily: "Poppins_400Regular",
-    lineHeight: 24,
-    marginBottom: 8,
+    fontSize: 30,
+    fontFamily: "PlayfairDisplay_400Regular",
+    letterSpacing: 0.3,
+    lineHeight: 38,
+    marginBottom: 28,
   },
   infoCard: {
     borderWidth: 1,
+    borderRadius: 12,
     overflow: "hidden",
-    marginTop: 8,
+    marginBottom: 28,
   },
   infoRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderBottomWidth: 1,
+    gap: 12,
   },
+  infoAccent: { width: 3, height: 18, borderRadius: 2, opacity: 0.7 },
   infoLabel: {
-    fontSize: 13,
+    fontSize: 10,
     fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.5,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    width: 80,
   },
   infoValue: {
     fontSize: 14,
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_300Light",
     flex: 1,
     textAlign: "right",
   },
+  notesSection: { marginBottom: 32, gap: 10 },
+  notesLabel: {
+    fontSize: 10,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+  notesText: {
+    fontSize: 15,
+    fontFamily: "PlayfairDisplay_400Regular_Italic",
+    lineHeight: 26,
+    letterSpacing: 0.2,
+  },
+  actions: { gap: 20, alignItems: "center" },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 13,
+    width: "100%",
+    justifyContent: "center",
+  },
+  editBtnText: { fontSize: 12, fontFamily: "Poppins_500Medium", letterSpacing: 1.5, textTransform: "uppercase" },
+  deleteLink: { paddingVertical: 4 },
+  deleteLinkText: { fontSize: 12, fontFamily: "Poppins_300Light", letterSpacing: 0.3, textDecorationLine: "underline" },
 });

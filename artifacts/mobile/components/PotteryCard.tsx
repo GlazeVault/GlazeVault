@@ -10,10 +10,9 @@ import { useColors } from "@/hooks/useColors";
 
 interface PotteryCardProps {
   piece: PotteryPiece;
-  compact?: boolean;
 }
 
-export function PotteryCard({ piece, compact = false }: PotteryCardProps) {
+export function PotteryCard({ piece }: PotteryCardProps) {
   const colors = useColors();
   const { toggleFavorite } = usePottery();
 
@@ -22,9 +21,7 @@ export function PotteryCard({ piece, compact = false }: PotteryCardProps) {
     await toggleFavorite(piece.id);
   };
 
-  const handlePress = () => {
-    router.push(`/piece/${piece.id}`);
-  };
+  const meta = [piece.clay, piece.glaze, piece.firing].filter(Boolean).join("  ·  ");
 
   return (
     <Pressable
@@ -33,47 +30,42 @@ export function PotteryCard({ piece, compact = false }: PotteryCardProps) {
         {
           backgroundColor: colors.card,
           borderRadius: colors.radius,
-          borderColor: colors.border,
-          opacity: pressed ? 0.92 : 1,
-          transform: [{ scale: pressed ? 0.98 : 1 }],
+          opacity: pressed ? 0.95 : 1,
+          transform: [{ scale: pressed ? 0.99 : 1 }],
         },
       ]}
-      onPress={handlePress}
+      onPress={() => router.push(`/piece/${piece.id}`)}
     >
-      <Image
-        source={{ uri: piece.imageUri }}
-        style={[styles.image, { borderRadius: colors.radius }]}
-        contentFit="cover"
-        transition={200}
-      />
+      <View style={{ borderRadius: colors.radius, overflow: "hidden" }}>
+        <Image
+          source={{ uri: piece.imageUri }}
+          style={styles.image}
+          contentFit="cover"
+          transition={300}
+        />
+      </View>
+
       <Pressable
-        style={[styles.favoriteBtn, { backgroundColor: "rgba(0,0,0,0.35)" }]}
+        style={[styles.favoriteBtn]}
         onPress={handleFavorite}
-        hitSlop={8}
+        hitSlop={10}
       >
         <Feather
           name="heart"
-          size={15}
-          color={piece.isFavorite ? "#FF6B6B" : "#FFFFFF"}
-          style={piece.isFavorite ? styles.heartFilled : undefined}
+          size={16}
+          color={piece.isFavorite ? colors.primary : colors.mutedForeground}
         />
       </Pressable>
+
       <View style={styles.info}>
-        <Text
-          style={[styles.title, { color: colors.foreground }]}
-          numberOfLines={1}
-        >
+        <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
           {piece.title}
         </Text>
-        {!compact && (
-          <Text
-            style={[styles.meta, { color: colors.mutedForeground }]}
-            numberOfLines={1}
-          >
-            {piece.technique}
-            {piece.materials ? ` · ${piece.materials}` : ""}
+        {meta ? (
+          <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>
+            {meta}
           </Text>
-        )}
+        ) : null}
       </View>
     </Pressable>
   );
@@ -81,36 +73,39 @@ export function PotteryCard({ piece, compact = false }: PotteryCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    overflow: "hidden",
-    borderWidth: 1,
+    overflow: "visible",
+    marginBottom: 32,
   },
   image: {
     width: "100%",
-    aspectRatio: 3 / 4,
+    aspectRatio: 4 / 5,
   },
   favoriteBtn: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    top: 14,
+    right: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(253,250,245,0.82)",
     alignItems: "center",
     justifyContent: "center",
   },
-  heartFilled: {
-    // tint handled by color prop
-  },
   info: {
-    padding: 10,
-    gap: 2,
+    paddingTop: 14,
+    paddingHorizontal: 4,
+    gap: 5,
   },
   title: {
-    fontSize: 14,
-    fontFamily: "Poppins_600SemiBold",
+    fontSize: 19,
+    fontFamily: "PlayfairDisplay_400Regular",
+    lineHeight: 25,
+    letterSpacing: 0.2,
   },
   meta: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Poppins_400Regular",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
 });

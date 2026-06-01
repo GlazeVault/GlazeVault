@@ -1,0 +1,105 @@
+Design a mobile-first “Gallery” screen for GlazeVault.
+The screen display a calm and elegant archive of ceramic works.
+
+Style:
+
+Japandi
+Quiet luxury
+Ceramic studio archive
+Museum catalog feeling
+Spacious and breathable
+Tactile and earthy
+Bright but warm
+Layout:
+Vertical scrolling gallery
+Large pottery images
+Soft rounded corners
+Generous spacing between pieces
+Minimal interface
+Each piece should show:
+Artwork image
+Title
+Clay body
+Glaze name
+Firing type
+Color palette:
+Limestone cream background
+Dusty cobalt blue accents
+Dusty emerald accents
+Warm charcoal typography
+Soft terracotta highlights
+Typography:
+Elegant serif mixed with clean sans-serif.
+The screen should feel emotionally calming and highly curated, like a ceramic artist’s private archive.
+
+Do not make it feel like social media or e-commerce.
+Avoid clutter and heavy UI elements.
+Design a mobile-first “Piece Detail” screen for GlazeVault.
+This screen opens when a user taps one ceramic work from the Gallery.
+
+Keep the same calm Japandi ceramic archive aesthetic.
+
+Layout:
+
+Large main pottery image at the top
+Artwork title below the image
+Three simple info rows:
+Clay
+Glaze
+Firing
+A quiet notes section
+A subtle “Edit Piece” button
+A simple back arrow to return to Gallery
+Style:
+Limestone cream background
+Warm charcoal text
+Dusty cobalt or dusty emerald small accents
+Soft terracotta only for important action buttons
+Spacious, quiet, museum archive feeling
+Do not make it look like shopping or social media.
+The detail page should feel like opening a private studio record: calm, beautiful, useful, and minimal.
+Design a mobile-first “Piece Detail” screen for GlazeVault.
+This screen opens when a user taps one ceramic work from the Gallery.
+Keep the same calm Japandi ceramic archive aesthetic.
+Layout:
+	●	Large main pottery image at the top
+	●	Artwork title below the image
+	●	Three simple info rows:
+	●	Clay
+	●	Glaze
+	●	Firing
+	●	A quiet notes section
+	●	A subtle “Edit Piece” button
+	●	A simple back arrow to return to Gallery
+Style:
+	●	Limestone cream background
+	●	Warm charcoal text
+	●	Dusty cobalt or dusty emerald small accents
+	●	Soft terracotta only for important action buttons
+	●	Spacious, quiet, museum archive feeling
+Do not make it look like shopping or social media.
+The detail page should feel like opening a private studio record: calm, beautiful, useful, and minimal.
+Update the typography of the “My Gallery” title.
+Make it feel more elegant, calm, editorial, and artistic.
+
+Changes:
+
+Use a refined serif font for the title
+Reduce the font weight slightly
+Increase letter spacing subtly
+Keep the color deep warm brown, not pure black
+Add more breathing space above and below the title
+Maintain a minimal Japandi ceramic aesthetic
+The title should feel like a quiet gallery heading, not a tech app header
+Update the typography of the “My Gallery” title.
+Make it feel more elegant, calm, editorial, and artistic.
+
+Changes:
+
+Use a refined serif font for the title
+Reduce the font weight slightly
+Increase letter spacing subtly
+Keep the color deep warm brown, not pure black
+Add more breathing space above and below the title
+Maintain a minimal Japandi ceramic aesthetic
+The title should feel like a quiet gallery heading, not a tech app header

@@ -4,10 +4,10 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 export interface PotteryPiece {
   id: string;
   title: string;
-  description: string;
-  technique: string;
-  materials: string;
+  notes: string;
+  clay: string;
   glaze: string;
+  firing: string;
   dimensions: string;
   imageUri: string;
   createdAt: string;
@@ -25,7 +25,7 @@ interface PotteryContextType {
 
 const PotteryContext = createContext<PotteryContextType | undefined>(undefined);
 
-const STORAGE_KEY = "@pottery_pieces";
+const STORAGE_KEY = "@glazevault_pieces";
 
 export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const [pieces, setPieces] = useState<PotteryPiece[]>([]);
@@ -51,7 +51,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
     async (piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite">) => {
       const newPiece: PotteryPiece = {
         ...piece,
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
         createdAt: new Date().toISOString(),
         isFavorite: false,
       };
@@ -62,8 +62,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
 
   const updatePiece = useCallback(
     async (id: string, updates: Partial<PotteryPiece>) => {
-      const updated = pieces.map((p) => (p.id === id ? { ...p, ...updates } : p));
-      await persist(updated);
+      await persist(pieces.map((p) => (p.id === id ? { ...p, ...updates } : p)));
     },
     [pieces, persist]
   );
@@ -77,18 +76,12 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
 
   const toggleFavorite = useCallback(
     async (id: string) => {
-      const updated = pieces.map((p) =>
-        p.id === id ? { ...p, isFavorite: !p.isFavorite } : p
-      );
-      await persist(updated);
+      await persist(pieces.map((p) => (p.id === id ? { ...p, isFavorite: !p.isFavorite } : p)));
     },
     [pieces, persist]
   );
 
-  const getPiece = useCallback(
-    (id: string) => pieces.find((p) => p.id === id),
-    [pieces]
-  );
+  const getPiece = useCallback((id: string) => pieces.find((p) => p.id === id), [pieces]);
 
   return (
     <PotteryContext.Provider value={{ pieces, addPiece, updatePiece, deletePiece, toggleFavorite, getPiece }}>

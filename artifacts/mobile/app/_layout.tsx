@@ -1,10 +1,16 @@
 import {
+  Poppins_300Light,
   Poppins_400Regular,
   Poppins_500Medium,
   Poppins_600SemiBold,
-  Poppins_700Bold,
-  useFonts,
+  useFonts as usePoppinsFonts,
 } from "@expo-google-fonts/poppins";
+import {
+  PlayfairDisplay_400Regular,
+  PlayfairDisplay_500Medium,
+  PlayfairDisplay_400Regular_Italic,
+  useFonts as usePlayfairFonts,
+} from "@expo-google-fonts/playfair-display";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -20,30 +26,26 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-function RootLayoutNav() {
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="piece/[id]" options={{ headerShown: false, presentation: "card" }} />
-    </Stack>
-  );
-}
-
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
+  const [poppinsLoaded, poppinsError] = usePoppinsFonts({
+    Poppins_300Light,
     Poppins_400Regular,
     Poppins_500Medium,
     Poppins_600SemiBold,
-    Poppins_700Bold,
+  });
+  const [playfairLoaded, playfairError] = usePlayfairFonts({
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_500Medium,
+    PlayfairDisplay_400Regular_Italic,
   });
 
-  useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
+  const ready = (poppinsLoaded || poppinsError) && (playfairLoaded || playfairError);
 
-  if (!fontsLoaded && !fontError) return null;
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) return null;
 
   return (
     <SafeAreaProvider>
@@ -52,7 +54,17 @@ export default function RootLayout() {
           <PotteryProvider>
             <GestureHandlerRootView>
               <KeyboardProvider>
-                <RootLayoutNav />
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen
+                    name="piece/[id]"
+                    options={{ presentation: "card" }}
+                  />
+                  <Stack.Screen
+                    name="piece/edit/[id]"
+                    options={{ presentation: "modal" }}
+                  />
+                </Stack>
               </KeyboardProvider>
             </GestureHandlerRootView>
           </PotteryProvider>

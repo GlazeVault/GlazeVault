@@ -1,23 +1,23 @@
 {
   "expo": {
-    "name": "Pottery Gallery",
+    "name": "GlazeVault",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FAF7F2"
+      "backgroundColor": "#F5F0E8"
     },
     "ios": {
       "supportsTablet": false,
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Allow Pottery Gallery to access your photos to upload pottery images.",
-        "NSCameraUsageDescription": "Allow Pottery Gallery to use your camera to photograph your pottery."
+        "NSPhotoLibraryUsageDescription": "Allow GlazeVault to access your photos to upload ceramic images.",
+        "NSCameraUsageDescription": "Allow GlazeVault to use your camera to photograph your ceramic work."
       }
     },
     "android": {

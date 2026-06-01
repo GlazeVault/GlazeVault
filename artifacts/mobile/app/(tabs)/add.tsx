@@ -20,25 +20,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
-const TECHNIQUES = [
-  "Wheel-thrown",
-  "Hand-built",
-  "Slab",
-  "Coil",
-  "Pinch",
-  "Cast",
-  "Mixed",
-];
-
-const MATERIALS = [
-  "Stoneware",
-  "Porcelain",
-  "Earthenware",
-  "Terracotta",
-  "Raku",
-  "Bone China",
-  "Other",
-];
+const CLAY_OPTIONS = ["Stoneware", "Porcelain", "Earthenware", "Terracotta", "Raku", "Bone China"];
+const FIRING_OPTIONS = ["Wood-fired", "Gas Reduction", "Electric", "Soda / Salt", "Raku", "Anagama"];
 
 function ChipSelector({
   options,
@@ -51,7 +34,7 @@ function ChipSelector({
 }) {
   const colors = useColors();
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
       <View style={styles.chipRow}>
         {options.map((opt) => {
           const selected = value === opt;
@@ -61,17 +44,17 @@ function ChipSelector({
               style={[
                 styles.chip,
                 {
-                  backgroundColor: selected ? colors.primary : colors.secondary,
-                  borderColor: selected ? colors.primary : colors.border,
-                  borderRadius: 20,
+                  backgroundColor: selected ? colors.cobalt : "transparent",
+                  borderColor: selected ? colors.cobalt : colors.border,
+                  borderRadius: 24,
                 },
               ]}
-              onPress={() => onChange(opt)}
+              onPress={() => onChange(selected ? "" : opt)}
             >
               <Text
                 style={[
                   styles.chipText,
-                  { color: selected ? colors.primaryForeground : colors.foreground },
+                  { color: selected ? "#FFFFFF" : colors.mutedForeground },
                 ]}
               >
                 {opt}
@@ -90,10 +73,10 @@ export default function AddScreen() {
   const insets = useSafeAreaInsets();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [technique, setTechnique] = useState("");
-  const [materials, setMaterials] = useState("");
+  const [notes, setNotes] = useState("");
+  const [clay, setClay] = useState("");
   const [glaze, setGlaze] = useState("");
+  const [firing, setFiring] = useState("");
   const [dimensions, setDimensions] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -103,27 +86,22 @@ export default function AddScreen() {
     if (Platform.OS !== "web") {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission needed", "Allow access to your photo library to upload pottery images.");
+        Alert.alert("Permission needed", "Allow access to your photo library.");
         return;
       }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.85,
+      aspect: [4, 5],
+      quality: 0.9,
     });
     if (!result.canceled && result.assets[0]) {
       setImageUri(result.assets[0].uri);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
   const takePhoto = async () => {
-    if (Platform.OS === "web") {
-      await pickImage();
-      return;
-    }
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permission needed", "Allow camera access to photograph your pottery.");
@@ -131,69 +109,54 @@ export default function AddScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.85,
+      aspect: [4, 5],
+      quality: 0.9,
     });
     if (!result.canceled && result.assets[0]) {
       setImageUri(result.assets[0].uri);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
+  };
+
+  const handlePickPhoto = () => {
+    if (Platform.OS === "web") {
+      pickImage();
+      return;
+    }
+    Alert.alert("Add Photo", undefined, [
+      { text: "Camera", onPress: takePhoto },
+      { text: "Photo Library", onPress: pickImage },
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   const handleSave = async () => {
     if (!imageUri) {
-      Alert.alert("Add a photo", "Please add a photo of your pottery piece.");
+      Alert.alert("Image required", "Please add a photograph of your piece.");
       return;
     }
     if (!title.trim()) {
-      Alert.alert("Add a title", "Give your piece a name.");
+      Alert.alert("Title required", "Give this piece a name.");
       return;
     }
     setSaving(true);
+    await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing, dimensions: dimensions.trim(), imageUri });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await addPiece({
-      title: title.trim(),
-      description: description.trim(),
-      technique,
-      materials,
-      glaze: glaze.trim(),
-      dimensions: dimensions.trim(),
-      imageUri,
-    });
-    setImageUri(null);
-    setTitle("");
-    setDescription("");
-    setTechnique("");
-    setMaterials("");
-    setGlaze("");
-    setDimensions("");
+    setImageUri(null); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setFiring(""); setDimensions("");
     setSaving(false);
     router.replace("/");
   };
 
-  const label = (text: string) => (
-    <Text style={[styles.label, { color: colors.foreground }]}>{text}</Text>
-  );
-
-  const field = (
-    value: string,
-    onChangeText: (v: string) => void,
-    placeholder: string,
-    multiline = false
-  ) => (
+  const Field = ({ value, onChange, placeholder, multiline = false }: {
+    value: string; onChange: (v: string) => void; placeholder: string; multiline?: boolean;
+  }) => (
     <TextInput
-      style={[
-        styles.input,
-        multiline && styles.inputMulti,
-        {
-          color: colors.foreground,
-          backgroundColor: colors.secondary,
-          borderColor: colors.border,
-          borderRadius: colors.radius,
-        },
-      ]}
+      style={[styles.input, multiline && styles.inputMulti, {
+        color: colors.foreground,
+        backgroundColor: "transparent",
+        borderBottomColor: colors.border,
+      }]}
       value={value}
-      onChangeText={onChangeText}
+      onChangeText={onChange}
       placeholder={placeholder}
       placeholderTextColor={colors.mutedForeground}
       multiline={multiline}
@@ -201,18 +164,21 @@ export default function AddScreen() {
     />
   );
 
+  const Label = ({ text }: { text: string }) => (
+    <Text style={[styles.label, { color: colors.mutedForeground }]}>{text}</Text>
+  );
+
   return (
     <KeyboardAwareScrollView
       style={{ backgroundColor: colors.background }}
-      contentContainerStyle={[
-        styles.container,
-        { paddingTop: topPad + 12, paddingBottom: insets.bottom + 100 },
-      ]}
+      contentContainerStyle={[styles.container, { paddingTop: topPad + 28, paddingBottom: insets.bottom + 120 }]}
       keyboardShouldPersistTaps="handled"
       bottomOffset={20}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={[styles.heading, { color: colors.foreground }]}>New Piece</Text>
+      <Text style={[styles.eyebrow, { color: colors.cobalt }]}>GlazeVault</Text>
+      <Text style={[styles.heading, { color: colors.foreground }]}>Record a Piece</Text>
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
       {/* Image picker */}
       <Pressable
@@ -220,73 +186,52 @@ export default function AddScreen() {
           styles.imagePicker,
           {
             backgroundColor: colors.secondary,
-            borderColor: imageUri ? "transparent" : colors.border,
             borderRadius: colors.radius,
-            opacity: pressed ? 0.85 : 1,
+            borderColor: colors.border,
+            opacity: pressed ? 0.88 : 1,
           },
         ]}
-        onPress={() => {
-          if (Platform.OS === "web") {
-            pickImage();
-          } else {
-            Alert.alert("Add Photo", "Choose how to add your pottery photo", [
-              { text: "Camera", onPress: takePhoto },
-              { text: "Photo Library", onPress: pickImage },
-              { text: "Cancel", style: "cancel" },
-            ]);
-          }
-        }}
+        onPress={handlePickPhoto}
       >
         {imageUri ? (
           <>
-            <Image
-              source={{ uri: imageUri }}
-              style={[styles.previewImage, { borderRadius: colors.radius }]}
-              contentFit="cover"
-            />
-            <View style={styles.changePhotoOverlay}>
-              <Feather name="camera" size={20} color="#FFFFFF" />
-              <Text style={styles.changePhotoText}>Change photo</Text>
+            <Image source={{ uri: imageUri }} style={[styles.previewImage, { borderRadius: colors.radius }]} contentFit="cover" />
+            <View style={styles.changeOverlay}>
+              <Feather name="camera" size={18} color="#FFFFFF" />
+              <Text style={styles.changeText}>Change</Text>
             </View>
           </>
         ) : (
-          <View style={styles.placeholderContent}>
-            <View
-              style={[
-                styles.cameraIconBg,
-                { backgroundColor: colors.accent, borderRadius: 40 },
-              ]}
-            >
-              <Feather name="camera" size={28} color={colors.primary} />
+          <View style={styles.placeholderInner}>
+            <View style={[styles.iconCircle, { backgroundColor: colors.accent }]}>
+              <Feather name="camera" size={24} color={colors.cobalt} />
             </View>
-            <Text style={[styles.addPhotoText, { color: colors.foreground }]}>
-              Add Photo
-            </Text>
+            <Text style={[styles.addPhotoTitle, { color: colors.foreground }]}>Add Photograph</Text>
             <Text style={[styles.addPhotoSub, { color: colors.mutedForeground }]}>
-              Tap to take a photo or choose from library
+              Tap to photograph or choose from library
             </Text>
           </View>
         )}
       </Pressable>
 
       <View style={styles.form}>
-        {label("Title *")}
-        {field(title, setTitle, "e.g. Yunomi Tea Bowl")}
+        <Label text="Title" />
+        <Field value={title} onChange={setTitle} placeholder="e.g. Wabi Yunomi" />
 
-        {label("Description")}
-        {field(description, setDescription, "Tell the story of this piece...", true)}
+        <Label text="Notes" />
+        <Field value={notes} onChange={setNotes} placeholder="Glaze recipe, firing notes, story…" multiline />
 
-        {label("Technique")}
-        <ChipSelector options={TECHNIQUES} value={technique} onChange={setTechnique} />
+        <Label text="Clay Body" />
+        <ChipSelector options={CLAY_OPTIONS} value={clay} onChange={setClay} />
 
-        {label("Materials")}
-        <ChipSelector options={MATERIALS} value={materials} onChange={setMaterials} />
+        <Label text="Glaze" />
+        <Field value={glaze} onChange={setGlaze} placeholder="e.g. Celadon, Shino, Tenmoku" />
 
-        {label("Glaze")}
-        {field(glaze, setGlaze, "e.g. Celadon, Ash, Matte black")}
+        <Label text="Firing" />
+        <ChipSelector options={FIRING_OPTIONS} value={firing} onChange={setFiring} />
 
-        {label("Dimensions")}
-        {field(dimensions, setDimensions, "e.g. 8cm H × 10cm W")}
+        <Label text="Dimensions" />
+        <Field value={dimensions} onChange={setDimensions} placeholder="e.g. 9 cm H × 11 cm W" />
 
         <Pressable
           style={({ pressed }) => [
@@ -294,14 +239,14 @@ export default function AddScreen() {
             {
               backgroundColor: saving ? colors.accent : colors.primary,
               borderRadius: colors.radius,
-              opacity: pressed ? 0.85 : 1,
+              opacity: pressed ? 0.88 : 1,
             },
           ]}
           onPress={handleSave}
           disabled={saving}
         >
           <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>
-            {saving ? "Saving..." : "Save Piece"}
+            {saving ? "Saving…" : "Save to Archive"}
           </Text>
         </Pressable>
       </View>
@@ -310,100 +255,50 @@ export default function AddScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 20 },
-  heading: {
-    fontSize: 28,
-    fontFamily: "Poppins_700Bold",
-    marginBottom: 20,
-  },
+  container: { paddingHorizontal: 28 },
+  eyebrow: { fontSize: 11, fontFamily: "Poppins_500Medium", letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 6 },
+  heading: { fontSize: 32, fontFamily: "PlayfairDisplay_400Regular", letterSpacing: 0.4, lineHeight: 40, marginBottom: 20 },
+  divider: { height: 1, width: 40, marginBottom: 28 },
   imagePicker: {
     width: "100%",
-    aspectRatio: 3 / 4,
-    borderWidth: 1.5,
+    aspectRatio: 4 / 5,
+    borderWidth: 1,
     borderStyle: "dashed",
     overflow: "hidden",
-    marginBottom: 24,
+    marginBottom: 32,
   },
   previewImage: { width: "100%", height: "100%" },
-  changePhotoOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    gap: 8,
+  changeOverlay: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    backgroundColor: "rgba(45,45,42,0.5)",
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    paddingVertical: 12, gap: 8,
   },
-  changePhotoText: {
-    color: "#FFFFFF",
-    fontFamily: "Poppins_500Medium",
-    fontSize: 14,
-  },
-  placeholderContent: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    padding: 24,
-  },
-  cameraIconBg: {
-    width: 72,
-    height: 72,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-  },
-  addPhotoText: {
-    fontSize: 18,
-    fontFamily: "Poppins_600SemiBold",
-  },
-  addPhotoSub: {
-    fontSize: 13,
-    fontFamily: "Poppins_400Regular",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  form: { gap: 10 },
+  changeText: { color: "#FFFFFF", fontFamily: "Poppins_400Regular", fontSize: 13 },
+  placeholderInner: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
+  iconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  addPhotoTitle: { fontSize: 16, fontFamily: "PlayfairDisplay_400Regular", letterSpacing: 0.2 },
+  addPhotoSub: { fontSize: 12, fontFamily: "Poppins_300Light", textAlign: "center", lineHeight: 19 },
+  form: { gap: 6 },
   label: {
-    fontSize: 13,
-    fontFamily: "Poppins_600SemiBold",
-    marginTop: 4,
-    marginBottom: 2,
-    letterSpacing: 0.3,
+    fontSize: 10,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.8,
     textTransform: "uppercase",
+    marginTop: 20,
+    marginBottom: 8,
   },
   input: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    fontFamily: "Poppins_400Regular",
-    borderWidth: 1,
-  },
-  inputMulti: {
-    height: 90,
-    paddingTop: 12,
-  },
-  chipScroll: { marginBottom: 4 },
-  chipRow: { flexDirection: "row", gap: 8, paddingVertical: 4 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontSize: 13,
-    fontFamily: "Poppins_500Medium",
-  },
-  saveBtn: {
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 12,
-  },
-  saveBtnText: {
+    paddingVertical: 10,
+    paddingHorizontal: 0,
     fontSize: 16,
-    fontFamily: "Poppins_600SemiBold",
+    fontFamily: "Poppins_300Light",
+    borderBottomWidth: 1,
   },
+  inputMulti: { height: 80, paddingTop: 10 },
+  chipRow: { flexDirection: "row", gap: 8, paddingVertical: 2, paddingBottom: 4 },
+  chip: { paddingHorizontal: 16, paddingVertical: 8, borderWidth: 1 },
+  chipText: { fontSize: 12, fontFamily: "Poppins_400Regular", letterSpacing: 0.2 },
+  saveBtn: { paddingVertical: 18, alignItems: "center", marginTop: 36 },
+  saveBtnText: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 1.5, textTransform: "uppercase" },
 });

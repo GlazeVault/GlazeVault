@@ -1,12 +1,9 @@
-import { Feather } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import React, { useMemo, useState } from "react";
+import React from "react";
 import {
   FlatList,
   Platform,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,177 +12,111 @@ import { PotteryCard } from "@/components/PotteryCard";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
+function EmptyState({ colors }: { colors: ReturnType<typeof useColors> }) {
+  return (
+    <View style={styles.empty}>
+      <View style={[styles.emptyDot, { backgroundColor: colors.cobalt, opacity: 0.18 }]} />
+      <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+        Your archive awaits
+      </Text>
+      <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+        Begin by recording your first ceramic piece
+      </Text>
+    </View>
+  );
+}
+
 export default function GalleryScreen() {
   const colors = useColors();
   const { pieces } = usePottery();
   const insets = useSafeAreaInsets();
-  const [search, setSearch] = useState("");
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return pieces;
-    const q = search.toLowerCase();
-    return pieces.filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.technique.toLowerCase().includes(q) ||
-        p.materials.toLowerCase().includes(q) ||
-        p.glaze.toLowerCase().includes(q)
-    );
-  }, [pieces, search]);
-
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12 }]}>
-        <View>
-          <Text style={[styles.heading, { color: colors.foreground }]}>
-            My Gallery
-          </Text>
-          <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
-            {pieces.length} {pieces.length === 1 ? "piece" : "pieces"}
-          </Text>
-        </View>
-      </View>
-
-      <View
-        style={[
-          styles.searchBar,
-          {
-            backgroundColor: colors.secondary,
-            borderRadius: colors.radius,
-            borderColor: colors.border,
-          },
+      <FlatList
+        data={pieces}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.list,
+          { paddingTop: topPad + 32, paddingBottom: insets.bottom + 120 },
         ]}
-      >
-        <Feather name="search" size={16} color={colors.mutedForeground} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.foreground }]}
-          placeholder="Search by title, technique..."
-          placeholderTextColor={colors.mutedForeground}
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search.length > 0 && (
-          <Feather
-            name="x"
-            size={16}
-            color={colors.mutedForeground}
-            onPress={() => setSearch("")}
-          />
-        )}
-      </View>
-
-      {filtered.length === 0 ? (
-        <View style={styles.empty}>
-          {pieces.length === 0 ? (
-            <>
-              <Image
-                source={require("@/assets/images/placeholder1.png")}
-                style={styles.emptyImage}
-                contentFit="cover"
-              />
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-                Your gallery awaits
-              </Text>
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                Tap + to add your first pottery piece
-              </Text>
-            </>
-          ) : (
-            <>
-              <Feather name="search" size={40} color={colors.accent} />
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-                No results
-              </Text>
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                Try a different search term
-              </Text>
-            </>
-          )}
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={[
-            styles.list,
-            { paddingBottom: insets.bottom + 100 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <View style={styles.cardWrap}>
-              <PotteryCard piece={item} />
-            </View>
-          )}
-        />
-      )}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <Text style={[styles.eyebrow, { color: colors.cobalt }]}>
+              GlazeVault
+            </Text>
+            <Text style={[styles.heading, { color: colors.foreground }]}>
+              Archive
+            </Text>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <Text style={[styles.count, { color: colors.mutedForeground }]}>
+              {pieces.length === 0
+                ? "No pieces recorded"
+                : `${pieces.length} ${pieces.length === 1 ? "piece" : "pieces"}`}
+            </Text>
+          </View>
+        }
+        ListEmptyComponent={<EmptyState colors={colors} />}
+        renderItem={({ item }) => <PotteryCard piece={item} />}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  list: { paddingHorizontal: 28 },
   header: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
+    marginBottom: 40,
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 2.5,
+    textTransform: "uppercase",
+    marginBottom: 6,
   },
   heading: {
-    fontSize: 28,
-    fontFamily: "Poppins_700Bold",
-    lineHeight: 34,
+    fontSize: 38,
+    fontFamily: "PlayfairDisplay_400Regular",
+    letterSpacing: 0.5,
+    lineHeight: 46,
+    marginBottom: 20,
   },
-  subheading: {
-    fontSize: 14,
+  divider: {
+    height: 1,
+    width: 40,
+    marginBottom: 12,
+  },
+  count: {
+    fontSize: 12,
     fontFamily: "Poppins_400Regular",
+    letterSpacing: 0.3,
   },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 20,
-    marginBottom: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-    borderWidth: 1,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: "Poppins_400Regular",
-    padding: 0,
-  },
-  list: { paddingHorizontal: 12 },
-  row: { gap: 10, paddingHorizontal: 8, marginBottom: 10 },
-  cardWrap: { flex: 1 },
   empty: {
-    flex: 1,
     alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    paddingHorizontal: 40,
+    paddingTop: 48,
+    gap: 14,
   },
-  emptyImage: {
-    width: 160,
-    height: 200,
-    borderRadius: 16,
+  emptyDot: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     marginBottom: 8,
-    opacity: 0.7,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontFamily: "Poppins_600SemiBold",
+    fontSize: 22,
+    fontFamily: "PlayfairDisplay_400Regular",
+    letterSpacing: 0.3,
     textAlign: "center",
   },
   emptyText: {
-    fontSize: 14,
-    fontFamily: "Poppins_400Regular",
+    fontSize: 13,
+    fontFamily: "Poppins_300Light",
     textAlign: "center",
     lineHeight: 22,
+    maxWidth: 240,
   },
 });

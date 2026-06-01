@@ -13,16 +13,16 @@ function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "photo.on.rectangle", selected: "photo.on.rectangle.fill" }} />
-        <Label>Gallery</Label>
+        <Icon sf={{ default: "archivebox", selected: "archivebox.fill" }} />
+        <Label>Archive</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="add">
         <Icon sf={{ default: "plus.circle", selected: "plus.circle.fill" }} />
-        <Label>Add</Label>
+        <Label>Record</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="favorites">
         <Icon sf={{ default: "heart", selected: "heart.fill" }} />
-        <Label>Favorites</Label>
+        <Label>Favourites</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -38,7 +38,7 @@ function ClassicTabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: colors.cobalt,
         tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: false,
         tabBarStyle: {
@@ -51,22 +51,15 @@ function ClassicTabLayout() {
         },
         tabBarBackground: () =>
           isIOS ? (
-            <BlurView
-              intensity={100}
-              tint={isDark ? "dark" : "light"}
-              style={StyleSheet.absoluteFill}
-            />
+            <BlurView intensity={80} tint={isDark ? "dark" : "extraLight"} style={StyleSheet.absoluteFill} />
           ) : isWeb ? (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.background },
-              ]}
-            />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
           ) : null,
         tabBarLabelStyle: {
-          fontFamily: "Poppins_500Medium",
-          fontSize: 11,
+          fontFamily: "Poppins_400Regular",
+          fontSize: 10,
+          letterSpacing: 0.8,
+          textTransform: "uppercase",
           marginBottom: 2,
         },
       }}
@@ -74,36 +67,36 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Gallery",
+          title: "Archive",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="photo.on.rectangle" tintColor={color} size={24} />
+              <SymbolView name="archivebox" tintColor={color} size={22} />
             ) : (
-              <Feather name="grid" size={22} color={color} />
+              <Feather name="grid" size={20} color={color} />
             ),
         }}
       />
       <Tabs.Screen
         name="add"
         options={{
-          title: "Add",
+          title: "Record",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="plus.circle" tintColor={color} size={24} />
+              <SymbolView name="plus.circle" tintColor={color} size={22} />
             ) : (
-              <Feather name="plus-circle" size={22} color={color} />
+              <Feather name="plus-circle" size={20} color={color} />
             ),
         }}
       />
       <Tabs.Screen
         name="favorites"
         options={{
-          title: "Favorites",
+          title: "Favourites",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="heart" tintColor={color} size={24} />
+              <SymbolView name="heart" tintColor={color} size={22} />
             ) : (
-              <Feather name="heart" size={22} color={color} />
+              <Feather name="heart" size={20} color={color} />
             ),
         }}
       />
@@ -112,8 +105,6 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
+  if (isLiquidGlassAvailable()) return <NativeTabLayout />;
   return <ClassicTabLayout />;
 }
