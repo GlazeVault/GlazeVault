@@ -18,7 +18,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="add">
         <Icon sf={{ default: "plus.circle", selected: "plus.circle.fill" }} />
-        <Label>Record</Label>
+        <Label>Add Piece</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="favorites">
         <Icon sf={{ default: "heart", selected: "heart.fill" }} />
@@ -79,7 +79,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="add"
         options={{
-          title: "Record",
+          title: "Add Piece",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="plus.circle" tintColor={color} size={22} />
