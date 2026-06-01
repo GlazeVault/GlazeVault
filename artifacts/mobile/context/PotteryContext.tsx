@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 export interface PotteryPiece {
   id: string;
@@ -63,6 +63,7 @@ function normalizePiece(p: Partial<PotteryPiece> & Pick<PotteryPiece, "id">): Po
 
 export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const [pieces, setPieces] = useState<PotteryPiece[]>([]);
+  const piecesRef = useRef<PotteryPiece[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -70,24 +71,31 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
         const data = await AsyncStorage.getItem(STORAGE_KEY);
         if (data) {
           const parsed = JSON.parse(data) as Array<Partial<PotteryPiece> & Pick<PotteryPiece, "id">>;
-          setPieces(parsed.map(normalizePiece));
+          const normalized = parsed.map(normalizePiece);
+          piecesRef.current = normalized;
+          setPieces(normalized);
         } else {
           await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_PIECES));
+          piecesRef.current = SEED_PIECES;
           setPieces(SEED_PIECES);
         }
       } catch {
+        piecesRef.current = SEED_PIECES;
         setPieces(SEED_PIECES);
       }
     })();
   }, []);
 
   const persist = useCallback(async (updated: PotteryPiece[]) => {
+    console.log("[GlazeVault] persist — saving", updated.length, "pieces");
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    piecesRef.current = updated;
     setPieces(updated);
   }, []);
 
   const addPiece = useCallback(
     async (piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite" | "isPublic">) => {
+      const current = piecesRef.current;
       const newPiece: PotteryPiece = {
         ...piece,
         id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
@@ -95,33 +103,36 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
         isFavorite: false,
         isPublic: false,
       };
-      await persist([newPiece, ...pieces]);
+      console.log("[GlazeVault] addPiece — collectionId:", piece.collectionId ?? "none");
+      console.log("[GlazeVault] addPiece — newPiece:", JSON.stringify(newPiece));
+      await persist([newPiece, ...current]);
     },
-    [pieces, persist]
+    [persist]
   );
 
   const updatePiece = useCallback(
     async (id: string, updates: Partial<PotteryPiece>) => {
-      await persist(pieces.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+      console.log("[GlazeVault] updatePiece — id:", id, "collectionId:", updates.collectionId ?? "none");
+      await persist(piecesRef.current.map((p) => (p.id === id ? { ...p, ...updates } : p)));
     },
-    [pieces, persist]
+    [persist]
   );
 
   const deletePiece = useCallback(
     async (id: string) => {
-      await persist(pieces.filter((p) => p.id !== id));
+      await persist(piecesRef.current.filter((p) => p.id !== id));
     },
-    [pieces, persist]
+    [persist]
   );
 
   const toggleFavorite = useCallback(
     async (id: string) => {
-      await persist(pieces.map((p) => (p.id === id ? { ...p, isFavorite: !p.isFavorite } : p)));
+      await persist(piecesRef.current.map((p) => (p.id === id ? { ...p, isFavorite: !p.isFavorite } : p)));
     },
-    [pieces, persist]
+    [persist]
   );
 
-  const getPiece = useCallback((id: string) => pieces.find((p) => p.id === id), [pieces]);
+  const getPiece = useCallback((id: string) => piecesRef.current.find((p) => p.id === id), []);
 
   return (
     <PotteryContext.Provider value={{ pieces, addPiece, updatePiece, deletePiece, toggleFavorite, getPiece }}>

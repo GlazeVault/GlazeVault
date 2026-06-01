@@ -28,6 +28,8 @@ export default function CollectionDetailScreen() {
 
   const collection = getCollection(id);
   const collectionPieces = pieces.filter((p) => p.collectionId === id);
+  console.log("[GlazeVault] Collection detail — id:", id, "| total pieces:", pieces.length, "| matched:", collectionPieces.length);
+  console.log("[GlazeVault] All collectionIds:", pieces.map((p) => `${p.title}:${p.collectionId ?? "none"}`).join(", "));
 
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(collection?.title ?? "");
