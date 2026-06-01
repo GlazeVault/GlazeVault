@@ -210,18 +210,31 @@ export default function ProfileScreen() {
 
         {/* Public Works */}
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-            Public Works
-          </Text>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+              Public Works
+            </Text>
+            {publicPieces.length > 0 && (
+              <View style={[styles.countBadge, { backgroundColor: "rgba(107,127,163,0.1)" }]}>
+                <Text style={[styles.countBadgeText, { color: colors.cobalt }]}>
+                  {publicPieces.length}
+                </Text>
+              </View>
+            )}
+          </View>
           {publicPieces.length === 0 ? (
             <View style={[styles.publicEmpty, { borderColor: "rgba(120,110,100,0.12)" }]}>
+              <Feather name="eye" size={16} color={colors.mutedForeground} style={{ opacity: 0.35, marginBottom: 8 }} />
               <Text style={[styles.publicEmptyText, { color: colors.mutedForeground }]}>
-                No public pieces yet — mark a piece as public from its edit screen to feature it here
+                No public pieces yet
+              </Text>
+              <Text style={[styles.publicEmptyHint, { color: colors.mutedForeground }]}>
+                Open any piece, tap Edit, and turn on Public Portfolio
               </Text>
             </View>
           ) : (
             <View style={styles.publicGrid}>
-              {publicPieces.slice(0, 6).map((piece) => (
+              {publicPieces.map((piece) => (
                 <Pressable
                   key={piece.id}
                   style={({ pressed }) => [
@@ -236,6 +249,9 @@ export default function ProfileScreen() {
                     contentFit="cover"
                     transition={200}
                   />
+                  <View style={styles.thumbOverlay}>
+                    <Text style={styles.thumbTitle} numberOfLines={1}>{piece.title}</Text>
+                  </View>
                 </Pressable>
               ))}
             </View>
@@ -415,12 +431,31 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   emptyField: { fontSize: 13, fontFamily: "Poppins_300Light", fontStyle: "italic", lineHeight: 20 },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  countBadgeText: {
+    fontSize: 10,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.5,
+  },
   publicEmpty: {
-    padding: 18,
+    padding: 20,
     borderRadius: 12,
     borderWidth: 0.75,
+    alignItems: "center",
+    gap: 4,
   },
-  publicEmptyText: { fontSize: 13, fontFamily: "Poppins_300Light", lineHeight: 20 },
+  publicEmptyText: { fontSize: 13, fontFamily: "Poppins_400Regular", lineHeight: 20 },
+  publicEmptyHint: { fontSize: 12, fontFamily: "Poppins_300Light", lineHeight: 18, textAlign: "center", opacity: 0.8 },
   publicGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -431,6 +466,21 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: 8,
     overflow: "hidden",
+  },
+  thumbOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(45,45,42,0.48)",
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+  },
+  thumbTitle: {
+    fontSize: 9,
+    fontFamily: "Poppins_400Regular",
+    color: "#FFFFFF",
+    letterSpacing: 0.2,
   },
   links: { gap: 12 },
   linkRow: { flexDirection: "row", alignItems: "center", gap: 10 },
