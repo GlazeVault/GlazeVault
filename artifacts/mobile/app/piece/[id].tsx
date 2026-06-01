@@ -128,7 +128,7 @@ export default function PieceDetailScreen() {
         <View style={styles.content}>
           <Text style={[styles.eyebrow, { color: colors.cobalt }]}>GlazeVault</Text>
           <Text style={[styles.title, { color: colors.foreground }]}>{piece.title}</Text>
-          <Text style={[styles.date, { color: colors.mutedForeground }]}>
+          <Text style={[styles.date, { color: "#8A7B6C" }]}>
             Recorded {formattedDate}
           </Text>
 
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  heroImage: { width: "100%", aspectRatio: 3 / 4 },
+  heroImage: { width: "100%", aspectRatio: 4 / 5 },
   content: { paddingHorizontal: 28, paddingTop: 28 },
   eyebrow: {
     fontSize: 10,
