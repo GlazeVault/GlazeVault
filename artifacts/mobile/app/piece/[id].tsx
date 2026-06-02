@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   Alert,
   Modal,
@@ -55,6 +55,17 @@ export default function PieceDetailScreen() {
   const [shareVisible, setShareVisible] = useState(false);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
   const [updatingCollection, setUpdatingCollection] = useState(false);
+
+  // On focus, re-read the latest piece from global state by id (single source of
+  // truth) so the public preview always reflects the current saved visibility.
+  useFocusEffect(
+    useCallback(() => {
+      const latestPiece = pieces.find((p) => p.id === id);
+      if (latestPiece && isPublicView) {
+        console.log("Preview loaded piece visibility:", latestPiece.id, latestPiece.visibility);
+      }
+    }, [pieces, id, isPublicView])
+  );
 
   if (!piece) {
     return (

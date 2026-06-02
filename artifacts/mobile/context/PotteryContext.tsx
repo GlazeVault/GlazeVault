@@ -191,7 +191,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
             merged.firing = firingEnvironment;
           }
           if (updates.visibility !== undefined) {
-            console.log("Piece visibility updated:", merged.id, merged.visibility);
+            console.log("Saved piece visibility:", merged.id, merged.visibility);
           }
           return merged;
         })
