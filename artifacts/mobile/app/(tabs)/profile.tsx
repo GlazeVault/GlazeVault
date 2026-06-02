@@ -131,28 +131,54 @@ export default function ProfileScreen() {
         return;
       }
     }
+    // On web the picker's `uri` is a blob: URL (revoked on reload) and fetching
+    // it can fail inside the sandboxed preview iframe, so we ask for base64 and
+    // build a permanent data: URI directly — no fetch needed.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
+      base64: Platform.OS === "web",
     });
-    if (result.canceled || !result.assets[0]) return;
-    const picked = result.assets[0].uri;
-    setAvatarUri(picked);
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    const asset = result.assets[0];
+    const selectedUri = asset.uri;
+    console.log("selectedUri", selectedUri.slice(0, 64));
+
+    // Turn the picked image into a permanent URI:
+    //  - web   → base64 data: URI (survives reload, no blob fetch)
+    //  - native → copy into documentDirectory and store a relative path
+    let storedAvatar: string;
     try {
-      const stored = await persistPieceImage(picked);
-      setAvatarUri(stored);
-      await updateProfile({ avatarUri: stored });
-      console.log("Saved profile avatar", stored.slice(0, 40));
+      if (Platform.OS === "web") {
+        // On web we must use the picker's base64; falling back to fetching the
+        // blob: URL is exactly the path that fails in the preview iframe.
+        if (!asset.base64) throw new Error("Picker returned no base64 data on web");
+        storedAvatar = `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}`;
+      } else {
+        storedAvatar = await persistPieceImage(selectedUri);
+      }
     } catch (e) {
-      console.warn("Failed to persist avatar", e);
-      setAvatarUri(profile.avatarUri ?? "");
+      console.warn("Failed to copy avatar", e);
       Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
+      return;
+    }
+    console.log("copied avatarUri", storedAvatar.slice(0, 64));
+
+    setAvatarUri(storedAvatar);
+    try {
+      await updateProfile({ avatarUri: storedAvatar });
+      console.log("updatedProfile avatarUri", storedAvatar.slice(0, 64));
+    } catch (e) {
+      console.warn("Failed to save profile avatar", e);
+      Alert.alert("Couldn’t save photo", "Your photo was loaded but couldn’t be saved. Please try again.");
     }
   };
 
   const initial = (isEditing ? name : profile.name).trim().charAt(0).toUpperCase();
+  const displayAvatar = isEditing ? avatarUri : profile.avatarUri;
+  if (displayAvatar) console.log("rendering avatarUri", displayAvatar.slice(0, 64));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -198,9 +224,9 @@ export default function ProfileScreen() {
         {/* Avatar */}
         <View style={styles.avatarSection}>
           <Pressable onPress={pickAvatar} style={styles.avatarWrap}>
-            {(isEditing ? avatarUri : profile.avatarUri) ? (
+            {displayAvatar ? (
               <Image
-                source={resolveImageSource(isEditing ? avatarUri : profile.avatarUri)}
+                source={resolveImageSource(displayAvatar)}
                 style={styles.avatar}
                 contentFit="cover"
                 transition={250}
