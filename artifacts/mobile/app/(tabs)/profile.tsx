@@ -124,6 +124,7 @@ export default function ProfileScreen() {
   };
 
   const runPickAvatar = async () => {
+    console.log("Avatar pressed");
     if (Platform.OS !== "web") {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
@@ -141,10 +142,21 @@ export default function ProfileScreen() {
       quality: 0.7,
       base64: Platform.OS === "web",
     });
-    if (result.canceled || !result.assets?.[0]?.uri) return;
+    // Avoid dumping the (huge) base64 payload; log a structural summary instead.
+    console.log("Picker result:", {
+      canceled: result.canceled,
+      assetCount: result.assets?.length ?? 0,
+      hasBase64: !!result.assets?.[0]?.base64,
+      mimeType: result.assets?.[0]?.mimeType,
+      uriPrefix: result.assets?.[0]?.uri?.slice(0, 16),
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) {
+      console.log("Picker canceled or returned no asset");
+      return;
+    }
     const asset = result.assets[0];
     const selectedUri = asset.uri;
-    console.log("selectedUri", selectedUri.slice(0, 64));
+    console.log("Selected URI:", selectedUri.slice(0, 64));
 
     // Turn the picked image into a permanent URI:
     //  - web   → base64 data: URI (survives reload, no blob fetch)
@@ -156,7 +168,9 @@ export default function ProfileScreen() {
         // blob: URL is exactly the path that fails in the preview iframe.
         if (!asset.base64) throw new Error("Picker returned no base64 data on web");
         storedAvatar = `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}`;
+        console.log("Copying avatar to: web data URI, length", storedAvatar.length);
       } else {
+        console.log("Copying avatar to: documentDirectory from", selectedUri.slice(0, 64));
         storedAvatar = await persistPieceImage(selectedUri);
       }
     } catch (e) {
@@ -164,12 +178,13 @@ export default function ProfileScreen() {
       Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
       return;
     }
-    console.log("copied avatarUri", storedAvatar.slice(0, 64));
+    console.log("Avatar copied successfully:", storedAvatar.slice(0, 64));
 
     setAvatarUri(storedAvatar);
     try {
+      console.log("Saving profile avatar");
       await updateProfile({ avatarUri: storedAvatar });
-      console.log("updatedProfile avatarUri", storedAvatar.slice(0, 64));
+      console.log("Updated profile avatarUri:", storedAvatar.slice(0, 64));
     } catch (e) {
       console.warn("Failed to save profile avatar", e);
       Alert.alert("Couldn’t save photo", "Your photo was loaded but couldn’t be saved. Please try again.");
@@ -177,8 +192,11 @@ export default function ProfileScreen() {
   };
 
   const initial = (isEditing ? name : profile.name).trim().charAt(0).toUpperCase();
-  const displayAvatar = isEditing ? avatarUri : profile.avatarUri;
-  if (displayAvatar) console.log("rendering avatarUri", displayAvatar.slice(0, 64));
+  // Avatar display depends only on the persisted profile, so the picked image
+  // shows immediately after save and the letter fallback appears only when there
+  // is genuinely no avatar — no edit-mode/local-state split to drop it.
+  const displayAvatar = profile.avatarUri;
+  console.log("Rendering avatarUri:", displayAvatar ? displayAvatar.slice(0, 64) : "(none)");
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
