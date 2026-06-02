@@ -12,11 +12,13 @@ import { useColors } from "@/hooks/useColors";
 interface PotteryCardProps {
   piece: PotteryPiece;
   fromCollectionId?: string;
+  showVisibility?: boolean;
 }
 
-export function PotteryCard({ piece, fromCollectionId }: PotteryCardProps) {
+export function PotteryCard({ piece, fromCollectionId, showVisibility }: PotteryCardProps) {
   const colors = useColors();
   const { toggleFavorite } = usePottery();
+  const isPrivate = piece.visibility === "private";
 
   const handleFavorite = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -67,6 +69,13 @@ export function PotteryCard({ piece, fromCollectionId }: PotteryCardProps) {
         />
       </Pressable>
 
+      {showVisibility && isPrivate && (
+        <View style={styles.privateBadge}>
+          <Feather name="lock" size={11} color="#8A7B6C" />
+          <Text style={styles.privateBadgeText}>Private</Text>
+        </View>
+      )}
+
       <View style={styles.info}>
         <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
           {piece.title}
@@ -103,6 +112,24 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(253,250,245,0.82)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  privateBadge: {
+    position: "absolute",
+    top: 14,
+    left: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: "rgba(253,250,245,0.88)",
+  },
+  privateBadgeText: {
+    fontSize: 10,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.5,
+    color: "#8A7B6C",
   },
   info: {
     paddingTop: 14,

@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PotteryCard } from "@/components/PotteryCard";
+import { Visibility } from "@/constants/privacy";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -32,6 +33,7 @@ export default function CollectionDetailScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(collection?.title ?? "");
   const [intro, setIntro] = useState(collection?.intro ?? "");
+  const [visibility, setVisibility] = useState<Visibility>(collection?.visibility ?? "private");
   const [saving, setSaving] = useState(false);
 
   if (!collection) {
@@ -50,7 +52,7 @@ export default function CollectionDetailScreen() {
       return;
     }
     setSaving(true);
-    await updateCollection(id, { title: title.trim(), intro: intro.trim() });
+    await updateCollection(id, { title: title.trim(), intro: intro.trim(), visibility });
     setSaving(false);
     setIsEditing(false);
   };
@@ -120,6 +122,99 @@ export default function CollectionDetailScreen() {
                 : `${collectionPieces.length} ${collectionPieces.length === 1 ? "piece" : "pieces"}`}
             </Text>
             {isEditing ? (
+              <Pressable
+                style={[
+                  styles.visibilityRow,
+                  {
+                    backgroundColor:
+                      visibility === "public" ? "rgba(107,139,122,0.1)" : colors.secondary,
+                    borderColor:
+                      visibility === "public"
+                        ? "rgba(107,139,122,0.3)"
+                        : "rgba(120,110,100,0.16)",
+                  },
+                ]}
+                onPress={() =>
+                  setVisibility((v) => (v === "public" ? "private" : "public"))
+                }
+                accessibilityRole="switch"
+                accessibilityState={{ checked: visibility === "public" }}
+                accessibilityLabel="Collection visibility"
+              >
+                <Feather
+                  name={visibility === "public" ? "globe" : "lock"}
+                  size={14}
+                  color={visibility === "public" ? colors.emerald : colors.mutedForeground}
+                />
+                <View style={styles.visibilityLabels}>
+                  <Text
+                    style={[
+                      styles.visibilityTitle,
+                      {
+                        color: visibility === "public" ? colors.emerald : colors.foreground,
+                      },
+                    ]}
+                  >
+                    {visibility === "public" ? "Public" : "Private"}
+                  </Text>
+                  <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
+                    {visibility === "public"
+                      ? "Public pieces in here are visible to others"
+                      : "Hidden from everyone but you"}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.visToggle,
+                    {
+                      backgroundColor:
+                        visibility === "public" ? colors.emerald : "rgba(120,110,100,0.18)",
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.visToggleThumb,
+                      { transform: [{ translateX: visibility === "public" ? 18 : 2 }] },
+                    ]}
+                  />
+                </View>
+              </Pressable>
+            ) : (
+              <View style={styles.viewBadgeRow}>
+                <View
+                  style={[
+                    styles.viewBadge,
+                    {
+                      backgroundColor:
+                        collection.visibility === "public"
+                          ? "rgba(107,139,122,0.12)"
+                          : colors.secondary,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name={collection.visibility === "public" ? "globe" : "lock"}
+                    size={11}
+                    color={
+                      collection.visibility === "public" ? colors.emerald : "#8A7B6C"
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.viewBadgeText,
+                      {
+                        color:
+                          collection.visibility === "public" ? colors.emerald : "#8A7B6C",
+                      },
+                    ]}
+                  >
+                    {collection.visibility === "public" ? "Public" : "Private"}
+                  </Text>
+                </View>
+              </View>
+            )}
+            {isEditing ? (
               <View style={styles.editActions}>
                 <Pressable
                   style={[styles.deleteBtn, { borderColor: "rgba(184,92,58,0.3)" }]}
@@ -161,7 +256,9 @@ export default function CollectionDetailScreen() {
             </Text>
           </View>
         }
-        renderItem={({ item }) => <PotteryCard piece={item} fromCollectionId={id} />}
+        renderItem={({ item }) => (
+          <PotteryCard piece={item} fromCollectionId={id} showVisibility />
+        )}
       />
 
       {/* Floating back + edit buttons */}
@@ -178,6 +275,7 @@ export default function CollectionDetailScreen() {
             onPress={() => {
               setTitle(collection.title);
               setIntro(collection.intro);
+              setVisibility(collection.visibility);
               setIsEditing(true);
             }}
           >
@@ -292,5 +390,39 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 240,
+  },
+  visibilityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 0.75,
+    marginTop: 18,
+  },
+  visibilityLabels: { flex: 1, gap: 2 },
+  visibilityTitle: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
+  visibilitySub: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
+  visToggle: {
+    width: 42,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+  },
+  visToggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#FFFFFF" },
+  viewBadgeRow: { flexDirection: "row", marginTop: 14 },
+  viewBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  viewBadgeText: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.4,
   },
 });

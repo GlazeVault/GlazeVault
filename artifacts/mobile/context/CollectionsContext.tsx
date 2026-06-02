@@ -1,16 +1,21 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 
+import { Visibility } from "@/constants/privacy";
+
 export interface Collection {
   id: string;
   title: string;
   intro: string;
   createdAt: string;
+  visibility: Visibility;
 }
 
 interface CollectionsContextType {
   collections: Collection[];
-  addCollection: (c: Omit<Collection, "id" | "createdAt">) => Promise<Collection>;
+  addCollection: (
+    c: Omit<Collection, "id" | "createdAt" | "visibility"> & { visibility?: Visibility }
+  ) => Promise<Collection>;
   updateCollection: (id: string, updates: Partial<Collection>) => Promise<void>;
   deleteCollection: (id: string) => Promise<void>;
   getCollection: (id: string) => Collection | undefined;
@@ -24,7 +29,12 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((data) => {
-      if (data) setCollections(JSON.parse(data));
+      if (!data) return;
+      const parsed = JSON.parse(data) as Partial<Collection>[];
+      // Backward compat: collections saved before privacy default to private.
+      setCollections(
+        parsed.map((c) => ({ ...(c as Collection), visibility: c.visibility ?? "private" }))
+      );
     });
   }, []);
 
@@ -34,9 +44,12 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const addCollection = useCallback(
-    async (c: Omit<Collection, "id" | "createdAt">): Promise<Collection> => {
+    async (
+      c: Omit<Collection, "id" | "createdAt" | "visibility"> & { visibility?: Visibility }
+    ): Promise<Collection> => {
       const newCol: Collection = {
         ...c,
+        visibility: c.visibility ?? "private",
         id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
         createdAt: new Date().toISOString(),
       };

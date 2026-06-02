@@ -21,6 +21,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SelectField } from "@/components/SelectField";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
+import {
+  DEFAULT_PUBLIC_DATA_SETTINGS,
+  PUBLIC_DATA_FIELDS,
+  PublicDataSettings,
+  Visibility,
+} from "@/constants/privacy";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -82,7 +88,11 @@ export default function EditPieceScreen() {
     piece?.firingEnvironment || piece?.firing || ""
   );
   const [dimensions, setDimensions] = useState(piece?.dimensions ?? "");
-  const [isPublic, setIsPublic] = useState(piece?.isPublic ?? false);
+  const [visibility, setVisibility] = useState<Visibility>(piece?.visibility ?? "private");
+  const [publicData, setPublicData] = useState<PublicDataSettings>(
+    piece?.publicDataSettings ?? { ...DEFAULT_PUBLIC_DATA_SETTINGS }
+  );
+  const isPublic = visibility === "public";
   const [collectionId, setCollectionId] = useState<string | undefined>(piece?.collectionId);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -123,7 +133,8 @@ export default function EditPieceScreen() {
       firingEnvironment,
       dimensions: dimensions.trim(),
       imageUri,
-      isPublic,
+      visibility,
+      publicDataSettings: publicData,
       collectionId,
     });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -281,16 +292,19 @@ export default function EditPieceScreen() {
             <View style={[styles.toggleDivider, { backgroundColor: "rgba(120,110,100,0.1)" }]} />
             <Pressable
               style={styles.toggleRow}
-              onPress={() => setIsPublic((v) => !v)}
+              onPress={() => setVisibility((v) => (v === "public" ? "private" : "public"))}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: isPublic }}
+              accessibilityLabel="Piece visibility"
             >
               <View style={styles.toggleLabels}>
                 <Text style={[styles.toggleTitle, { color: colors.foreground }]}>
-                  Public Portfolio
+                  {isPublic ? "Public" : "Private"}
                 </Text>
                 <Text style={[styles.toggleSub, { color: colors.mutedForeground }]}>
                   {isPublic
-                    ? "Visible on your public profile"
-                    : "Only visible to you"}
+                    ? "Visible on your public profile and in public collections"
+                    : "Only visible to you, everywhere"}
                 </Text>
               </View>
               <View
@@ -315,6 +329,59 @@ export default function EditPieceScreen() {
                 />
               </View>
             </Pressable>
+
+            {/* Field-level public data controls */}
+            {isPublic && (
+              <View style={styles.publicData}>
+                <Text style={[styles.publicDataLabel, { color: colors.mutedForeground }]}>
+                  Public Details
+                </Text>
+                <Text style={[styles.publicDataHint, { color: colors.mutedForeground }]}>
+                  Choose what shows on the public view of this piece.
+                </Text>
+                {PUBLIC_DATA_FIELDS.map((field, i) => {
+                  const on = publicData[field.key];
+                  return (
+                    <Pressable
+                      key={field.key}
+                      style={[
+                        styles.fieldToggleRow,
+                        i > 0 && { borderTopWidth: 0.75, borderTopColor: "rgba(120,110,100,0.1)" },
+                      ]}
+                      onPress={() =>
+                        setPublicData((prev) => ({ ...prev, [field.key]: !prev[field.key] }))
+                      }
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: on }}
+                      accessibilityLabel={field.label}
+                    >
+                      <Text style={[styles.fieldToggleLabel, { color: colors.foreground }]}>
+                        {field.label}
+                      </Text>
+                      <View
+                        style={[
+                          styles.toggleSm,
+                          {
+                            backgroundColor: on ? colors.emerald : colors.secondary,
+                            borderColor: on ? colors.emerald : "rgba(120,110,100,0.2)",
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.toggleSmThumb,
+                            {
+                              backgroundColor: on ? "#FFFFFF" : colors.mutedForeground,
+                              transform: [{ translateX: on ? 15 : 2 }],
+                            },
+                          ]}
+                        />
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
         </View>
       </KeyboardAwareScrollView>
@@ -570,6 +637,40 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
+    opacity: 0.85,
+  },
+  publicData: { marginTop: 24 },
+  publicDataLabel: {
+    fontSize: 9,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.8,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  publicDataHint: {
+    fontSize: 12,
+    fontFamily: "Poppins_300Light",
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  fieldToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+  },
+  fieldToggleLabel: { fontSize: 14, fontFamily: "Poppins_300Light" },
+  toggleSm: {
+    width: 36,
+    height: 21,
+    borderRadius: 11,
+    borderWidth: 1,
+    justifyContent: "center",
+  },
+  toggleSmThumb: {
+    width: 15,
+    height: 15,
+    borderRadius: 8,
     opacity: 0.85,
   },
 });

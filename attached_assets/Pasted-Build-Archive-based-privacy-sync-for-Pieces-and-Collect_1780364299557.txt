@@ -1,0 +1,86 @@
+Build Archive-based privacy sync for Pieces and Collections.
+
+Core rule:
+Archive Piece privacy is the source of truth.
+Collections must follow Piece privacy.
+Collection visibility can never override Piece privacy.
+
+Data model:
+Each Piece should have:
+- visibility: "public" | "private"
+- publicDataSettings object
+
+Each Collection should have:
+- visibility: "public" | "private"
+- pieceIds: string[]
+
+Important behavior:
+1. User sets Public/Private only from Piece Detail or Edit Piece.
+2. When a Piece is set to private:
+   - it remains visible to the owner in Archive
+   - it remains visible to the owner inside Collections
+   - it must be hidden from all public views
+   - it must not appear publicly even inside public Collections
+3. When a Piece is public:
+   - it can appear publicly only if the Collection is also public
+4. Private Collection:
+   - never visible publicly
+5. Public Collection:
+   - publicly shows only pieces where piece.visibility === "public"
+
+Public display logic:
+Create helper functions:
+
+isPiecePublic(piece):
+  return piece.visibility === "public"
+
+isCollectionPublic(collection):
+  return collection.visibility === "public"
+
+getPublicCollectionPieces(collection, pieces):
+  return pieces where:
+    collection.pieceIds includes piece.id
+    AND piece.visibility === "public"
+
+Do not duplicate Piece data inside Collections.
+Collections should only reference pieces by pieceId.
+
+UI:
+- Add Public/Private toggle in Piece Detail and Edit Piece.
+- Add Public/Private toggle in Collection Detail/Edit.
+- In Collection owner view, show private pieces normally but add a small "Private" label or lock icon.
+- In public view, hide private pieces completely.
+- New Pieces default to private.
+- New Collections default to private.
+
+Also add field-level public data controls for pieces:
+
+publicDataSettings:
+- showTitle
+- showPhotos
+- showDescription
+- showClayBody
+- showGlazeName
+- showGlazeRecipe
+- showCone
+- showFiringEnvironment
+- showFiringNotes
+- showDimensions
+- showPrice
+
+Default:
+showTitle: true
+showPhotos: true
+showDescription: true
+showClayBody: false
+showGlazeName: true
+showGlazeRecipe: false
+showCone: false
+showFiringEnvironment: false
+showFiringNotes: false
+showDimensions: true
+showPrice: false
+
+If piece.visibility === "private", nothing is public regardless of publicDataSettings.
+
+Keep the UI calm, minimal, and consistent with the GlazeVault archive/portfolio aesthetic.

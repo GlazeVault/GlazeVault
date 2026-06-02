@@ -1,0 +1,24 @@
+---
+name: GlazeVault privacy / visibility model
+description: How piece + collection visibility, public-data field toggles, and public-surface gating work in the mobile app
+---
+
+# Privacy model
+
+Pieces and collections each carry `visibility: "public" | "private"`. Pieces also carry a `publicDataSettings` object (11 field toggles). Helpers live in `constants/privacy.ts`: `isPiecePublic`, `isCollectionPublic`, `getPublicCollectionPieces`, `isPubliclyVisiblePiece`.
+
+## Source-of-truth rule
+Piece privacy is the source of truth. Collection visibility can **suppress** a public piece but can **never** reveal a private one. A private piece is never public regardless of `publicDataSettings`.
+
+**How to apply:** any new public/non-owner surface must filter through `isPubliclyVisiblePiece(piece, collections)` — never just `isPiecePublic`. That helper hides a public piece if its parent collection is private; pieces with no collection (or a deleted one) surface as long as the piece is public.
+
+## collectionId vs pieceIds (intentional)
+The spec described `pieceIds[]` on collections, but the app uses `collectionId`-per-piece (one collection per piece). We kept `collectionId` — it already references by ID with no duplication, and avoids a risky migration. `getPublicCollectionPieces` computes membership via `collectionId`, not a `pieceIds` array. Do not add `pieceIds[]` unless multi-collection membership is actually needed.
+
+**Why:** lower risk, no dual source of truth, identical user-facing behavior.
+
+## Defaults & backward compat
+- New pieces AND new collections default to `private`.
+- `normalizePiece` migrates legacy `isPublic` → `visibility` (only when `visibility` absent) and backfills `publicDataSettings` from `DEFAULT_PUBLIC_DATA_SETTINGS`.
+- CollectionsContext load defaults missing `visibility` to `private`.
+- `PUBLIC_DATA_FIELDS` (ordered key+label list) drives the field-toggle UI in Edit Piece; field controls only render when the piece is public.

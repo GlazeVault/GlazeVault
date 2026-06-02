@@ -14,6 +14,7 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { Visibility } from "@/constants/privacy";
 import { useCollections } from "@/context/CollectionsContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -26,12 +27,14 @@ export default function NewCollectionScreen() {
 
   const [title, setTitle] = useState(existing?.title ?? "");
   const [intro, setIntro] = useState(existing?.intro ?? "");
+  const [visibility, setVisibility] = useState<Visibility>(existing?.visibility ?? "private");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (existing) {
       setTitle(existing.title);
       setIntro(existing.intro);
+      setVisibility(existing.visibility);
     }
   }, [existing?.id]);
 
@@ -44,9 +47,9 @@ export default function NewCollectionScreen() {
     }
     setSaving(true);
     if (existing && editId) {
-      await updateCollection(editId, { title: title.trim(), intro: intro.trim() });
+      await updateCollection(editId, { title: title.trim(), intro: intro.trim(), visibility });
     } else {
-      await addCollection({ title: title.trim(), intro: intro.trim() });
+      await addCollection({ title: title.trim(), intro: intro.trim(), visibility });
     }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setSaving(false);
@@ -109,6 +112,64 @@ export default function NewCollectionScreen() {
             multiline
             textAlignVertical="top"
           />
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>Visibility</Text>
+          <Pressable
+            style={[
+              styles.visibilityRow,
+              {
+                backgroundColor:
+                  visibility === "public" ? "rgba(107,139,122,0.1)" : colors.secondary,
+                borderColor:
+                  visibility === "public"
+                    ? "rgba(107,139,122,0.3)"
+                    : "rgba(120,110,100,0.16)",
+              },
+            ]}
+            onPress={() => setVisibility((v) => (v === "public" ? "private" : "public"))}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: visibility === "public" }}
+            accessibilityLabel="Collection visibility"
+          >
+            <Feather
+              name={visibility === "public" ? "globe" : "lock"}
+              size={14}
+              color={visibility === "public" ? colors.emerald : colors.mutedForeground}
+            />
+            <View style={styles.visibilityLabels}>
+              <Text
+                style={[
+                  styles.visibilityTitle,
+                  { color: visibility === "public" ? colors.emerald : colors.foreground },
+                ]}
+              >
+                {visibility === "public" ? "Public" : "Private"}
+              </Text>
+              <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
+                {visibility === "public"
+                  ? "Public pieces in here are visible to others"
+                  : "Hidden from everyone but you"}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.visToggle,
+                {
+                  backgroundColor:
+                    visibility === "public" ? colors.emerald : "rgba(120,110,100,0.18)",
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.visToggleThumb,
+                  { transform: [{ translateX: visibility === "public" ? 18 : 2 }] },
+                ]}
+              />
+            </View>
+          </Pressable>
         </View>
 
         <View style={[styles.hint, { backgroundColor: colors.secondary, borderColor: "rgba(120,110,100,0.12)" }]}>
@@ -180,4 +241,23 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   hintText: { flex: 1, fontSize: 12, fontFamily: "Poppins_300Light", lineHeight: 18 },
+  visibilityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 0.75,
+  },
+  visibilityLabels: { flex: 1, gap: 2 },
+  visibilityTitle: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
+  visibilitySub: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
+  visToggle: {
+    width: 42,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+  },
+  visToggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#FFFFFF" },
 });

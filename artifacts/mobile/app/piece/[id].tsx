@@ -186,13 +186,69 @@ export default function PieceDetailScreen() {
             <Text style={[styles.date, { color: "#8A7B6C" }]}>
               Recorded {formattedDate}
             </Text>
-            {piece.isPublic && (
-              <View style={[styles.publicBadge, { backgroundColor: "rgba(107,139,122,0.12)" }]}>
-                <View style={[styles.publicDot, { backgroundColor: colors.emerald }]} />
-                <Text style={[styles.publicBadgeText, { color: colors.emerald }]}>Public</Text>
-              </View>
-            )}
           </View>
+
+          {/* Visibility toggle */}
+          {(() => {
+            const isPublic = piece.visibility === "public";
+            return (
+              <Pressable
+                style={[
+                  styles.visibilityRow,
+                  {
+                    backgroundColor: isPublic ? "rgba(107,139,122,0.1)" : colors.secondary,
+                    borderColor: isPublic ? "rgba(107,139,122,0.3)" : "rgba(120,110,100,0.16)",
+                  },
+                ]}
+                onPress={async () => {
+                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  await updatePiece(piece.id, {
+                    visibility: isPublic ? "private" : "public",
+                  });
+                }}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: isPublic }}
+                accessibilityLabel="Piece visibility"
+              >
+                <Feather
+                  name={isPublic ? "globe" : "lock"}
+                  size={14}
+                  color={isPublic ? colors.emerald : colors.mutedForeground}
+                />
+                <View style={styles.visibilityLabels}>
+                  <Text
+                    style={[
+                      styles.visibilityTitle,
+                      { color: isPublic ? colors.emerald : colors.foreground },
+                    ]}
+                  >
+                    {isPublic ? "Public" : "Private"}
+                  </Text>
+                  <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
+                    {isPublic ? "Shown on your public profile" : "Only visible to you"}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.visToggle,
+                    {
+                      backgroundColor: isPublic ? colors.emerald : "rgba(120,110,100,0.18)",
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.visToggleThumb,
+                      {
+                        backgroundColor: "#FFFFFF",
+                        transform: [{ translateX: isPublic ? 18 : 2 }],
+                      },
+                    ]}
+                  />
+                </View>
+              </Pressable>
+            );
+          })()}
 
           {/* Collection row */}
           <Pressable
@@ -526,20 +582,26 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_300Light",
     letterSpacing: 0.3,
   },
-  publicBadge: {
+  visibilityRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 10,
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 0.75,
+    marginBottom: 16,
   },
-  publicDot: { width: 5, height: 5, borderRadius: 3 },
-  publicBadgeText: {
-    fontSize: 10,
-    fontFamily: "Poppins_500Medium",
-    letterSpacing: 0.5,
+  visibilityLabels: { flex: 1, gap: 2 },
+  visibilityTitle: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
+  visibilitySub: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
+  visToggle: {
+    width: 42,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
   },
+  visToggleThumb: { width: 18, height: 18, borderRadius: 9 },
   collectionRow: {
     flexDirection: "row",
     alignItems: "center",

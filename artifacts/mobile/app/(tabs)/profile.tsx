@@ -16,7 +16,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { isPubliclyVisiblePiece } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
+import { useCollections } from "@/context/CollectionsContext";
 import { useProfile } from "@/context/ProfileContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -26,6 +28,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { profile, updateProfile } = useProfile();
   const { pieces } = usePottery();
+  const { collections } = useCollections();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const [isEditing, setIsEditing] = useState(false);
@@ -37,7 +40,7 @@ export default function ProfileScreen() {
   const [avatarUri, setAvatarUri] = useState(profile.avatarUri ?? "");
   const [saving, setSaving] = useState(false);
 
-  const publicPieces = pieces.filter((p) => p.isPublic);
+  const publicPieces = pieces.filter((p) => isPubliclyVisiblePiece(p, collections));
   const hasProfile = profile.name.trim().length > 0;
 
   const startEditing = () => {
@@ -229,7 +232,7 @@ export default function ProfileScreen() {
                 No public pieces yet
               </Text>
               <Text style={[styles.publicEmptyHint, { color: colors.mutedForeground }]}>
-                Open any piece, tap Edit, and turn on Public Portfolio
+                Open any piece and set its visibility to Public
               </Text>
             </View>
           ) : (
