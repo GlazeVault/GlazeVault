@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ShareSheet } from "@/components/ShareSheet";
+import { PUBLIC_DATA_FIELDS, isPubliclyVisiblePiece } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
@@ -43,7 +44,9 @@ function InfoRow({
 }
 
 export default function PieceDetailScreen() {
-  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  const params = useLocalSearchParams<{ id: string; from?: string; public?: string }>();
+  const { id, from } = params;
+  const isPublicView = params.public === "1";
   const { getPiece, updatePiece, toggleFavorite, deletePiece, removePieceFromCollection } = usePottery();
   const { collections } = useCollections();
   const colors = useColors();
@@ -133,6 +136,117 @@ export default function PieceDetailScreen() {
     day: "numeric",
     year: "numeric",
   });
+
+  const pds = piece.publicDataSettings;
+
+  const togglePublicField = async (key: (typeof PUBLIC_DATA_FIELDS)[number]["key"]) => {
+    await Haptics.selectionAsync();
+    await updatePiece(piece.id, {
+      publicDataSettings: { ...piece.publicDataSettings, [key]: !piece.publicDataSettings[key] },
+    });
+  };
+
+  // Public preview: how this piece appears to others. Only fields enabled in
+  // publicDataSettings are shown, and only when the piece is publicly visible.
+  if (isPublicView) {
+    const publiclyVisible = isPubliclyVisiblePiece(piece, collections);
+    if (!publiclyVisible) {
+      return (
+        <View style={[styles.center, { backgroundColor: colors.background }]}>
+          <View style={[styles.privateCircle, { backgroundColor: colors.secondary }]}>
+            <Feather name="lock" size={20} color={colors.mutedForeground} style={{ opacity: 0.6 }} />
+          </View>
+          <Text style={[styles.privateTitle, { color: colors.foreground }]}>This piece is private</Text>
+          <Text style={[styles.privateText, { color: colors.mutedForeground }]}>
+            It isn’t visible on your public profile.
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.privateBack, { opacity: pressed ? 0.6 : 1 }]}
+            onPress={() => router.back()}
+          >
+            <Text style={[styles.privateBackText, { color: colors.cobalt }]}>Go back</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    const infoRows = [
+      pds.showClayBody && { label: "Clay", value: piece.clay, accent: colors.cobalt },
+      pds.showGlazeName && { label: "Glaze", value: piece.glaze, accent: colors.emerald },
+      pds.showCone && { label: "Cone", value: piece.cone, accent: colors.primary },
+      pds.showFiringEnvironment && {
+        label: "Firing Environment",
+        value: piece.firingEnvironment || piece.firing,
+        accent: colors.cobalt,
+      },
+      pds.showDimensions && { label: "Dimensions", value: piece.dimensions, accent: colors.mutedForeground },
+    ].filter((r): r is { label: string; value: string; accent: string } => Boolean(r && r.value));
+
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.topBar, { top: insets.top + 10 }]}>
+          <Pressable
+            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
+            onPress={() => router.back()}
+          >
+            <Feather name="arrow-left" size={18} color="#8A7B6C" />
+          </Pressable>
+          <Pressable
+            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
+            onPress={() => setShareVisible(true)}
+          >
+            <Feather name="share-2" size={18} color="#8A7B6C" />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
+        >
+          {pds.showPhotos ? (
+            <Image
+              source={resolveImageSource(piece.imageUri)}
+              style={styles.heroImage}
+              contentFit="cover"
+              transition={200}
+            />
+          ) : (
+            <View style={[styles.heroImage, styles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
+              <Feather name="image" size={26} color={colors.mutedForeground} style={{ opacity: 0.3 }} />
+            </View>
+          )}
+
+          <View style={styles.content}>
+            <Text style={[styles.eyebrow, { color: colors.emerald }]}>Public View</Text>
+            {pds.showTitle && piece.title ? (
+              <Text style={[styles.title, { color: colors.foreground }]}>{piece.title}</Text>
+            ) : null}
+
+            {infoRows.length > 0 ? (
+              <View style={[styles.infoCard, { borderColor: "rgba(120, 110, 100, 0.14)", marginTop: 8 }]}>
+                {infoRows.map((row) => (
+                  <InfoRow key={row.label} label={row.label} value={row.value} accent={row.accent} />
+                ))}
+              </View>
+            ) : null}
+
+            {pds.showDescription && piece.notes ? (
+              <View style={styles.notesSection}>
+                <Text style={[styles.notesLabel, { color: colors.mutedForeground }]}>Studio Notes</Text>
+                <Text style={[styles.notesText, { color: colors.foreground }]}>{piece.notes}</Text>
+              </View>
+            ) : null}
+          </View>
+        </ScrollView>
+
+        <ShareSheet
+          visible={shareVisible}
+          onClose={() => setShareVisible(false)}
+          pieceTitle={pds.showTitle ? piece.title : "Untitled piece"}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -249,6 +363,66 @@ export default function PieceDetailScreen() {
               </Pressable>
             );
           })()}
+
+          {/* Field-level public display settings (only when piece is public) */}
+          {piece.visibility === "public" && (
+            <View style={styles.publicData}>
+              <Text style={[styles.publicDataLabel, { color: colors.mutedForeground }]}>
+                Public Display Settings
+              </Text>
+              <Text style={[styles.publicDataHint, { color: colors.mutedForeground }]}>
+                Choose what shows on the public view of this piece.
+              </Text>
+              {PUBLIC_DATA_FIELDS.map((field, i) => {
+                const on = pds[field.key];
+                return (
+                  <Pressable
+                    key={field.key}
+                    style={[
+                      styles.fieldToggleRow,
+                      i > 0 && { borderTopWidth: 0.75, borderTopColor: "rgba(120,110,100,0.1)" },
+                    ]}
+                    onPress={() => togglePublicField(field.key)}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: on }}
+                    accessibilityLabel={field.label}
+                  >
+                    <Text style={[styles.fieldToggleLabel, { color: colors.foreground }]}>
+                      {field.label}
+                    </Text>
+                    <View
+                      style={[
+                        styles.toggleSm,
+                        {
+                          backgroundColor: on ? colors.emerald : colors.secondary,
+                          borderColor: on ? colors.emerald : "rgba(120,110,100,0.2)",
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.toggleSmThumb,
+                          {
+                            backgroundColor: on ? "#FFFFFF" : colors.mutedForeground,
+                            transform: [{ translateX: on ? 15 : 2 }],
+                          },
+                        ]}
+                      />
+                    </View>
+                  </Pressable>
+                );
+              })}
+              <Pressable
+                style={({ pressed }) => [styles.previewBtn, { opacity: pressed ? 0.6 : 1 }]}
+                onPress={() => router.push(`/piece/${piece.id}?public=1`)}
+              >
+                <Feather name="eye" size={13} color={colors.cobalt} />
+                <Text style={[styles.previewBtnText, { color: colors.cobalt }]}>
+                  Preview public view
+                </Text>
+              </Pressable>
+            </View>
+          )}
 
           {/* Collection row */}
           <Pressable
@@ -654,6 +828,64 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     letterSpacing: 0.2,
   },
+  // Field-level public display settings
+  publicData: { marginBottom: 20 },
+  publicDataLabel: {
+    fontSize: 9,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.8,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  publicDataHint: {
+    fontSize: 12,
+    fontFamily: "Poppins_300Light",
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  fieldToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+  },
+  fieldToggleLabel: { fontSize: 14, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
+  toggleSm: { width: 38, height: 22, borderRadius: 11, justifyContent: "center", borderWidth: 1 },
+  toggleSmThumb: { width: 16, height: 16, borderRadius: 8 },
+  previewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 12,
+    marginTop: 6,
+  },
+  previewBtnText: { fontSize: 13, fontFamily: "Poppins_400Regular", letterSpacing: 0.3 },
+  // Public-view private notice
+  privateCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  privateTitle: {
+    fontSize: 20,
+    fontFamily: "PlayfairDisplay_400Regular",
+    letterSpacing: 0.3,
+    marginBottom: 6,
+  },
+  privateText: {
+    fontSize: 13,
+    fontFamily: "Poppins_300Light",
+    lineHeight: 20,
+    textAlign: "center",
+    maxWidth: 240,
+  },
+  privateBack: { marginTop: 20, paddingVertical: 8, paddingHorizontal: 16 },
+  privateBackText: { fontSize: 13, fontFamily: "Poppins_500Medium", letterSpacing: 0.3 },
+  heroPlaceholder: { alignItems: "center", justifyContent: "center" },
   actions: { gap: 16 },
   actionRow: { flexDirection: "row", gap: 10 },
   actionBtn: {

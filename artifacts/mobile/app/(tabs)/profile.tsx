@@ -244,7 +244,7 @@ export default function ProfileScreen() {
                     styles.publicThumb,
                     { backgroundColor: colors.secondary, opacity: pressed ? 0.85 : 1 },
                   ]}
-                  onPress={() => router.push(`/piece/${piece.id}`)}
+                  onPress={() => router.push(`/piece/${piece.id}?public=1`)}
                 >
                   <Image
                     source={resolveImageSource(piece.imageUri)}

@@ -21,4 +21,9 @@ The spec described `pieceIds[]` on collections, but the app uses `collectionId`-
 - New pieces AND new collections default to `private`.
 - `normalizePiece` migrates legacy `isPublic` → `visibility` (only when `visibility` absent) and backfills `publicDataSettings` from `DEFAULT_PUBLIC_DATA_SETTINGS`.
 - CollectionsContext load defaults missing `visibility` to `private`.
-- `PUBLIC_DATA_FIELDS` (ordered key+label list) drives the field-toggle UI in Edit Piece; field controls only render when the piece is public.
+- `PUBLIC_DATA_FIELDS` (ordered key+label list) drives the field-toggle UI in Edit Piece AND the Public Display Settings section in Piece Detail; field controls only render when the piece is public.
+
+## Public renderer & field gating
+- Canonical public renderer is the piece detail route in public mode (`/piece/[id]?public=1`). `public` is a reserved word — read it via the params object (`params.public === "1"`), don't destructure. Public mode is read-only: hide favorite/edit/delete/visibility/collection/field-settings; show a private notice when `!isPubliclyVisiblePiece`.
+- Data model has FEWER content fields than the 11 toggles: `showGlazeRecipe`/`showFiringNotes`/`showPrice` intentionally map to no field. Do NOT add new data fields to satisfy them.
+- **Gate every outbound channel, not just on-screen rows.** A hidden field can still leak through side channels — e.g. ShareSheet was leaking `piece.title` when `showTitle=false`. **Why:** the architect flagged this as a privacy violation. **How to apply:** in public mode, pass share/export metadata through the same `publicDataSettings` gate (fall back to a generic label like "Untitled piece" when a field is off).
