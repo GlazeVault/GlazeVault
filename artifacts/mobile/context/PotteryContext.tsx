@@ -116,6 +116,9 @@ function normalizePiece(
 export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const [pieces, setPieces] = useState<PotteryPiece[]>([]);
   const piecesRef = useRef<PotteryPiece[]>([]);
+  // Serializes AsyncStorage writes so rapid successive saves commit in order and
+  // an older snapshot can never overwrite a newer one.
+  const writeChain = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     (async () => {
@@ -126,12 +129,15 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
           const normalized = parsed.map(normalizePiece);
           piecesRef.current = normalized;
           setPieces(normalized);
+          console.log("Loaded pieces", normalized.length);
         } else {
           await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_PIECES));
           piecesRef.current = SEED_PIECES;
           setPieces(SEED_PIECES);
+          console.log("Loaded pieces", SEED_PIECES.length, "(seeded)");
         }
-      } catch {
+      } catch (e) {
+        console.warn("Failed to load pieces", e);
         piecesRef.current = SEED_PIECES;
         setPieces(SEED_PIECES);
       }
@@ -139,9 +145,14 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const persist = useCallback(async (updated: PotteryPiece[]) => {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     piecesRef.current = updated;
     setPieces(updated);
+    const write = writeChain.current
+      .catch(() => {})
+      .then(() => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)));
+    writeChain.current = write;
+    await write;
+    console.log("Saved pieces", updated.length);
   }, []);
 
   const addPiece = useCallback(

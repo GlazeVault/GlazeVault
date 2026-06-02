@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
+import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -98,7 +99,7 @@ export default function AddScreen() {
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [4, 5],
-      quality: 1,
+      quality: 0.7,
     });
     if (!result.canceled && result.assets[0]) {
       setImageUri(result.assets[0].uri);
@@ -114,7 +115,7 @@ export default function AddScreen() {
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 5],
-      quality: 1,
+      quality: 0.7,
     });
     if (!result.canceled && result.assets[0]) {
       setImageUri(result.assets[0].uri);
@@ -212,7 +213,7 @@ export default function AddScreen() {
         >
           {imageUri ? (
             <Image
-              source={{ uri: imageUri }}
+              source={resolveImageSource(imageUri)}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
             />

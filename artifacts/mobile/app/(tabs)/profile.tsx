@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { persistPieceImage } from "@/constants/imageStorage";
 import { getPublicCollectionPieces, isCollectionFeatured } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
@@ -69,13 +70,24 @@ export default function ProfileScreen() {
 
   const handleSave = async () => {
     setSaving(true);
+    let storedAvatar = avatarUri;
+    if (avatarUri) {
+      try {
+        storedAvatar = await persistPieceImage(avatarUri);
+      } catch (e) {
+        console.warn("Failed to persist avatar", e);
+        setSaving(false);
+        Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
+        return;
+      }
+    }
     await updateProfile({
       name,
       bio,
       statement,
       website,
       instagram,
-      avatarUri: avatarUri || undefined,
+      avatarUri: storedAvatar || undefined,
     });
     await updatePublicSite({ contactEmail, etsy, shopify });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -157,7 +169,7 @@ export default function ProfileScreen() {
           <Pressable onPress={isEditing ? pickAvatar : undefined} style={styles.avatarWrap}>
             {(isEditing ? avatarUri : profile.avatarUri) ? (
               <Image
-                source={{ uri: isEditing ? avatarUri : profile.avatarUri }}
+                source={resolveImageSource(isEditing ? avatarUri : profile.avatarUri)}
                 style={styles.avatar}
                 contentFit="cover"
               />

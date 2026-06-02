@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
+import { resolveImageSource } from "@/constants/seedImages";
 import {
   DEFAULT_PUBLIC_DATA_SETTINGS,
   PUBLIC_DATA_FIELDS,
@@ -222,7 +223,7 @@ export default function EditPieceScreen() {
           onPress={pickImage}
         >
           <Image
-            source={{ uri: imageUri }}
+            source={resolveImageSource(imageUri)}
             style={[styles.previewImage, { borderRadius: colors.radius }]}
             contentFit="cover"
           />

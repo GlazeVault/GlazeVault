@@ -138,7 +138,7 @@ export default function PublicSiteScreen() {
         <Text style={[styles.eyebrow, { color: colors.emerald }]}>Public Site</Text>
         <View style={styles.masthead}>
           {profile.avatarUri ? (
-            <Image source={{ uri: profile.avatarUri }} style={styles.avatar} contentFit="cover" />
+            <Image source={resolveImageSource(profile.avatarUri)} style={styles.avatar} contentFit="cover" />
           ) : (
             <View style={[styles.avatarPlaceholder, { backgroundColor: colors.secondary }]}>
               {initial ? (

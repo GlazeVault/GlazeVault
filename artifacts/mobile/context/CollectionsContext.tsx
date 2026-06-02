@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { Visibility } from "@/constants/privacy";
 
@@ -30,26 +30,45 @@ const STORAGE_KEY = "@glazevault_collections_v1";
 
 export function CollectionsProvider({ children }: { children: React.ReactNode }) {
   const [collections, setCollections] = useState<Collection[]>([]);
+  // Mirror of the latest collections so rapid successive writes merge against
+  // fresh state instead of a stale render closure (prevents toggles/edits from
+  // clobbering each other).
+  const collectionsRef = useRef<Collection[]>([]);
+  // Serializes AsyncStorage writes so rapid successive saves commit in order and
+  // an older snapshot can never overwrite a newer one.
+  const writeChain = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((data) => {
-      if (!data) return;
-      const parsed = JSON.parse(data) as Partial<Collection>[];
-      // Backward compat: collections saved before privacy default to private,
-      // and collections saved before site-featuring default to not featured.
-      setCollections(
-        parsed.map((c) => ({
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((data) => {
+        if (!data) {
+          console.log("Loaded collections", 0);
+          return;
+        }
+        const parsed = JSON.parse(data) as Partial<Collection>[];
+        // Backward compat: collections saved before privacy default to private,
+        // and collections saved before site-featuring default to not featured.
+        const normalized = parsed.map((c) => ({
           ...(c as Collection),
           visibility: c.visibility ?? "private",
           featuredOnSite: c.featuredOnSite ?? false,
-        }))
-      );
-    });
+        }));
+        collectionsRef.current = normalized;
+        setCollections(normalized);
+        console.log("Loaded collections", normalized.length);
+      })
+      .catch((e) => console.warn("Failed to load collections", e));
   }, []);
 
   const persist = useCallback(async (updated: Collection[]) => {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    collectionsRef.current = updated;
     setCollections(updated);
+    const write = writeChain.current
+      .catch(() => {})
+      .then(() => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)));
+    writeChain.current = write;
+    await write;
+    console.log("Saved collections", updated.length);
   }, []);
 
   const addCollection = useCallback(
@@ -66,29 +85,31 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
         id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
         createdAt: new Date().toISOString(),
       };
-      await persist([...collections, newCol]);
+      await persist([...collectionsRef.current, newCol]);
       return newCol;
     },
-    [collections, persist]
+    [persist]
   );
 
   const updateCollection = useCallback(
     async (id: string, updates: Partial<Collection>) => {
-      await persist(collections.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+      await persist(
+        collectionsRef.current.map((c) => (c.id === id ? { ...c, ...updates } : c))
+      );
     },
-    [collections, persist]
+    [persist]
   );
 
   const deleteCollection = useCallback(
     async (id: string) => {
-      await persist(collections.filter((c) => c.id !== id));
+      await persist(collectionsRef.current.filter((c) => c.id !== id));
     },
-    [collections, persist]
+    [persist]
   );
 
   const getCollection = useCallback(
-    (id: string) => collections.find((c) => c.id === id),
-    [collections]
+    (id: string) => collectionsRef.current.find((c) => c.id === id),
+    []
   );
 
   return (

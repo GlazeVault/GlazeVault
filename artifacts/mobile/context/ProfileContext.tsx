@@ -75,22 +75,35 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   // saves from clobbering each other).
   const profileRef = useRef(profile);
   profileRef.current = profile;
+  // Serializes AsyncStorage writes so rapid successive saves commit in order and
+  // an older snapshot can never overwrite a newer one.
+  const writeChain = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((data) => {
-      if (data) {
-        const next = normalizeProfile(JSON.parse(data));
-        profileRef.current = next;
-        setProfile(next);
-      }
-    });
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((data) => {
+        if (data) {
+          const next = normalizeProfile(JSON.parse(data));
+          profileRef.current = next;
+          setProfile(next);
+          console.log("Loaded profile", next.name || "(unnamed)");
+        } else {
+          console.log("Loaded profile", "(none)");
+        }
+      })
+      .catch((e) => console.warn("Failed to load profile", e));
   }, []);
 
   const updateProfile = useCallback(async (updates: Partial<ArtistProfile>) => {
     const updated = { ...profileRef.current, ...updates };
     profileRef.current = updated;
     setProfile(updated);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    const write = writeChain.current
+      .catch(() => {})
+      .then(() => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)));
+    writeChain.current = write;
+    await write;
+    console.log("Saved profile", updated.name || "(unnamed)");
   }, []);
 
   const updatePublicSite = useCallback(
