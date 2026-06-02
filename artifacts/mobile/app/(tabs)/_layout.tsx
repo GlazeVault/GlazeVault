@@ -1,128 +1,184 @@
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
-import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import React, { useState, type ComponentProps } from "react";
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useColorScheme,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AddMenu } from "@/components/AddMenu";
 import { useColors } from "@/hooks/useColors";
 
-function NativeTabLayout() {
-  return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "archivebox", selected: "archivebox.fill" }} />
-        <Label>Archive</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="collections">
-        <Icon sf={{ default: "rectangle.stack", selected: "rectangle.stack.fill" }} />
-        <Label>Collections</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="add">
-        <Icon sf={{ default: "plus.circle", selected: "plus.circle.fill" }} />
-        <Label>Add Piece</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="profile">
-        <Icon sf={{ default: "person", selected: "person.fill" }} />
-        <Label>Profile</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
-  );
+type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
+
+type IconName = keyof typeof Feather.glyphMap;
+
+interface NavItem {
+  name: string;
+  label: string;
+  sf: string;
+  feather: IconName;
 }
 
-function ClassicTabLayout() {
+const NAV_ITEMS: NavItem[] = [
+  { name: "index", label: "Archive", sf: "archivebox", feather: "grid" },
+  { name: "collections", label: "Collections", sf: "rectangle.stack", feather: "layers" },
+  { name: "profile", label: "Profile", sf: "person", feather: "user" },
+];
+
+function TabIcon({ item, active, color }: { item: NavItem; active: boolean; color: string }) {
+  if (Platform.OS === "ios") {
+    return <SymbolView name={(active ? `${item.sf}.fill` : item.sf) as never} tintColor={color} size={22} />;
+  }
+  return <Feather name={item.feather} size={20} color={color} />;
+}
+
+function GlazeTabBar({ state, navigation }: TabBarProps) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  const activeName = state.routes[state.index]?.name;
+
+  const navItem = (item: NavItem) => {
+    const active = activeName === item.name;
+    const color = active ? colors.cobalt : colors.mutedForeground;
+    return (
+      <Pressable
+        key={item.name}
+        style={styles.tabItem}
+        accessibilityRole="button"
+        accessibilityState={active ? { selected: true } : {}}
+        accessibilityLabel={item.label}
+        onPress={() => {
+          const route = state.routes.find((r) => r.name === item.name);
+          if (!route) return;
+          const event = navigation.emit({
+            type: "tabPress",
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!active && !event.defaultPrevented) {
+            navigation.navigate(item.name as never);
+          }
+        }}
+      >
+        <TabIcon item={item} active={active} color={color} />
+        <Text style={[styles.tabLabel, { color }]}>{item.label}</Text>
+      </Pressable>
+    );
+  };
 
   return (
+    <View style={styles.wrap} pointerEvents="box-none">
+      <View
+        style={[
+          styles.bar,
+          {
+            height: (isWeb ? 64 : 60) + insets.bottom,
+            paddingBottom: insets.bottom,
+            backgroundColor: isIOS ? "transparent" : colors.background,
+            borderTopColor: "rgba(120, 110, 100, 0.18)",
+          },
+        ]}
+      >
+        {isIOS ? (
+          <BlurView intensity={40} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+        ) : null}
+
+        {navItem(NAV_ITEMS[0])}
+        {navItem(NAV_ITEMS[1])}
+
+        <View style={styles.tabItem}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add"
+            style={({ pressed }) => [
+              styles.fab,
+              {
+                backgroundColor: colors.foreground,
+                transform: [{ scale: pressed ? 0.94 : 1 }],
+              },
+            ]}
+            onPress={() => setMenuVisible(true)}
+          >
+            <Feather name="plus" size={24} color={colors.background} />
+          </Pressable>
+          <Text style={[styles.tabLabel, { color: colors.mutedForeground }]}>Add</Text>
+        </View>
+
+        {navItem(NAV_ITEMS[2])}
+      </View>
+
+      <AddMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
+    </View>
+  );
+}
+
+export default function TabLayout() {
+  return (
     <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: colors.cobalt,
-        tabBarInactiveTintColor: colors.mutedForeground,
-        headerShown: false,
-        tabBarStyle: {
-          position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.background,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: "rgba(120, 110, 100, 0.18)",
-          elevation: 0,
-          shadowColor: "transparent",
-          height: isWeb ? 84 : 60,
-        },
-        tabBarBackground: () =>
-          isIOS ? (
-            <BlurView intensity={40} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-          ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
-          ) : null,
-        tabBarLabelStyle: {
-          fontFamily: "Poppins_400Regular",
-          fontSize: 10,
-          letterSpacing: 0.8,
-          textTransform: "uppercase",
-          marginBottom: 2,
-        },
-      }}
+      tabBar={(props) => <GlazeTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Archive",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="archivebox" tintColor={color} size={22} />
-            ) : (
-              <Feather name="grid" size={20} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
-        name="collections"
-        options={{
-          title: "Collections",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="rectangle.stack" tintColor={color} size={22} />
-            ) : (
-              <Feather name="layers" size={20} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
-        name="add"
-        options={{
-          title: "Add Piece",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="plus.circle" tintColor={color} size={22} />
-            ) : (
-              <Feather name="plus-circle" size={20} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="person" tintColor={color} size={22} />
-            ) : (
-              <Feather name="feather" size={20} color={color} />
-            ),
-        }}
-      />
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="collections" />
+      <Tabs.Screen name="add" options={{ href: null }} />
+      <Tabs.Screen name="profile" />
       <Tabs.Screen name="favorites" options={{ href: null }} />
     </Tabs>
   );
 }
 
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) return <NativeTabLayout />;
-  return <ClassicTabLayout />;
-}
+const styles = StyleSheet.create({
+  wrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  bar: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-around",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 8,
+    overflow: "visible",
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: 4,
+  },
+  tabLabel: {
+    fontFamily: "Poppins_400Regular",
+    fontSize: 10,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  fab: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -14,
+    shadowColor: "#2D2D2A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+});

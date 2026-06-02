@@ -1,2 +1,3 @@
 - [GlazeVault collections model](glazevault-collections-model.md) — single `collectionId` per piece; removing a relation must never deletePiece; collection deletion must cascade-unlink pieces at the call site.
 - [GlazeVault firing metadata](glazevault-firing-metadata.md) — `firing`/`firingEnvironment` kept in lockstep in PotteryContext; display fallback `firingEnvironment || firing`; never write only one.
+- [GlazeVault navigation](glazevault-navigation.md) — custom JS tabBar (not NativeTabs) for center + FAB; + opens AddMenu; navigate to /add (tab) vs push /collection/new (modal).
