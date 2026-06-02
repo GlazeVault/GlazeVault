@@ -8,6 +8,8 @@ export interface PotteryPiece {
   clay: string;
   glaze: string;
   firing: string;
+  cone: string;
+  firingEnvironment: string;
   dimensions: string;
   imageUri: string;
   createdAt: string;
@@ -39,6 +41,8 @@ const SEED_PIECES: PotteryPiece[] = [
     clay: "Stoneware",
     glaze: "Turquoise Matt",
     firing: "Gas Reduction",
+    cone: "Cone 6",
+    firingEnvironment: "Gas Reduction",
     dimensions: "9 cm H × 8 cm W",
     imageUri: "@seed/blue-mug",
     createdAt: new Date("2026-05-12").toISOString(),
@@ -48,11 +52,13 @@ const SEED_PIECES: PotteryPiece[] = [
 ];
 
 function normalizePiece(p: Partial<PotteryPiece> & Pick<PotteryPiece, "id">): PotteryPiece {
-  return {
+  const base = {
     notes: "",
     clay: "",
     glaze: "",
     firing: "",
+    cone: "",
+    firingEnvironment: "",
     dimensions: "",
     imageUri: "",
     createdAt: new Date().toISOString(),
@@ -60,6 +66,10 @@ function normalizePiece(p: Partial<PotteryPiece> & Pick<PotteryPiece, "id">): Po
     isPublic: false,
     ...p,
   } as PotteryPiece;
+  if (!base.firingEnvironment && base.firing) {
+    base.firingEnvironment = base.firing;
+  }
+  return base;
 }
 
 export function PotteryProvider({ children }: { children: React.ReactNode }) {
@@ -88,7 +98,6 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const persist = useCallback(async (updated: PotteryPiece[]) => {
-    console.log("[GlazeVault] persist — saving", updated.length, "pieces");
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     piecesRef.current = updated;
     setPieces(updated);
@@ -97,15 +106,16 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const addPiece = useCallback(
     async (piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite" | "isPublic">) => {
       const current = piecesRef.current;
+      const firingEnvironment = piece.firingEnvironment || piece.firing || "";
       const newPiece: PotteryPiece = {
         ...piece,
+        firingEnvironment,
+        firing: firingEnvironment,
         id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
         createdAt: new Date().toISOString(),
         isFavorite: false,
         isPublic: false,
       };
-      console.log("[GlazeVault] addPiece — collectionId:", piece.collectionId ?? "none");
-      console.log("[GlazeVault] addPiece — newPiece:", JSON.stringify(newPiece));
       await persist([newPiece, ...current]);
     },
     [persist]
@@ -113,8 +123,18 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
 
   const updatePiece = useCallback(
     async (id: string, updates: Partial<PotteryPiece>) => {
-      console.log("[GlazeVault] updatePiece — id:", id, "collectionId:", updates.collectionId ?? "none");
-      await persist(piecesRef.current.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+      await persist(
+        piecesRef.current.map((p) => {
+          if (p.id !== id) return p;
+          const merged = { ...p, ...updates };
+          if (updates.firingEnvironment !== undefined || updates.firing !== undefined) {
+            const firingEnvironment = merged.firingEnvironment || merged.firing || "";
+            merged.firingEnvironment = firingEnvironment;
+            merged.firing = firingEnvironment;
+          }
+          return merged;
+        })
+      );
     },
     [persist]
   );

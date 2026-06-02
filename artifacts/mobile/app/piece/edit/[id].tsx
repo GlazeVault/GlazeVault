@@ -19,12 +19,11 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SelectField } from "@/components/SelectField";
+import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
-
-const CLAY_OPTIONS = ["Stoneware", "Porcelain", "Earthenware", "Terracotta", "Raku", "Bone China"];
-const FIRING_OPTIONS = ["Wood-fired", "Gas Reduction", "Electric", "Soda / Salt", "Raku", "Anagama"];
 
 function ChipSelector({
   options,
@@ -78,7 +77,10 @@ export default function EditPieceScreen() {
   const [notes, setNotes] = useState(piece?.notes ?? "");
   const [clay, setClay] = useState(piece?.clay ?? "");
   const [glaze, setGlaze] = useState(piece?.glaze ?? "");
-  const [firing, setFiring] = useState(piece?.firing ?? "");
+  const [cone, setCone] = useState(piece?.cone ?? "");
+  const [firingEnvironment, setFiringEnvironment] = useState(
+    piece?.firingEnvironment || piece?.firing || ""
+  );
   const [dimensions, setDimensions] = useState(piece?.dimensions ?? "");
   const [isPublic, setIsPublic] = useState(piece?.isPublic ?? false);
   const [collectionId, setCollectionId] = useState<string | undefined>(piece?.collectionId);
@@ -116,7 +118,9 @@ export default function EditPieceScreen() {
       notes: notes.trim(),
       clay,
       glaze: glaze.trim(),
-      firing,
+      firing: firingEnvironment,
+      cone: cone.trim(),
+      firingEnvironment,
       dimensions: dimensions.trim(),
       imageUri,
       isPublic,
@@ -221,8 +225,17 @@ export default function EditPieceScreen() {
           <Label text="Glaze" />
           <Field value={glaze} onChange={setGlaze} placeholder="e.g. Celadon, Shino, Tenmoku" />
 
-          <Label text="Firing" />
-          <ChipSelector options={FIRING_OPTIONS} value={firing} onChange={setFiring} />
+          <Label text="Cone" />
+          <Field value={cone} onChange={setCone} placeholder="e.g. Cone 04, Cone 6, Cone 10" />
+
+          <Label text="Firing Environment" />
+          <SelectField
+            value={firingEnvironment}
+            options={FIRING_ENVIRONMENT_OPTIONS}
+            placeholder="Select firing environment"
+            title="Firing Environment"
+            onChange={setFiringEnvironment}
+          />
 
           <Label text="Dimensions" />
           <Field value={dimensions} onChange={setDimensions} placeholder="e.g. 9 cm H × 11 cm W" />

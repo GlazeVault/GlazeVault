@@ -231,7 +231,12 @@ export default function PieceDetailScreen() {
           <View style={[styles.infoCard, { borderColor: "rgba(120, 110, 100, 0.14)" }]}>
             <InfoRow label="Clay" value={piece.clay} accent={colors.cobalt} />
             <InfoRow label="Glaze" value={piece.glaze} accent={colors.emerald} />
-            <InfoRow label="Firing" value={piece.firing} accent={colors.primary} />
+            <InfoRow label="Cone" value={piece.cone} accent={colors.primary} />
+            <InfoRow
+              label="Firing Environment"
+              value={piece.firingEnvironment || piece.firing}
+              accent={colors.cobalt}
+            />
             {piece.dimensions ? (
               <InfoRow
                 label="Dimensions"

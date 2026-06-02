@@ -23,7 +23,9 @@ export function PotteryCard({ piece, fromCollectionId }: PotteryCardProps) {
     await toggleFavorite(piece.id);
   };
 
-  const meta = [piece.clay, piece.glaze, piece.firing].filter(Boolean).join("  ·  ");
+  const meta = [piece.clay, piece.cone, piece.firingEnvironment || piece.firing]
+    .filter(Boolean)
+    .join("  ·  ");
 
   return (
     <Pressable

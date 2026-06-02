@@ -1,0 +1,210 @@
+Fix metadata text clipping under piece titles.
+
+The first letters in metadata tags like "STONEWARE" are slightly clipped vertically.
+
+Please:
+- increase lineHeight for metadata text
+- add a little top padding or marginTop
+- ensure text container does not use overflow hidden
+- avoid tight vertical alignment
+- keep the elegant typography style
+
+Suggested:
+fontSize: 12-13
+letterSpacing: 2
+lineHeight: 18-20
+paddingTop: 2-4
+Fix remove behavior in Collections.
+
+Removing a piece from a Collection must NOT delete the piece from Archive.
+
+Archive is the master storage of all pieces.
+Collections are only groupings that reference pieces.
+
+When user taps Remove from Collection:
+- remove only the relationship between collectionId and pieceId
+- do not delete the piece object
+- do not remove it from the global pieces/archive list
+- after removal, the piece should disappear from that collection only
+- the piece should still appear in Archive
+
+Data model should be:
+pieces: all saved pieces
+collections: collection records
+collectionPieces or piece.collectionIds: relationship only
+
+Do not use deletePiece() for remove-from-collection.
+Create a separate removePieceFromCollection(collectionId, pieceId) function.
+The metadata text is STILL clipping at the top.
+The first letter "S" in "STONEWARE" is cut off vertically.
+
+Please fully fix the typography rendering issue.
+
+Requirements:
+- remove overflow hidden from metadata text containers
+- add paddingTop: 4 to metadata wrapper
+- use lineHeight at least 1.4x fontSize
+- vertically center text correctly
+- ensure no parent container has fixed height smaller than the text
+- avoid alignItems: center on the metadata row if it clips text
+- make serif/small caps text render safely on iOS
+
+Suggested:
+fontSize: 12
+lineHeight: 20
+paddingTop: 4
+paddingBottom: 2
+Piece Detail remove button behavior based on entry context.
+
+Problem:
+When I open a piece from inside a Collection, the detail page shows "Remove from Archive".
+If I tap it, the piece is deleted everywhere: Archive and Collections.
+
+Expected behavior:
+- If the piece detail was opened from Archive:
+  show "FixRemove from Archive"
+  this deletes the piece globally.
+
+  The piece must remain in other collections if it belongs to more than one.
+
+Implementation:
+- Pass collectionId or source="collection" when navigating from Collection to Piece Detail.
+- In Piece Detail, check route params.
+- If collectionId exists:
+    button label = "Remove from Collection"
+    onPress = removePieceFromCollection(collectionId, pieceId)
+- If no collectionId:
+    button label = "Remove from Archive"
+    onPress = deletePiece(pieceId)
+
+Do not call deletePiece() when the user is inside a collection context.
+
+Add separate functions:
+- deletePiece(pieceId)
+- removePieceFromCollection(collectionId, pieceId)
+
+Archive is the master storage.
+Collections are only references/groupings.- If the piece detail was opened from a Collection:
+  show "Remove from Collection"
+  this only removes the piece from that collection.
+  The piece must remain in Archive.
+
+Fix Piece Detail remove button behavior based on entry context.
+
+Problem:
+When I open a piece from inside a Collection, the detail page shows "Remove from Archive".
+If I tap it, the piece is deleted everywhere: Archive and Collections.
+
+Expected behavior:
+- If the piece detail was opened from Archive:
+  show "Remove from Archive"
+  this deletes the piece globally.
+
+- If the piece detail was opened from a Collection:
+  show "Remove from Collection"
+  this only removes the piece from that collection.
+  The piece must remain in Archive.
+  The piece must remain in other collections if it belongs to more than one.
+
+Implementation:
+- Pass collectionId or source="collection" when navigating from Collection to Piece Detail.
+- In Piece Detail, check route params.
+- If collectionId exists:
+    button label = "Remove from Collection"
+    onPress = removePieceFromCollection(collectionId, pieceId)
+- If no collectionId:
+    button label = "Remove from Archive"
+    onPress = deletePiece(pieceId)
+
+Do not call deletePiece() when the user is inside a collection context.
+
+Add separate functions:
+- deletePiece(pieceId)
+- removePieceFromCollection(collectionId, pieceId)
+
+Archive is the master storage.
+Collections are only references/groupings.
+Add ceramic firing metadata fields to Piece data model and UI.
+
+New fields:
+- cone
+- firingEnvironment
+
+Cone:
+- free text or selectable
+- examples:
+  Cone 04
+  Cone 6
+  Cone 10
+
+Firing Environment options:
+- Oxidation
+- Reduction
+- Soda
+- Salt
+- Raku
+- Wood Fire
+- Electric
+- Gas Reduction
+- Gas Oxidation
+- Pit Fire
+- Saggar
+- Other
+
+Requirements:
+- Add these fields to:
+  1. Piece data model
+  2. Add Piece screen
+  3. Edit Piece screen
+  4. Piece Detail screen
+  5. Archive card metadata display
+
+Display example:
+STONEWARE · CONE 10 · GAS REDUCTION
+
+Use elegant small caps metadata styling consistent with current GlazeVault typography.
+
+Make firing environment selectable with a clean modal or dropdown.
+Keep the UI calm, minimal, and gallery-like.
+Add ceramic firing metadata fields to Piece data model and UI.
+
+New fields:
+- cone
+- firingEnvironment
+
+Cone:
+- free text or selectable
+- examples:
+  Cone 04
+  Cone 6
+  Cone 10
+
+Firing Environment options:
+- Oxidation
+- Reduction
+- Soda
+- Salt
+- Raku
+- Wood Fire
+- Electric
+- Gas Reduction
+- Gas Oxidation
+- Pit Fire
+- Saggar
+- Other
+
+Requirements:
+- Add these fields to:
+  1. Piece data model
+  2. Add Piece screen
+  3. Edit Piece screen
+  4. Piece Detail screen
+  5. Archive card metadata display
+
+Display example:
+STONEWARE · CONE 10 · GAS REDUCTION
+
+Use elegant small caps metadata styling consistent with current GlazeVault typography.
+
+Make firing environment selectable with a clean modal or dropdown.
+Keep the UI calm, minimal, and gallery-like.

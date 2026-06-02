@@ -17,12 +17,11 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SelectField } from "@/components/SelectField";
+import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
-
-const CLAY_OPTIONS = ["Stoneware", "Porcelain", "Earthenware", "Terracotta", "Raku", "Bone China"];
-const FIRING_OPTIONS = ["Wood-fired", "Gas Reduction", "Electric", "Soda / Salt", "Raku", "Anagama"];
 
 function ChipSelector({
   options,
@@ -78,7 +77,8 @@ export default function AddScreen() {
   const [notes, setNotes] = useState("");
   const [clay, setClay] = useState("");
   const [glaze, setGlaze] = useState("");
-  const [firing, setFiring] = useState("");
+  const [cone, setCone] = useState("");
+  const [firingEnvironment, setFiringEnvironment] = useState("");
   const [dimensions, setDimensions] = useState("");
   const [collectionId, setCollectionId] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
@@ -142,9 +142,9 @@ export default function AddScreen() {
       return;
     }
     setSaving(true);
-    await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing, dimensions: dimensions.trim(), imageUri, collectionId });
+    await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), imageUri, collectionId });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setImageUri(null); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setFiring(""); setDimensions(""); setCollectionId(undefined);
+    setImageUri(null); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setCollectionId(undefined);
     setSaving(false);
     router.replace("/");
   };
@@ -240,8 +240,17 @@ export default function AddScreen() {
         <Label text="Glaze" />
         <Field value={glaze} onChange={setGlaze} placeholder="e.g. Celadon, Shino, Tenmoku" />
 
-        <Label text="Firing" />
-        <ChipSelector options={FIRING_OPTIONS} value={firing} onChange={setFiring} />
+        <Label text="Cone" />
+        <Field value={cone} onChange={setCone} placeholder="e.g. Cone 04, Cone 6, Cone 10" />
+
+        <Label text="Firing Environment" />
+        <SelectField
+          value={firingEnvironment}
+          options={FIRING_ENVIRONMENT_OPTIONS}
+          placeholder="Select firing environment"
+          title="Firing Environment"
+          onChange={setFiringEnvironment}
+        />
 
         <Label text="Dimensions" />
         <Field value={dimensions} onChange={setDimensions} placeholder="e.g. 9 cm H × 11 cm W" />
