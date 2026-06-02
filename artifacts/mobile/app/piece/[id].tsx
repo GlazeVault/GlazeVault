@@ -43,7 +43,7 @@ function InfoRow({
 }
 
 export default function PieceDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const { getPiece, updatePiece, toggleFavorite, deletePiece, removePieceFromCollection } = usePottery();
   const { collections } = useCollections();
   const colors = useColors();
@@ -83,6 +83,29 @@ export default function PieceDetailScreen() {
         },
       },
     ]);
+  };
+
+  const handleContextRemove = () => {
+    if (!from) {
+      handleDelete();
+      return;
+    }
+    Alert.alert(
+      "Remove from Collection",
+      `Remove "${piece.title}" from this collection? It will stay in your archive.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            await removePieceFromCollection(from, piece.id);
+            router.back();
+          },
+        },
+      ]
+    );
   };
 
   const handleSelectCollection = async (collectionId: string | undefined) => {
@@ -275,10 +298,10 @@ export default function PieceDetailScreen() {
                 styles.deleteLink,
                 { opacity: pressed ? 0.5 : 0.7 },
               ]}
-              onPress={handleDelete}
+              onPress={handleContextRemove}
             >
               <Text style={[styles.deleteLinkText, { color: colors.mutedForeground }]}>
-                Remove from archive
+                {from ? "Remove from collection" : "Remove from archive"}
               </Text>
             </Pressable>
           </View>

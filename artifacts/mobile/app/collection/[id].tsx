@@ -161,7 +161,7 @@ export default function CollectionDetailScreen() {
             </Text>
           </View>
         }
-        renderItem={({ item }) => <PotteryCard piece={item} />}
+        renderItem={({ item }) => <PotteryCard piece={item} fromCollectionId={id} />}
       />
 
       {/* Floating back + edit buttons */}

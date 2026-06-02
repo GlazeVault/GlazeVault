@@ -11,9 +11,10 @@ import { useColors } from "@/hooks/useColors";
 
 interface PotteryCardProps {
   piece: PotteryPiece;
+  fromCollectionId?: string;
 }
 
-export function PotteryCard({ piece }: PotteryCardProps) {
+export function PotteryCard({ piece, fromCollectionId }: PotteryCardProps) {
   const colors = useColors();
   const { toggleFavorite } = usePottery();
 
@@ -34,7 +35,14 @@ export function PotteryCard({ piece }: PotteryCardProps) {
           transform: [{ scale: pressed ? 0.99 : 1 }],
         },
       ]}
-      onPress={() => router.push(`/piece/${piece.id}`)}
+      onPress={() =>
+        router.push({
+          pathname: "/piece/[id]",
+          params: fromCollectionId
+            ? { id: piece.id, from: fromCollectionId }
+            : { id: piece.id },
+        })
+      }
     >
       <View style={styles.imageWrapper}>
         <Image
