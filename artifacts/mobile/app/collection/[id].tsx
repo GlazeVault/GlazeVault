@@ -23,13 +23,11 @@ export default function CollectionDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { getCollection, updateCollection, deleteCollection } = useCollections();
-  const { pieces } = usePottery();
+  const { pieces, removePieceFromCollection } = usePottery();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const collection = getCollection(id);
   const collectionPieces = pieces.filter((p) => p.collectionId === id);
-  console.log("[GlazeVault] Collection detail — id:", id, "| total pieces:", pieces.length, "| matched:", collectionPieces.length);
-  console.log("[GlazeVault] All collectionIds:", pieces.map((p) => `${p.title}:${p.collectionId ?? "none"}`).join(", "));
 
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(collection?.title ?? "");
@@ -67,6 +65,9 @@ export default function CollectionDetailScreen() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
+            for (const p of collectionPieces) {
+              await removePieceFromCollection(id, p.id);
+            }
             await deleteCollection(id);
             router.back();
           },

@@ -44,7 +44,7 @@ function InfoRow({
 
 export default function PieceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPiece, updatePiece, toggleFavorite, deletePiece } = usePottery();
+  const { getPiece, updatePiece, toggleFavorite, deletePiece, removePieceFromCollection } = usePottery();
   const { collections } = useCollections();
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -91,6 +91,18 @@ export default function PieceDetailScreen() {
     await updatePiece(piece.id, { collectionId });
     setUpdatingCollection(false);
     setCollectionPickerVisible(false);
+  };
+
+  const handleRemoveFromCollection = async () => {
+    if (!piece.collectionId) return;
+    setUpdatingCollection(true);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await removePieceFromCollection(piece.collectionId, piece.id);
+      setCollectionPickerVisible(false);
+    } finally {
+      setUpdatingCollection(false);
+    }
   };
 
   const formattedDate = new Date(piece.createdAt).toLocaleDateString("en-US", {
@@ -321,7 +333,7 @@ export default function PieceDetailScreen() {
                           borderColor: "rgba(120,110,100,0.1)",
                         },
                       ]}
-                      onPress={() => handleSelectCollection(undefined)}
+                      onPress={handleRemoveFromCollection}
                       disabled={updatingCollection}
                     >
                       <View style={[styles.optionIconCircle, { backgroundColor: colors.secondary }]}>

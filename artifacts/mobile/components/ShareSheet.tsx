@@ -79,7 +79,7 @@ export function ShareSheet({ visible, onClose, pieceTitle }: ShareSheetProps) {
     {
       id: "shopify",
       label: "Shopify",
-      icon: <MaterialCommunityIcons name="shopify" size={22} color={colors.foreground} />,
+      icon: <MaterialCommunityIcons name="storefront" size={22} color={colors.foreground} />,
       accent: "#6B8B7A",
     },
     {

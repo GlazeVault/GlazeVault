@@ -21,6 +21,7 @@ interface PotteryContextType {
   addPiece: (piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite" | "isPublic">) => Promise<void>;
   updatePiece: (id: string, updates: Partial<PotteryPiece>) => Promise<void>;
   deletePiece: (id: string) => Promise<void>;
+  removePieceFromCollection: (collectionId: string, pieceId: string) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   getPiece: (id: string) => PotteryPiece | undefined;
 }
@@ -125,6 +126,19 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
 
+  const removePieceFromCollection = useCallback(
+    async (collectionId: string, pieceId: string) => {
+      await persist(
+        piecesRef.current.map((p) =>
+          p.id === pieceId && p.collectionId === collectionId
+            ? { ...p, collectionId: undefined }
+            : p
+        )
+      );
+    },
+    [persist]
+  );
+
   const toggleFavorite = useCallback(
     async (id: string) => {
       await persist(piecesRef.current.map((p) => (p.id === id ? { ...p, isFavorite: !p.isFavorite } : p)));
@@ -135,7 +149,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const getPiece = useCallback((id: string) => piecesRef.current.find((p) => p.id === id), []);
 
   return (
-    <PotteryContext.Provider value={{ pieces, addPiece, updatePiece, deletePiece, toggleFavorite, getPiece }}>
+    <PotteryContext.Provider value={{ pieces, addPiece, updatePiece, deletePiece, removePieceFromCollection, toggleFavorite, getPiece }}>
       {children}
     </PotteryContext.Provider>
   );

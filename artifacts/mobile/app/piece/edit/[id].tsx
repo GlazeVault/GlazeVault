@@ -475,6 +475,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   inputMulti: { height: 80, paddingTop: 10 },
+  chipRow: { flexDirection: "row", gap: 8, paddingVertical: 4 },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+  },
+  chipText: { fontSize: 13, fontFamily: "Poppins_400Regular", letterSpacing: 0.2 },
   collectionRow: {
     flexDirection: "row",
     alignItems: "center",
