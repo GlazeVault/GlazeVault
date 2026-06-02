@@ -48,10 +48,13 @@ export default function PublicSiteScreen() {
   const featured = site.featuredCollectionIds
     .map((id) => collections.find((c) => c.id === id))
     .filter((c): c is NonNullable<typeof c> => Boolean(c) && isCollectionPublic(c!))
-    .map((c) => ({
-      collection: c,
-      pieces: getPublicCollectionPieces(c, pieces) as PublicPiece[],
-    }))
+    .map((c) => {
+      const cp = getPublicCollectionPieces(c, pieces) as PublicPiece[];
+      // Cover may only use a public piece that itself allows photos, so a
+      // hidden image never leaks through the cover.
+      const cover = cp.find((p) => p.publicDataSettings.showPhotos) ?? null;
+      return { collection: c, pieces: cp, cover };
+    })
     .filter((entry) => entry.pieces.length > 0);
 
   const links: { icon: keyof typeof Feather.glyphMap; label: string }[] = [];
@@ -194,8 +197,21 @@ export default function PublicSiteScreen() {
             </Text>
           </View>
         ) : (
-          featured.map(({ collection, pieces: cp }) => (
+          featured.map(({ collection, pieces: cp, cover }) => (
             <View key={collection.id} style={styles.collectionSection}>
+              {cover ? (
+                <Pressable
+                  style={({ pressed }) => [styles.coverWrap, { opacity: pressed ? 0.9 : 1 }]}
+                  onPress={() => router.push(`/piece/${cover.id}?public=1`)}
+                >
+                  <Image
+                    source={resolveImageSource(cover.imageUri)}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    transition={200}
+                  />
+                </Pressable>
+              ) : null}
               <Text style={[styles.collectionTitle, { color: colors.foreground }]}>
                 {collection.title}
               </Text>
@@ -311,6 +327,13 @@ const styles = StyleSheet.create({
   linkText: { fontSize: 13, fontFamily: "Poppins_300Light", flexShrink: 1 },
   divider: { height: 1, marginVertical: 28 },
   collectionSection: { marginBottom: 36 },
+  coverWrap: {
+    width: "100%",
+    aspectRatio: 16 / 10,
+    borderRadius: 14,
+    overflow: "hidden",
+    marginBottom: 16,
+  },
   collectionTitle: {
     fontSize: 22,
     fontFamily: "PlayfairDisplay_400Regular",
