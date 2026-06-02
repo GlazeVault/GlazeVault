@@ -62,9 +62,11 @@ export function PotteryCard({ piece }: PotteryCardProps) {
           {piece.title}
         </Text>
         {meta ? (
-          <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>
-            {meta}
-          </Text>
+          <View style={styles.metaWrap}>
+            <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>
+              {meta}
+            </Text>
+          </View>
         ) : null}
       </View>
     </Pressable>
@@ -73,12 +75,13 @@ export function PotteryCard({ piece }: PotteryCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    overflow: "hidden",
     marginBottom: 44,
   },
   imageWrapper: {
     width: "100%",
     aspectRatio: 4 / 5,
+    borderRadius: 24,
+    overflow: "hidden",
   },
   favoriteBtn: {
     position: "absolute",
@@ -102,12 +105,16 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     letterSpacing: 0.2,
   },
+  metaWrap: {
+    paddingTop: 4,
+    paddingBottom: 2,
+  },
   meta: {
     fontSize: 12,
+    lineHeight: 20,
     fontFamily: "Poppins_400Regular",
     letterSpacing: 2,
-    lineHeight: 20,
     textTransform: "uppercase",
-    paddingTop: 3,
+    includeFontPadding: true,
   },
 });
