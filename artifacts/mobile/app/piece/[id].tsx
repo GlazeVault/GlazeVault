@@ -47,11 +47,11 @@ export default function PieceDetailScreen() {
   const params = useLocalSearchParams<{ id: string; from?: string; public?: string }>();
   const { id, from } = params;
   const isPublicView = params.public === "1";
-  const { getPiece, updatePiece, toggleFavorite, deletePiece, removePieceFromCollection } = usePottery();
+  const { pieces, updatePiece, toggleFavorite, deletePiece, removePieceFromCollection } = usePottery();
   const { collections } = useCollections();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const piece = getPiece(id);
+  const piece = pieces.find((p) => p.id === id);
   const [shareVisible, setShareVisible] = useState(false);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
   const [updatingCollection, setUpdatingCollection] = useState(false);

@@ -5,3 +5,4 @@
 - [GlazeVault privacy](glazevault-privacy.md) — piece visibility is source of truth; public surfaces must use isPubliclyVisiblePiece (gates by parent collection); kept collectionId not pieceIds; new items default private.
 - [GlazeVault file-text import](glazevault-file-import.md) — web reads DOM asset.file (not fetch blob:); native uses new File().text(); docx via fflate unzip of word/document.xml; pdf deferred; import mutates only local state until Save.
 - [GlazeVault image & data persistence](glazevault-image-persistence.md) — web=base64 data URI, native=relative pieces/ path; all images via persistPieceImage+resolveImageSource (fail-closed on save); per-context writeChain serializes AsyncStorage writes; seed only when empty.
+- [GlazeVault context reactivity](glazevault-context-reactivity.md) — getPiece reads a non-reactive ref; rendered must-stay-fresh values (badges/toggles) must read the reactive `pieces` list; getPiece ok only for one-shot form init.

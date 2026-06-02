@@ -69,12 +69,18 @@ export function PotteryCard({ piece, fromCollectionId, showVisibility }: Pottery
         />
       </Pressable>
 
-      {showVisibility && isPrivate && (
-        <View style={styles.privateBadge}>
-          <Feather name="lock" size={11} color="#8A7B6C" />
-          <Text style={styles.privateBadgeText}>Private</Text>
-        </View>
-      )}
+      {showVisibility &&
+        (isPrivate ? (
+          <View style={styles.privateBadge}>
+            <Feather name="lock" size={11} color="#8A7B6C" />
+            <Text style={styles.privateBadgeText}>Private</Text>
+          </View>
+        ) : (
+          <View style={styles.publicBadge}>
+            <Feather name="globe" size={11} color={colors.emerald} />
+            <Text style={[styles.publicBadgeText, { color: colors.emerald }]}>Public</Text>
+          </View>
+        ))}
 
       <View style={styles.info}>
         <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
@@ -130,6 +136,23 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_500Medium",
     letterSpacing: 0.5,
     color: "#8A7B6C",
+  },
+  publicBadge: {
+    position: "absolute",
+    top: 14,
+    left: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: "rgba(253,250,245,0.88)",
+  },
+  publicBadgeText: {
+    fontSize: 10,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.5,
   },
   info: {
     paddingTop: 14,

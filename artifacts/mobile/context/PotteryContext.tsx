@@ -190,6 +190,9 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
             merged.firingEnvironment = firingEnvironment;
             merged.firing = firingEnvironment;
           }
+          if (updates.visibility !== undefined) {
+            console.log("Piece visibility updated:", merged.id, merged.visibility);
+          }
           return merged;
         })
       );
