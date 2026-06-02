@@ -1,0 +1,118 @@
+Finish Case 1 flow for GlazeVault.
+
+Goal:
+A ceramic artist should be able to:
+1. Record a piece
+2. Add it to collections
+3. Make it public
+4. Feature collections on a public site
+5. Preview a beautiful portfolio website
+
+Focus on completing and stabilizing this flow.
+Do not add unrelated features.
+
+1. Public Site Preview
+
+Finish the Public Site Preview screen.
+
+Requirements:
+- Show profile image
+- Artist name
+- Bio
+- Artist statement
+- Featured collections
+- Public pieces only
+- Respect publicDataSettings
+- Hide all private pieces and hidden fields
+
+Support layouts:
+- Grid
+- Editorial
+- Masonry
+
+Keep design:
+- calm
+- editorial
+- gallery-like
+- minimal
+- warm Japandi aesthetic
+
+2. Featured Collections
+
+Make Featured Collections fully functional.
+
+Collection Edit must support:
+- Public / Private toggle
+- Feature on Public Site toggle
+- Collection cover image
+
+Rules:
+- featuredOnSite only works if collection is public
+- if collection becomes private:
+  automatically disable featuredOnSite
+
+Profile screen should display:
+- featured collections
+- cover image
+- title
+- public piece count
+
+3. Collection Cover Image
+
+Add stable collection cover image support.
+
+Requirements:
+- image picker
+- save permanent image URI using expo-file-system
+- persist with AsyncStorage
+
+Fallback order:
+1. collection.coverImageUri
+2. first public piece image
+3. neutral placeholder
+
+4. Persistence Stability
+
+Verify persistence for:
+- pieces
+- collections
+- profile
+- visibility
+- publicDataSettings
+- featuredOnSite
+- collection cover images
+- profile image
+- public site settings
+
+App restart must preserve all data.
+
+5. Public Preview Privacy
+
+Fix all stale visibility bugs.
+
+Public Preview must always use latest piece state.
+
+Never show:
+- private pieces
+- private collections
+- hidden technical fields
+
+6. Search MVP
+
+Add simple search:
+- Search Pieces
+- Search Collections
+
+Basic local filtering only for now.
+
+7. Stability Pass
+
+Before finishing:
+- no crashes
+- no PDF parser errors
+- no stale visibility state
+- no broken image rendering
+- no mock/demo data overwriting saved data
+
+This milestone should make GlazeVault feel like:
+a real ceramic archive + portfolio platform MVP.

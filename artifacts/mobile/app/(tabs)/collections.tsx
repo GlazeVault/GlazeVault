@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SearchBar } from "@/components/SearchBar";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { resolveImageSource } from "@/constants/seedImages";
@@ -23,6 +24,16 @@ export default function CollectionsScreen() {
   const { collections } = useCollections();
   const { pieces } = usePottery();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const [query, setQuery] = React.useState("");
+
+  const trimmed = query.trim().toLowerCase();
+  const filtered = trimmed
+    ? collections.filter((c) =>
+        [c.title, c.intro]
+          .filter(Boolean)
+          .some((field) => field.toLowerCase().includes(trimmed))
+      )
+    : collections;
 
   const getPiecesForCollection = (collectionId: string) =>
     pieces.filter((p) => p.collectionId === collectionId);
@@ -35,9 +46,11 @@ export default function CollectionsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
-        data={collections}
+        data={filtered}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={[
           styles.list,
           { paddingTop: topPad + 32, paddingBottom: insets.bottom + 120 },
@@ -60,30 +73,52 @@ export default function CollectionsScreen() {
             <Text style={[styles.count, { color: colors.mutedForeground }]}>
               {collections.length === 0
                 ? "No collections yet"
-                : `${collections.length} ${collections.length === 1 ? "collection" : "collections"}`}
+                : trimmed
+                  ? `${filtered.length} of ${collections.length} ${collections.length === 1 ? "collection" : "collections"}`
+                  : `${collections.length} ${collections.length === 1 ? "collection" : "collections"}`}
             </Text>
+            {collections.length > 0 ? (
+              <View style={styles.searchWrap}>
+                <SearchBar
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Search collections"
+                />
+              </View>
+            ) : null}
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <View style={[styles.emptyCircle, { backgroundColor: colors.secondary }]}>
-              <Feather name="layers" size={24} color={colors.mutedForeground} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-              No collections yet
-            </Text>
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              Group your works into curated series, themes, or firing sessions
-            </Text>
-            <Pressable
-              style={[styles.emptyBtn, { borderColor: "rgba(120,110,100,0.2)" }]}
-              onPress={() => router.push("/collection/new")}
-            >
-              <Text style={[styles.emptyBtnText, { color: colors.foreground }]}>
-                Create first collection
+          trimmed ? (
+            <View style={styles.noResults}>
+              <Text style={[styles.noResultsTitle, { color: colors.foreground }]}>
+                No matches
               </Text>
-            </Pressable>
-          </View>
+              <Text style={[styles.noResultsText, { color: colors.mutedForeground }]}>
+                No collections match “{query.trim()}”
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.empty}>
+              <View style={[styles.emptyCircle, { backgroundColor: colors.secondary }]}>
+                <Feather name="layers" size={24} color={colors.mutedForeground} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+                No collections yet
+              </Text>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                Group your works into curated series, themes, or firing sessions
+              </Text>
+              <Pressable
+                style={[styles.emptyBtn, { borderColor: "rgba(120,110,100,0.2)" }]}
+                onPress={() => router.push("/collection/new")}
+              >
+                <Text style={[styles.emptyBtnText, { color: colors.foreground }]}>
+                  Create first collection
+                </Text>
+              </Pressable>
+            </View>
+          )
         }
         renderItem={({ item }) => {
           const cover = getCoverForCollection(item.id);
@@ -170,6 +205,21 @@ const styles = StyleSheet.create({
   },
   divider: { height: 1, width: 40, marginBottom: 12 },
   count: { fontSize: 12, fontFamily: "Poppins_400Regular", letterSpacing: 0.3 },
+  searchWrap: { marginTop: 24 },
+  noResults: { alignItems: "center", paddingTop: 32, gap: 8 },
+  noResultsTitle: {
+    fontSize: 20,
+    fontFamily: "PlayfairDisplay_400Regular",
+    letterSpacing: 0.3,
+    textAlign: "center",
+  },
+  noResultsText: {
+    fontSize: 13,
+    fontFamily: "Poppins_300Light",
+    textAlign: "center",
+    lineHeight: 22,
+    maxWidth: 260,
+  },
   empty: { alignItems: "center", paddingTop: 40, gap: 14 },
   emptyCircle: {
     width: 64,
