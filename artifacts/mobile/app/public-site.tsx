@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   PublicDataSettings,
   getPublicCollectionPieces,
-  isCollectionPublic,
+  isCollectionFeatured,
 } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
@@ -43,11 +43,10 @@ export default function PublicSiteScreen() {
   const site = profile.publicSite;
   const layout: HomepageLayout = site.homepageLayout;
 
-  // Privacy: only featured collections that are still public, each reduced to
-  // its public pieces. Order follows the artist's featured selection.
-  const featured = site.featuredCollectionIds
-    .map((id) => collections.find((c) => c.id === id))
-    .filter((c): c is NonNullable<typeof c> => Boolean(c) && isCollectionPublic(c!))
+  // Privacy: only public collections explicitly featured on the site, each
+  // reduced to its public pieces. Featuring lives on the collection itself.
+  const featured = collections
+    .filter(isCollectionFeatured)
     .map((c) => {
       const cp = getPublicCollectionPieces(c, pieces) as PublicPiece[];
       // Cover may only use a public piece that itself allows photos, so a

@@ -28,6 +28,9 @@ export default function NewCollectionScreen() {
   const [title, setTitle] = useState(existing?.title ?? "");
   const [intro, setIntro] = useState(existing?.intro ?? "");
   const [visibility, setVisibility] = useState<Visibility>(existing?.visibility ?? "private");
+  const [featuredOnSite, setFeaturedOnSite] = useState<boolean>(
+    existing?.featuredOnSite ?? false
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -35,6 +38,7 @@ export default function NewCollectionScreen() {
       setTitle(existing.title);
       setIntro(existing.intro);
       setVisibility(existing.visibility);
+      setFeaturedOnSite(existing.featuredOnSite);
     }
   }, [existing?.id]);
 
@@ -46,10 +50,21 @@ export default function NewCollectionScreen() {
       return;
     }
     setSaving(true);
+    const featured = visibility === "public" ? featuredOnSite : false;
     if (existing && editId) {
-      await updateCollection(editId, { title: title.trim(), intro: intro.trim(), visibility });
+      await updateCollection(editId, {
+        title: title.trim(),
+        intro: intro.trim(),
+        visibility,
+        featuredOnSite: featured,
+      });
     } else {
-      await addCollection({ title: title.trim(), intro: intro.trim(), visibility });
+      await addCollection({
+        title: title.trim(),
+        intro: intro.trim(),
+        visibility,
+        featuredOnSite: featured,
+      });
     }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setSaving(false);
@@ -128,7 +143,13 @@ export default function NewCollectionScreen() {
                     : "rgba(120,110,100,0.16)",
               },
             ]}
-            onPress={() => setVisibility((v) => (v === "public" ? "private" : "public"))}
+            onPress={() =>
+              setVisibility((v) => {
+                const next = v === "public" ? "private" : "public";
+                if (next === "private") setFeaturedOnSite(false);
+                return next;
+              })
+            }
             accessibilityRole="switch"
             accessibilityState={{ checked: visibility === "public" }}
             accessibilityLabel="Collection visibility"
@@ -171,6 +192,63 @@ export default function NewCollectionScreen() {
             </View>
           </Pressable>
         </View>
+
+        {visibility === "public" ? (
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.label, { color: colors.mutedForeground }]}>Public Site</Text>
+            <Pressable
+              style={[
+                styles.visibilityRow,
+                {
+                  backgroundColor: featuredOnSite ? "rgba(107,127,163,0.1)" : colors.secondary,
+                  borderColor: featuredOnSite
+                    ? "rgba(107,127,163,0.3)"
+                    : "rgba(120,110,100,0.16)",
+                },
+              ]}
+              onPress={() => setFeaturedOnSite((f) => !f)}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: featuredOnSite }}
+              accessibilityLabel="Feature on public site"
+            >
+              <Feather
+                name="star"
+                size={14}
+                color={featuredOnSite ? colors.cobalt : colors.mutedForeground}
+              />
+              <View style={styles.visibilityLabels}>
+                <Text
+                  style={[
+                    styles.visibilityTitle,
+                    { color: featuredOnSite ? colors.cobalt : colors.foreground },
+                  ]}
+                >
+                  Feature on Public Site
+                </Text>
+                <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
+                  {featuredOnSite
+                    ? "Highlighted on your public site"
+                    : "Not shown on your public site"}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.visToggle,
+                  {
+                    backgroundColor: featuredOnSite ? colors.cobalt : "rgba(120,110,100,0.18)",
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.visToggleThumb,
+                    { transform: [{ translateX: featuredOnSite ? 18 : 2 }] },
+                  ]}
+                />
+              </View>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={[styles.hint, { backgroundColor: colors.secondary, borderColor: "rgba(120,110,100,0.12)" }]}>
           <Feather name="info" size={13} color={colors.mutedForeground} style={{ marginTop: 1 }} />

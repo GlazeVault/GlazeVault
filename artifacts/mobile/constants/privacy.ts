@@ -50,6 +50,18 @@ export function isCollectionPublic(collection: { visibility: Visibility }): bool
   return collection.visibility === "public";
 }
 
+/**
+ * Whether a collection should surface on the public site. Featuring requires the
+ * collection to be public — a private collection can never be featured, so the
+ * public flag always wins over a stale `featuredOnSite` value.
+ */
+export function isCollectionFeatured(collection: {
+  visibility: Visibility;
+  featuredOnSite: boolean;
+}): boolean {
+  return isCollectionPublic(collection) && collection.featuredOnSite;
+}
+
 export function getPublicCollectionPieces<
   P extends { collectionId?: string; visibility: Visibility }
 >(collection: { id: string }, pieces: P[]): P[] {

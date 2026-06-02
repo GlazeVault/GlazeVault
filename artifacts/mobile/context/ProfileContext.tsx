@@ -5,7 +5,6 @@ export type HomepageLayout = "grid" | "editorial" | "masonry";
 
 export interface PublicSiteSettings {
   enabled: boolean;
-  featuredCollectionIds: string[];
   homepageLayout: HomepageLayout;
   contactEmail: string;
   etsy: string;
@@ -14,7 +13,6 @@ export interface PublicSiteSettings {
 
 export const DEFAULT_PUBLIC_SITE: PublicSiteSettings = {
   enabled: false,
-  featuredCollectionIds: [],
   homepageLayout: "grid",
   contactEmail: "",
   etsy: "",
@@ -56,11 +54,18 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 const STORAGE_KEY = "@glazevault_profile_v1";
 
 function normalizeProfile(raw: Partial<ArtistProfile>): ArtistProfile {
-  return {
-    ...DEFAULT_PROFILE,
-    ...raw,
-    publicSite: { ...DEFAULT_PUBLIC_SITE, ...(raw.publicSite ?? {}) },
+  // Whitelist publicSite to the current schema so legacy keys (e.g. the old
+  // profile-side `featuredCollectionIds`, now replaced by per-collection
+  // `featuredOnSite`) are dropped and never re-persisted.
+  const rawSite = (raw.publicSite ?? {}) as Partial<PublicSiteSettings>;
+  const publicSite: PublicSiteSettings = {
+    enabled: rawSite.enabled ?? DEFAULT_PUBLIC_SITE.enabled,
+    homepageLayout: rawSite.homepageLayout ?? DEFAULT_PUBLIC_SITE.homepageLayout,
+    contactEmail: rawSite.contactEmail ?? DEFAULT_PUBLIC_SITE.contactEmail,
+    etsy: rawSite.etsy ?? DEFAULT_PUBLIC_SITE.etsy,
+    shopify: rawSite.shopify ?? DEFAULT_PUBLIC_SITE.shopify,
   };
+  return { ...DEFAULT_PROFILE, ...raw, publicSite };
 }
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {

@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PotteryCard } from "@/components/PotteryCard";
-import { Visibility } from "@/constants/privacy";
+import { Visibility, isCollectionFeatured } from "@/constants/privacy";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -34,6 +34,9 @@ export default function CollectionDetailScreen() {
   const [title, setTitle] = useState(collection?.title ?? "");
   const [intro, setIntro] = useState(collection?.intro ?? "");
   const [visibility, setVisibility] = useState<Visibility>(collection?.visibility ?? "private");
+  const [featuredOnSite, setFeaturedOnSite] = useState<boolean>(
+    collection?.featuredOnSite ?? false
+  );
   const [saving, setSaving] = useState(false);
 
   if (!collection) {
@@ -52,7 +55,13 @@ export default function CollectionDetailScreen() {
       return;
     }
     setSaving(true);
-    await updateCollection(id, { title: title.trim(), intro: intro.trim(), visibility });
+    await updateCollection(id, {
+      title: title.trim(),
+      intro: intro.trim(),
+      visibility,
+      // A private collection can never be featured.
+      featuredOnSite: visibility === "public" ? featuredOnSite : false,
+    });
     setSaving(false);
     setIsEditing(false);
   };
@@ -122,6 +131,7 @@ export default function CollectionDetailScreen() {
                 : `${collectionPieces.length} ${collectionPieces.length === 1 ? "piece" : "pieces"}`}
             </Text>
             {isEditing ? (
+              <>
               <Pressable
                 style={[
                   styles.visibilityRow,
@@ -135,7 +145,11 @@ export default function CollectionDetailScreen() {
                   },
                 ]}
                 onPress={() =>
-                  setVisibility((v) => (v === "public" ? "private" : "public"))
+                  setVisibility((v) => {
+                    const next = v === "public" ? "private" : "public";
+                    if (next === "private") setFeaturedOnSite(false);
+                    return next;
+                  })
                 }
                 accessibilityRole="switch"
                 accessibilityState={{ checked: visibility === "public" }}
@@ -180,6 +194,65 @@ export default function CollectionDetailScreen() {
                   />
                 </View>
               </Pressable>
+              {visibility === "public" ? (
+                <Pressable
+                  style={[
+                    styles.visibilityRow,
+                    {
+                      marginTop: 10,
+                      backgroundColor: featuredOnSite
+                        ? "rgba(107,127,163,0.1)"
+                        : colors.secondary,
+                      borderColor: featuredOnSite
+                        ? "rgba(107,127,163,0.3)"
+                        : "rgba(120,110,100,0.16)",
+                    },
+                  ]}
+                  onPress={() => setFeaturedOnSite((f) => !f)}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: featuredOnSite }}
+                  accessibilityLabel="Feature on public site"
+                >
+                  <Feather
+                    name="star"
+                    size={14}
+                    color={featuredOnSite ? colors.cobalt : colors.mutedForeground}
+                  />
+                  <View style={styles.visibilityLabels}>
+                    <Text
+                      style={[
+                        styles.visibilityTitle,
+                        { color: featuredOnSite ? colors.cobalt : colors.foreground },
+                      ]}
+                    >
+                      Feature on Public Site
+                    </Text>
+                    <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
+                      {featuredOnSite
+                        ? "Highlighted on your public site"
+                        : "Not shown on your public site"}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.visToggle,
+                      {
+                        backgroundColor: featuredOnSite
+                          ? colors.cobalt
+                          : "rgba(120,110,100,0.18)",
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.visToggleThumb,
+                        { transform: [{ translateX: featuredOnSite ? 18 : 2 }] },
+                      ]}
+                    />
+                  </View>
+                </Pressable>
+              ) : null}
+              </>
             ) : (
               <View style={styles.viewBadgeRow}>
                 <View
@@ -212,6 +285,14 @@ export default function CollectionDetailScreen() {
                     {collection.visibility === "public" ? "Public" : "Private"}
                   </Text>
                 </View>
+                {isCollectionFeatured(collection) ? (
+                  <View
+                    style={[styles.viewBadge, { backgroundColor: "rgba(107,127,163,0.12)" }]}
+                  >
+                    <Feather name="star" size={11} color={colors.cobalt} />
+                    <Text style={[styles.viewBadgeText, { color: colors.cobalt }]}>Featured</Text>
+                  </View>
+                ) : null}
               </View>
             )}
             {isEditing ? (
@@ -276,6 +357,7 @@ export default function CollectionDetailScreen() {
               setTitle(collection.title);
               setIntro(collection.intro);
               setVisibility(collection.visibility);
+              setFeaturedOnSite(collection.featuredOnSite);
               setIsEditing(true);
             }}
           >
@@ -411,7 +493,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   visToggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#FFFFFF" },
-  viewBadgeRow: { flexDirection: "row", marginTop: 14 },
+  viewBadgeRow: { flexDirection: "row", marginTop: 14, gap: 8 },
   viewBadge: {
     flexDirection: "row",
     alignItems: "center",

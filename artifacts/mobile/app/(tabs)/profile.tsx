@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { isCollectionPublic, isPubliclyVisiblePiece } from "@/constants/privacy";
+import { getPublicCollectionPieces, isCollectionFeatured } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import {
@@ -49,8 +49,7 @@ export default function ProfileScreen() {
   const [avatarUri, setAvatarUri] = useState(profile.avatarUri ?? "");
   const [saving, setSaving] = useState(false);
 
-  const publicPieces = pieces.filter((p) => isPubliclyVisiblePiece(p, collections));
-  const publicCollections = collections.filter(isCollectionPublic);
+  const featuredCollections = collections.filter(isCollectionFeatured);
   const site = profile.publicSite;
 
   const startEditing = () => {
@@ -89,15 +88,6 @@ export default function ProfileScreen() {
   const toggleSite = async () => {
     await Haptics.selectionAsync();
     await updatePublicSite({ enabled: !site.enabled });
-  };
-
-  const toggleFeatured = async (collectionId: string) => {
-    await Haptics.selectionAsync();
-    const current = site.featuredCollectionIds;
-    const next = current.includes(collectionId)
-      ? current.filter((cid) => cid !== collectionId)
-      : [...current, collectionId];
-    await updatePublicSite({ featuredCollectionIds: next });
   };
 
   const selectLayout = async (layout: HomepageLayout) => {
@@ -253,52 +243,72 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Public Works */}
+        {/* Featured Collections */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-              Public Works
+              Featured Collections
             </Text>
-            {publicPieces.length > 0 && (
+            {featuredCollections.length > 0 && (
               <View style={[styles.countBadge, { backgroundColor: "rgba(107,127,163,0.1)" }]}>
                 <Text style={[styles.countBadgeText, { color: colors.cobalt }]}>
-                  {publicPieces.length}
+                  {featuredCollections.length}
                 </Text>
               </View>
             )}
           </View>
-          {publicPieces.length === 0 ? (
+          {featuredCollections.length === 0 ? (
             <View style={[styles.publicEmpty, { borderColor: "rgba(120,110,100,0.12)" }]}>
-              <Feather name="eye" size={16} color={colors.mutedForeground} style={{ opacity: 0.35, marginBottom: 8 }} />
+              <Feather name="star" size={16} color={colors.mutedForeground} style={{ opacity: 0.35, marginBottom: 8 }} />
               <Text style={[styles.publicEmptyText, { color: colors.mutedForeground }]}>
-                No public pieces yet
+                No featured collections yet
               </Text>
               <Text style={[styles.publicEmptyHint, { color: colors.mutedForeground }]}>
-                Open any piece and set its visibility to Public
+                Open a public collection and turn on “Feature on Public Site”
               </Text>
             </View>
           ) : (
-            <View style={styles.publicGrid}>
-              {publicPieces.map((piece) => (
-                <Pressable
-                  key={piece.id}
-                  style={({ pressed }) => [
-                    styles.publicThumb,
-                    { backgroundColor: colors.secondary, opacity: pressed ? 0.85 : 1 },
-                  ]}
-                  onPress={() => router.push(`/piece/${piece.id}?public=1`)}
-                >
-                  <Image
-                    source={resolveImageSource(piece.imageUri)}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="cover"
-                    transition={200}
-                  />
-                  <View style={styles.thumbOverlay}>
-                    <Text style={styles.thumbTitle} numberOfLines={1}>{piece.title}</Text>
-                  </View>
-                </Pressable>
-              ))}
+            <View style={styles.featuredList}>
+              {featuredCollections.map((c) => {
+                const cp = getPublicCollectionPieces(c, pieces);
+                const cover = cp.find((p) => p.publicDataSettings.showPhotos);
+                return (
+                  <Pressable
+                    key={c.id}
+                    style={({ pressed }) => [
+                      styles.featuredCard,
+                      {
+                        backgroundColor: colors.secondary,
+                        borderColor: "rgba(120,110,100,0.12)",
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                    onPress={() => router.push(`/collection/${c.id}`)}
+                  >
+                    <View style={[styles.featuredCover, { backgroundColor: "rgba(120,110,100,0.1)" }]}>
+                      {cover ? (
+                        <Image
+                          source={resolveImageSource(cover.imageUri)}
+                          style={StyleSheet.absoluteFill}
+                          contentFit="cover"
+                          transition={200}
+                        />
+                      ) : (
+                        <Feather name="image" size={18} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
+                      )}
+                    </View>
+                    <View style={styles.featuredInfo}>
+                      <Text style={[styles.featuredTitle, { color: colors.foreground }]} numberOfLines={1}>
+                        {c.title}
+                      </Text>
+                      <Text style={[styles.featuredCount, { color: colors.mutedForeground }]}>
+                        {cp.length} public {cp.length === 1 ? "piece" : "pieces"}
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={18} color={colors.mutedForeground} style={{ opacity: 0.5 }} />
+                  </Pressable>
+                );
+              })}
             </View>
           )}
         </View>
@@ -439,45 +449,17 @@ export default function ProfileScreen() {
 
           {site.enabled ? (
             <>
-              {/* Featured collections */}
-              <Text style={[styles.subLabel, { color: colors.mutedForeground }]}>
-                Featured Collections
-              </Text>
-              {publicCollections.length === 0 ? (
-                <Text style={[styles.emptyField, { color: colors.mutedForeground }]}>
-                  Make a collection public to feature it on your site
+              {/* Featured collections hint — featuring is managed per collection */}
+              <View style={[styles.siteHintRow, { borderColor: "rgba(120,110,100,0.16)" }]}>
+                <Feather name="star" size={13} color={colors.cobalt} />
+                <Text style={[styles.siteHintText, { color: colors.mutedForeground }]}>
+                  {featuredCollections.length === 0
+                    ? "Open a public collection and turn on “Feature on Public Site” to add it here."
+                    : `${featuredCollections.length} ${
+                        featuredCollections.length === 1 ? "collection is" : "collections are"
+                      } featured. Manage featuring from each collection.`}
                 </Text>
-              ) : (
-                <View style={styles.chipWrap}>
-                  {publicCollections.map((c) => {
-                    const selected = site.featuredCollectionIds.includes(c.id);
-                    return (
-                      <Pressable
-                        key={c.id}
-                        onPress={() => toggleFeatured(c.id)}
-                        style={[
-                          styles.chip,
-                          {
-                            backgroundColor: selected ? colors.cobalt : colors.secondary,
-                            borderColor: selected ? colors.cobalt : "rgba(120,110,100,0.16)",
-                          },
-                        ]}
-                      >
-                        {selected && <Feather name="check" size={11} color="#FFFFFF" />}
-                        <Text
-                          style={[
-                            styles.chipText,
-                            { color: selected ? "#FFFFFF" : colors.foreground },
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {c.title}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              )}
+              </View>
 
               {/* Homepage layout */}
               <Text style={[styles.subLabel, { color: colors.mutedForeground, marginTop: 22 }]}>
@@ -756,32 +738,6 @@ const styles = StyleSheet.create({
   },
   publicEmptyText: { fontSize: 13, fontFamily: "Poppins_400Regular", lineHeight: 20 },
   publicEmptyHint: { fontSize: 12, fontFamily: "Poppins_300Light", lineHeight: 18, textAlign: "center", opacity: 0.8 },
-  publicGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  publicThumb: {
-    width: "31.5%",
-    aspectRatio: 1,
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  thumbOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(45,45,42,0.48)",
-    paddingHorizontal: 6,
-    paddingVertical: 5,
-  },
-  thumbTitle: {
-    fontSize: 9,
-    fontFamily: "Poppins_400Regular",
-    color: "#FFFFFF",
-    letterSpacing: 0.2,
-  },
   links: { gap: 12 },
   linkRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   linkText: { fontSize: 14, fontFamily: "Poppins_300Light" },
@@ -842,18 +798,40 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 12,
   },
-  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
+  featuredList: { gap: 10 },
+  featuredCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 20,
+    gap: 14,
+    padding: 10,
+    borderRadius: 14,
     borderWidth: 0.75,
-    maxWidth: "100%",
   },
-  chipText: { fontSize: 12, fontFamily: "Poppins_400Regular", letterSpacing: 0.2, flexShrink: 1 },
+  featuredCover: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  featuredInfo: { flex: 1, gap: 3 },
+  featuredTitle: {
+    fontSize: 16,
+    fontFamily: "PlayfairDisplay_400Regular",
+    letterSpacing: 0.2,
+  },
+  featuredCount: { fontSize: 12, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
+  siteHintRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 0.75,
+  },
+  siteHintText: { flex: 1, fontSize: 12, fontFamily: "Poppins_300Light", lineHeight: 19 },
   layoutWrap: { gap: 8 },
   layoutCard: {
     paddingHorizontal: 14,
