@@ -5,18 +5,22 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
+import { ImportedText, pickAndExtractText } from "@/constants/importText";
 import { getPublicCollectionPieces, isCollectionFeatured } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
@@ -49,6 +53,11 @@ export default function ProfileScreen() {
   const [shopify, setShopify] = useState(profile.publicSite.shopify);
   const [avatarUri, setAvatarUri] = useState(profile.avatarUri ?? "");
   const [saving, setSaving] = useState(false);
+  // Import-from-file flow: which field we're importing into, the extracted
+  // preview awaiting a Replace/Append choice, and an in-flight guard.
+  const [importTarget, setImportTarget] = useState<"bio" | "statement" | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportedText | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
   // Prevents overlapping picker/save runs (and duplicate native file copies)
   // from rapid taps on the avatar.
   const pickingAvatar = useRef(false);
@@ -191,6 +200,65 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleImportPress = async (target: "bio" | "statement") => {
+    if (importBusy) return;
+    setImportBusy(true);
+    try {
+      const result = await pickAndExtractText();
+      if (!result) return; // user canceled the picker
+      if (!result.text.trim()) {
+        Alert.alert("Nothing to import", "We couldn’t find any readable text in that file.");
+        return;
+      }
+      setImportTarget(target);
+      setImportPreview(result);
+    } catch (e) {
+      console.warn("Import from file failed", e);
+      Alert.alert("Import failed", e instanceof Error ? e.message : "We couldn’t read that file.");
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
+  const closeImport = () => {
+    setImportTarget(null);
+    setImportPreview(null);
+  };
+
+  const applyImport = (mode: "replace" | "append") => {
+    if (!importPreview || !importTarget) return;
+    const current = importTarget === "bio" ? bio : statement;
+    const setter = importTarget === "bio" ? setBio : setStatement;
+    const incoming = importPreview.text.trim();
+    const next =
+      mode === "append" && current.trim()
+        ? `${current.trimEnd()}\n\n${incoming}`
+        : incoming;
+    setter(next);
+    closeImport();
+  };
+
+  const renderImportButton = (target: "bio" | "statement") => (
+    <Pressable
+      onPress={() => handleImportPress(target)}
+      disabled={importBusy}
+      style={({ pressed }) => [
+        styles.importBtn,
+        { borderColor: "rgba(120,110,100,0.22)", opacity: pressed || importBusy ? 0.55 : 1 },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel="Import from file"
+      accessibilityHint="Choose a .txt or .docx file to fill this field"
+    >
+      {importBusy ? (
+        <ActivityIndicator size="small" color={colors.mutedForeground} />
+      ) : (
+        <Feather name="upload" size={12} color={colors.mutedForeground} />
+      )}
+      <Text style={[styles.importBtnText, { color: colors.mutedForeground }]}>Import from file</Text>
+    </Pressable>
+  );
+
   const initial = (isEditing ? name : profile.name).trim().charAt(0).toUpperCase();
   // Avatar display depends only on the persisted profile, so the picked image
   // shows immediately after save and the letter fallback appears only when there
@@ -287,15 +355,18 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Bio</Text>
           {isEditing ? (
-            <TextInput
-              style={[styles.bioInput, { color: colors.foreground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
-              value={bio}
-              onChangeText={setBio}
-              placeholder="A few words about your practice…"
-              placeholderTextColor={colors.mutedForeground}
-              multiline
-              textAlignVertical="top"
-            />
+            <>
+              <TextInput
+                style={[styles.bioInput, { color: colors.foreground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
+                value={bio}
+                onChangeText={setBio}
+                placeholder="A few words about your practice…"
+                placeholderTextColor={colors.mutedForeground}
+                multiline
+                textAlignVertical="top"
+              />
+              {renderImportButton("bio")}
+            </>
           ) : profile.bio ? (
             <Text style={[styles.bioText, { color: colors.foreground }]}>{profile.bio}</Text>
           ) : (
@@ -311,15 +382,18 @@ export default function ProfileScreen() {
             Artist Statement
           </Text>
           {isEditing ? (
-            <TextInput
-              style={[styles.statementInput, { color: colors.foreground }]}
-              value={statement}
-              onChangeText={setStatement}
-              placeholder="Your artistic vision and approach…"
-              placeholderTextColor={colors.mutedForeground}
-              multiline
-              textAlignVertical="top"
-            />
+            <>
+              <TextInput
+                style={[styles.statementInput, { color: colors.foreground }]}
+                value={statement}
+                onChangeText={setStatement}
+                placeholder="Your artistic vision and approach…"
+                placeholderTextColor={colors.mutedForeground}
+                multiline
+                textAlignVertical="top"
+              />
+              {renderImportButton("statement")}
+            </>
           ) : profile.statement ? (
             <Text style={[styles.statementText, { color: colors.foreground }]}>{profile.statement}</Text>
           ) : (
@@ -678,6 +752,85 @@ export default function ProfileScreen() {
           )}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={!!importPreview}
+        transparent
+        animationType="fade"
+        onRequestClose={closeImport}
+      >
+        <TouchableWithoutFeedback onPress={closeImport}>
+          <View style={styles.importOverlay}>
+            <TouchableWithoutFeedback>
+              <View
+                style={[
+                  styles.importSheet,
+                  {
+                    backgroundColor: colors.background,
+                    paddingBottom: Math.max(insets.bottom, 24),
+                  },
+                ]}
+              >
+                <View style={[styles.importHandle, { backgroundColor: "rgba(120,110,100,0.2)" }]} />
+                <Text style={[styles.importEyebrow, { color: colors.cobalt }]}>
+                  Import to {importTarget === "statement" ? "Artist Statement" : "Bio"}
+                </Text>
+                <Text style={[styles.importTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  {importPreview?.fileName}
+                </Text>
+                <View style={[styles.importDivider, { backgroundColor: colors.border }]} />
+
+                <ScrollView
+                  style={[styles.importPreviewBox, { borderColor: "rgba(120,110,100,0.14)", backgroundColor: colors.secondary }]}
+                  contentContainerStyle={{ padding: 16 }}
+                >
+                  <Text style={[styles.importPreviewText, { color: colors.foreground }]}>
+                    {importPreview?.text}
+                  </Text>
+                </ScrollView>
+                <Text style={[styles.importMeta, { color: colors.mutedForeground }]}>
+                  {importPreview ? `${importPreview.text.length.toLocaleString()} characters` : ""}
+                </Text>
+
+                <View style={styles.importActions}>
+                  <Pressable
+                    onPress={closeImport}
+                    style={({ pressed }) => [styles.importCancel, { opacity: pressed ? 0.6 : 1 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancel import"
+                  >
+                    <Text style={[styles.importCancelText, { color: colors.mutedForeground }]}>Cancel</Text>
+                  </Pressable>
+                  <View style={styles.importPrimaryRow}>
+                    <Pressable
+                      onPress={() => applyImport("append")}
+                      style={({ pressed }) => [
+                        styles.importGhost,
+                        { borderColor: "rgba(120,110,100,0.28)", opacity: pressed ? 0.6 : 1 },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Append imported text"
+                    >
+                      <Text style={[styles.importGhostText, { color: colors.foreground }]}>Append</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => applyImport("replace")}
+                      style={({ pressed }) => [
+                        styles.importSolid,
+                        { backgroundColor: colors.foreground, opacity: pressed ? 0.85 : 1 },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Replace with imported text"
+                    >
+                      <Text style={[styles.importSolidText, { color: colors.background }]}>Replace</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
@@ -943,4 +1096,78 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   previewBtnText: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.3 },
+  importBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    alignSelf: "flex-start",
+    marginTop: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 13,
+    borderRadius: 18,
+    borderWidth: 0.75,
+  },
+  importBtnText: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  importOverlay: { flex: 1, backgroundColor: "rgba(40,36,32,0.4)", justifyContent: "flex-end" },
+  importSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+  },
+  importHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 22 },
+  importEyebrow: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 2.5,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  importTitle: {
+    fontSize: 22,
+    fontFamily: "PlayfairDisplay_400Regular",
+    letterSpacing: 0.3,
+    marginBottom: 14,
+  },
+  importDivider: { height: 1, width: 40, marginBottom: 18 },
+  importPreviewBox: {
+    maxHeight: 240,
+    borderRadius: 16,
+    borderWidth: 0.75,
+  },
+  importPreviewText: { fontSize: 14, fontFamily: "Poppins_300Light", lineHeight: 22 },
+  importMeta: {
+    fontSize: 11,
+    fontFamily: "Poppins_300Light",
+    letterSpacing: 0.3,
+    marginTop: 10,
+    marginBottom: 18,
+  },
+  importActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  importCancel: { paddingVertical: 12, paddingHorizontal: 8 },
+  importCancelText: { fontSize: 13, fontFamily: "Poppins_500Medium", letterSpacing: 0.3 },
+  importPrimaryRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  importGhost: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    borderWidth: 0.75,
+  },
+  importGhostText: { fontSize: 13, fontFamily: "Poppins_500Medium", letterSpacing: 0.3 },
+  importSolid: {
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 24,
+  },
+  importSolidText: { fontSize: 13, fontFamily: "Poppins_500Medium", letterSpacing: 0.3 },
 });

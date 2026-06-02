@@ -1,0 +1,86 @@
+The profile image picker opens, but the avatar still does not display after selecting an image.
+
+Please fully debug the avatar upload pipeline.
+
+VERY IMPORTANT:
+Do not guess.
+Add console logs to every step.
+
+1. Avatar button
+console.log("Avatar pressed")
+
+2. Image picker result
+console.log("Picker result:", result)
+
+3. Selected URI
+console.log("Selected URI:", selectedUri)
+
+4. FileSystem copy
+console.log("Copying avatar to:", avatarUri)
+
+5. After copy
+console.log("Avatar copied successfully")
+
+6. Updated profile
+console.log("Updated profile:", updatedProfile)
+
+7. AsyncStorage save
+console.log("Saving profile avatar")
+
+8. App load
+console.log("Loaded profile:", loadedProfile)
+
+9. Render
+console.log("Rendering avatarUri:", profile.avatarUri)
+
+Then verify:
+
+- Does FileSystem.copyAsync succeed?
+- Is avatarUri actually saved in AsyncStorage?
+- Is the Profile component re-rendering after save?
+- Is Image using:
+  <Image source={{ uri: profile.avatarUri }} />
+  correctly?
+
+Also:
+- remove all fallback conditions that accidentally override avatarUri
+- only show the fallback letter avatar if:
+  !profile.avatarUri
+
+Finally:
+After image selection,
+immediately update the UI using setProfile(updatedProfile)
+before AsyncStorage completes.
+Add import-from-file feature for Profile Bio and Artist Statement.
+
+Goal:
+User should be able to import bio and statement text from a document/file into Profile.
+
+In Profile Edit screen:
+Add two buttons:
+1. Import Bio from File
+2. Import Statement from File
+
+Requirements:
+- Use Expo Document Picker.
+- Allow .txt, .docx, .pdf if possible.
+- After selecting a file, extract readable text.
+- Show a preview before saving.
+- User can choose:
+  - Replace current text
+  - Append to current text
+- Save imported text into profile.bio or profile.statement.
+- Persist with AsyncStorage.
+
+If full docx/pdf parsing is too complex for now:
+Start with .txt import first.
+Then add docx/pdf later.
+
+UI:
+- Keep buttons minimal and elegant.
+- Place them under Bio and Artist Statement fields.
+- Label:
+  "Import from file"
+
+Important:
+Do not overwrite existing bio/statement without confirmation.
