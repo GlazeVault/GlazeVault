@@ -1,7 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -14,7 +16,9 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { persistPieceImage } from "@/constants/imageStorage";
 import { Visibility } from "@/constants/privacy";
+import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -31,7 +35,10 @@ export default function NewCollectionScreen() {
   const [featuredOnSite, setFeaturedOnSite] = useState<boolean>(
     existing?.featuredOnSite ?? false
   );
+  const [coverImageUri, setCoverImageUri] = useState(existing?.coverImageUri ?? "");
   const [saving, setSaving] = useState(false);
+  // Prevents overlapping picker runs (and duplicate native file copies).
+  const pickingCover = useRef(false);
 
   useEffect(() => {
     if (existing) {
@@ -39,10 +46,33 @@ export default function NewCollectionScreen() {
       setIntro(existing.intro);
       setVisibility(existing.visibility);
       setFeaturedOnSite(existing.featuredOnSite);
+      setCoverImageUri(existing.coverImageUri ?? "");
     }
   }, [existing?.id]);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  const pickCover = async () => {
+    if (pickingCover.current) return;
+    pickingCover.current = true;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [16, 10],
+        quality: 0.85,
+      });
+      if (!result.canceled && result.assets[0]?.uri) {
+        const stored = await persistPieceImage(result.assets[0].uri);
+        setCoverImageUri(stored);
+      }
+    } catch (e) {
+      console.warn("Failed to pick collection cover", e);
+      Alert.alert("Couldn't add image", "Something went wrong choosing that image.");
+    } finally {
+      pickingCover.current = false;
+    }
+  };
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -57,6 +87,7 @@ export default function NewCollectionScreen() {
         intro: intro.trim(),
         visibility,
         featuredOnSite: featured,
+        coverImageUri: coverImageUri || undefined,
       });
     } else {
       await addCollection({
@@ -64,6 +95,7 @@ export default function NewCollectionScreen() {
         intro: intro.trim(),
         visibility,
         featuredOnSite: featured,
+        coverImageUri: coverImageUri || undefined,
       });
     }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -127,6 +159,49 @@ export default function NewCollectionScreen() {
             multiline
             textAlignVertical="top"
           />
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>Cover Image</Text>
+          {coverImageUri ? (
+            <View style={styles.coverWrap}>
+              <Image
+                source={resolveImageSource(coverImageUri)}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                transition={200}
+              />
+              <View style={styles.coverActions}>
+                <Pressable
+                  style={[styles.coverBtn, { backgroundColor: "rgba(253,250,245,0.92)" }]}
+                  onPress={pickCover}
+                >
+                  <Feather name="refresh-cw" size={13} color="#8A7B6C" />
+                  <Text style={[styles.coverBtnText, { color: "#8A7B6C" }]}>Replace</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.coverBtn, { backgroundColor: "rgba(253,250,245,0.92)" }]}
+                  onPress={() => setCoverImageUri("")}
+                >
+                  <Feather name="trash-2" size={13} color={colors.destructive} />
+                  <Text style={[styles.coverBtnText, { color: colors.destructive }]}>Remove</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              style={[styles.coverPicker, { backgroundColor: colors.secondary, borderColor: "rgba(120,110,100,0.2)" }]}
+              onPress={pickCover}
+            >
+              <Feather name="image" size={20} color={colors.mutedForeground} style={{ opacity: 0.5 }} />
+              <Text style={[styles.coverPickerText, { color: colors.mutedForeground }]}>
+                Choose a cover image
+              </Text>
+              <Text style={[styles.coverPickerHint, { color: colors.mutedForeground }]}>
+                Falls back to a public piece if left empty
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.fieldGroup}>
@@ -310,6 +385,39 @@ const styles = StyleSheet.create({
     minHeight: 80,
     lineHeight: 24,
   },
+  coverWrap: {
+    width: "100%",
+    aspectRatio: 16 / 10,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  coverActions: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    flexDirection: "row",
+    gap: 8,
+  },
+  coverBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+  },
+  coverBtnText: { fontSize: 12, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
+  coverPicker: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    aspectRatio: 16 / 10,
+    borderRadius: 14,
+    borderWidth: 0.75,
+    borderStyle: "dashed",
+  },
+  coverPickerText: { fontSize: 13, fontFamily: "Poppins_400Regular", letterSpacing: 0.2 },
+  coverPickerHint: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
   hint: {
     flexDirection: "row",
     gap: 10,

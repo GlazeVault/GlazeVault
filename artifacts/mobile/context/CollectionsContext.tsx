@@ -10,6 +10,9 @@ export interface Collection {
   createdAt: string;
   visibility: Visibility;
   featuredOnSite: boolean;
+  // Optional artist-chosen cover image (web: base64 data URI, native: relative
+  // pieces/ path). When absent, surfaces fall back to a public piece image.
+  coverImageUri?: string;
 }
 
 interface CollectionsContextType {

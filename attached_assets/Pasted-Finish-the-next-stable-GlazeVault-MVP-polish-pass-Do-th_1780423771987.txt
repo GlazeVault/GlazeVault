@@ -1,0 +1,202 @@
+Finish the next stable GlazeVault MVP polish pass.
+
+Do these in order and do not add unrelated features.
+
+1. Complete TXT import for Profile
+
+Profile Edit should support importing .txt files into:
+- Bio
+- Artist Statement
+
+Requirements:
+- Use Expo Document Pickeråç
+- Allow only text/plain files for now
+- Read the selected .txt file
+- Show preview before applying
+- User can choose:
+  - Replace current text
+  - Append to current text
+  - Cancel
+- Save result to profile.bio or profile.statement
+- Persist with AsyncStorage
+- Do not overwrite existing text without confirmation
+- If PDF is selected, show:
+  "PDF import is coming soon. Please use a .txt file for now."
+
+2. Finish Featured Collections connection
+
+Collection Detail / Edit must have:
+- Public / Private toggle
+- Feature on Public Site toggle
+
+Rules:
+- Feature on Public Site can only be ON if collection.visibility === "public"
+- If collection is private, disable Feature on Public Site
+- Save:
+  visibility: "public" | "private"
+  featuredOnSite: boolean
+
+Profile → Featured Collections should show collections where:
+- visibility === "public"
+- featuredOnSite === true
+
+Display:
+- cover image
+- title
+- public piece count
+
+3. Add Collection cover image
+
+Collection Edit should allow:
+- choose cover image
+- use image picker
+- copy image to FileSystem.documentDirectory
+- save permanent URI as collection.coverImageUri
+- persist with AsyncStorage
+
+If no cover image:
+- use first public piece image as fallback
+- if no image, show calm placeholder
+
+4. Add Public Site Preview
+
+Profile → Preview Public Site button should open a preview screen.
+
+Preview should show:
+- artist name
+- profile image
+- bio
+- artist statement
+- featured collections
+- public pieces only
+- only fields allowed by publicDataSettings
+
+Rules:
+- private pieces must never appear
+- private collections must never appear
+- hidden data fields must not appear
+
+5. Add Share Public Site
+
+In Profile Public Site section:
+- Add "Copy Public Link"
+- Add "Share Public Site"
+
+Use the URL:
+glazevault.art/{profile.slug}
+
+If site is off:
+- disable sharing
+- show helper text:
+  "Turn on your public site before sharing."
+
+6. Stability
+
+Before finishing:
+- typecheck
+- make sure app launches
+- make sure no PDF parser crash returns
+- make sure profile, collections, images, and public site settings persist after reload
+
+Keep the design calm, warm, minimal, refined, and consistent with GlazeVault.
+Finish the next stable GlazeVault MVP polish pass.
+
+Do these in order and do not add unrelated features.
+
+1. Complete TXT import for Profile
+
+Profile Edit should support importing .txt files into:
+- Bio
+- Artist Statement
+
+Requirements:
+- Use Expo Document Picker
+- Allow only text/plain files for now
+- Read the selected .txt file
+- Show preview before applying
+- User can choose:
+  - Replace current text
+  - Append to current text
+  - Cancel
+- Save result to profile.bio or profile.statement
+- Persist with AsyncStorage
+- Do not overwrite existing text without confirmation
+- If PDF is selected, show:
+  "PDF import is coming soon. Please use a .txt file for now."
+
+2. Finish Featured Collections connection
+
+Collection Detail / Edit must have:
+- Public / Private toggle
+- Feature on Public Site toggle
+
+Rules:
+- Feature on Public Site can only be ON if collection.visibility === "public"
+- If collection is private, disable Feature on Public Site
+- Save:
+  visibility: "public" | "private"
+  featuredOnSite: boolean
+
+Profile → Featured Collections should show collections where:
+- visibility === "public"
+- featuredOnSite === true
+
+Display:
+- cover image
+- title
+- public piece count
+
+3. Add Collection cover image
+
+Collection Edit should allow:
+- choose cover image
+- use image picker
+- copy image to FileSystem.documentDirectory
+- save permanent URI as collection.coverImageUri
+- persist with AsyncStorage
+
+If no cover image:
+- use first public piece image as fallback
+- if no image, show calm placeholder
+
+4. Add Public Site Preview
+
+Profile → Preview Public Site button should open a preview screen.
+
+Preview should show:
+- artist name
+- profile image
+- bio
+- artist statement
+- featured collections
+- public pieces only
+- only fields allowed by publicDataSettings
+
+Rules:
+- private pieces must never appear
+- private collections must never appear
+- hidden data fields must not appear
+
+5. Add Share Public Site
+
+In Profile Public Site section:
+- Add "Copy Public Link"
+- Add "Share Public Site"
+
+Use the URL:
+glazevault.art/{profile.slug}
+
+If site is off:
+- disable sharing
+- show helper text:
+  "Turn on your public site before sharing."
+
+6. Stability
+
+Before finishing:
+- typecheck
+- make sure app launches
+- make sure no PDF parser crash returns
+- make sure profile, collections, images, and public site settings persist after reload
+
+Keep the design calm, warm, minimal, refined, and consistent with GlazeVault.

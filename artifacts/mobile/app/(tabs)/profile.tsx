@@ -11,12 +11,14 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
@@ -117,6 +119,29 @@ export default function ProfileScreen() {
   const selectLayout = async (layout: HomepageLayout) => {
     await Haptics.selectionAsync();
     await updatePublicSite({ homepageLayout: layout });
+  };
+
+  const publicSiteUrl = `${PUBLIC_SITE_DOMAIN}/${publicSiteSlug(profile.name)}`;
+
+  const handleCopyLink = async () => {
+    if (!site.enabled) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await Clipboard.setStringAsync(publicSiteUrl);
+    Alert.alert("Link copied", `${publicSiteUrl} is on your clipboard.`);
+  };
+
+  const handleShareSite = async () => {
+    if (!site.enabled) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await Share.share({
+        message: `${profile.name ? `${profile.name} — ` : ""}${publicSiteUrl}`,
+        url: `https://${publicSiteUrl}`,
+        title: profile.name || "My public site",
+      });
+    } catch (e) {
+      console.warn("Failed to share public site", e);
+    }
   };
 
   // Tapping the avatar (in any mode) opens the picker, copies the image into
@@ -435,7 +460,8 @@ export default function ProfileScreen() {
             <View style={styles.featuredList}>
               {featuredCollections.map((c) => {
                 const cp = getPublicCollectionPieces(c, pieces);
-                const cover = cp.find((p) => p.publicDataSettings.showPhotos);
+                const coverUri =
+                  c.coverImageUri || cp.find((p) => p.publicDataSettings.showPhotos)?.imageUri;
                 return (
                   <Pressable
                     key={c.id}
@@ -450,9 +476,9 @@ export default function ProfileScreen() {
                     onPress={() => router.push(`/collection/${c.id}`)}
                   >
                     <View style={[styles.featuredCover, { backgroundColor: "rgba(120,110,100,0.1)" }]}>
-                      {cover ? (
+                      {coverUri ? (
                         <Image
-                          source={resolveImageSource(cover.imageUri)}
+                          source={resolveImageSource(coverUri)}
                           style={StyleSheet.absoluteFill}
                           contentFit="cover"
                           transition={200}
@@ -754,6 +780,52 @@ export default function ProfileScreen() {
               gallery of your work.
             </Text>
           )}
+
+          {/* Share */}
+          <Text style={[styles.subLabel, { color: colors.mutedForeground, marginTop: 24 }]}>
+            Share
+          </Text>
+          <View style={styles.shareRow}>
+            <Pressable
+              style={[
+                styles.shareBtn,
+                {
+                  backgroundColor: colors.secondary,
+                  borderColor: "rgba(120,110,100,0.16)",
+                  opacity: site.enabled ? 1 : 0.45,
+                },
+              ]}
+              onPress={handleCopyLink}
+              disabled={!site.enabled}
+              accessibilityRole="button"
+              accessibilityLabel="Copy public link"
+            >
+              <Feather name="link" size={14} color={colors.cobalt} />
+              <Text style={[styles.shareBtnText, { color: colors.foreground }]}>Copy Public Link</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.shareBtn,
+                {
+                  backgroundColor: colors.secondary,
+                  borderColor: "rgba(120,110,100,0.16)",
+                  opacity: site.enabled ? 1 : 0.45,
+                },
+              ]}
+              onPress={handleShareSite}
+              disabled={!site.enabled}
+              accessibilityRole="button"
+              accessibilityLabel="Share public site"
+            >
+              <Feather name="share-2" size={14} color={colors.emerald} />
+              <Text style={[styles.shareBtnText, { color: colors.foreground }]}>Share Public Site</Text>
+            </Pressable>
+          </View>
+          {!site.enabled ? (
+            <Text style={[styles.shareHelper, { color: colors.mutedForeground }]}>
+              Turn on your public site before sharing.
+            </Text>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -1100,6 +1172,25 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   previewBtnText: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.3 },
+  shareRow: { flexDirection: "row", gap: 10, marginTop: 12 },
+  shareBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 13,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    borderWidth: 0.75,
+  },
+  shareBtnText: { fontSize: 12, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
+  shareHelper: {
+    fontSize: 12,
+    fontFamily: "Poppins_300Light",
+    letterSpacing: 0.2,
+    marginTop: 10,
+  },
   importBtn: {
     flexDirection: "row",
     alignItems: "center",

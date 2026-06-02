@@ -49,10 +49,12 @@ export default function PublicSiteScreen() {
     .filter(isCollectionFeatured)
     .map((c) => {
       const cp = getPublicCollectionPieces(c, pieces) as PublicPiece[];
-      // Cover may only use a public piece that itself allows photos, so a
-      // hidden image never leaks through the cover.
-      const cover = cp.find((p) => p.publicDataSettings.showPhotos) ?? null;
-      return { collection: c, pieces: cp, cover };
+      // Prefer the artist-chosen cover. Otherwise fall back to a public piece
+      // that itself allows photos, so a hidden image never leaks through.
+      const fallback = cp.find((p) => p.publicDataSettings.showPhotos) ?? null;
+      const coverUri = c.coverImageUri || fallback?.imageUri || null;
+      const coverPieceId = c.coverImageUri ? null : (fallback?.id ?? null);
+      return { collection: c, pieces: cp, coverUri, coverPieceId };
     })
     .filter((entry) => entry.pieces.length > 0);
 
@@ -196,15 +198,18 @@ export default function PublicSiteScreen() {
             </Text>
           </View>
         ) : (
-          featured.map(({ collection, pieces: cp, cover }) => (
+          featured.map(({ collection, pieces: cp, coverUri, coverPieceId }) => (
             <View key={collection.id} style={styles.collectionSection}>
-              {cover ? (
+              {coverUri ? (
                 <Pressable
                   style={({ pressed }) => [styles.coverWrap, { opacity: pressed ? 0.9 : 1 }]}
-                  onPress={() => router.push(`/piece/${cover.id}?public=1`)}
+                  onPress={() =>
+                    coverPieceId ? router.push(`/piece/${coverPieceId}?public=1`) : undefined
+                  }
+                  disabled={!coverPieceId}
                 >
                   <Image
-                    source={resolveImageSource(cover.imageUri)}
+                    source={resolveImageSource(coverUri)}
                     style={StyleSheet.absoluteFill}
                     contentFit="cover"
                     transition={200}
