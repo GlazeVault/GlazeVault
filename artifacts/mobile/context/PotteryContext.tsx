@@ -44,12 +44,18 @@ const PotteryContext = createContext<PotteryContextType | undefined>(undefined);
 
 const STORAGE_KEY = "@glazevault_pieces_v2";
 
+// The seed piece originally shipped with a fabricated, AI-style description in
+// its `notes`. We no longer seed prose, and any already-stored copy of this
+// exact text is cleared on load (see normalizePiece) so it never masquerades as
+// the user's own notes. Matched verbatim so genuine user notes are never touched.
+const LEGACY_SEED_DEMO_NOTES =
+  "A quiet morning piece. The turquoise matt glaze pools gently at the foot, revealing the warm stoneware body beneath. Thrown on the wheel in a single session.";
+
 const SEED_PIECES: PotteryPiece[] = [
   {
     id: "seed-blue-mug",
     title: "Blue Mug",
-    notes:
-      "A quiet morning piece. The turquoise matt glaze pools gently at the foot, revealing the warm stoneware body beneath. Thrown on the wheel in a single session.",
+    notes: "",
     clay: "Stoneware",
     glaze: "Turquoise Matt",
     firing: "Gas Reduction",
@@ -84,6 +90,17 @@ function normalizePiece(
   } as PotteryPiece;
   if (!base.firingEnvironment && base.firing) {
     base.firingEnvironment = base.firing;
+  }
+  // One-time cleanup: drop the legacy seeded demo description so it no longer
+  // surfaces as if it were the user's own notes. Scoped to the untouched seed
+  // piece (original id + photo) AND a verbatim text match, so genuine
+  // user-entered notes are never cleared.
+  if (
+    base.id === "seed-blue-mug" &&
+    base.imageUri === "@seed/blue-mug" &&
+    base.notes === LEGACY_SEED_DEMO_NOTES
+  ) {
+    base.notes = "";
   }
   // Backward compat: migrate legacy `isPublic` flag → `visibility`.
   if (rest.visibility == null && isPublic != null) {

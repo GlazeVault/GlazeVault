@@ -1,5 +1,6 @@
 - [GlazeVault collections model](glazevault-collections-model.md) — single `collectionId` per piece; removing a relation must never deletePiece; collection deletion must cascade-unlink pieces at the call site.
 - [GlazeVault firing metadata](glazevault-firing-metadata.md) — `firing`/`firingEnvironment` kept in lockstep in PotteryContext; display fallback `firingEnvironment || firing`; never write only one.
 - [GlazeVault navigation](glazevault-navigation.md) — custom JS tabBar (not NativeTabs) for center + FAB; + opens AddMenu; navigate to /add (tab) vs push /collection/new (modal).
+- [GlazeVault seed data](glazevault-seed-data.md) — seed pieces must not carry fabricated prose in editable fields (notes); Edit form is fine, the bug is in seed data; legacy seed notes cleaned in normalizePiece by fingerprint+verbatim match.
 - [GlazeVault privacy](glazevault-privacy.md) — piece visibility is source of truth; public surfaces must use isPubliclyVisiblePiece (gates by parent collection); kept collectionId not pieceIds; new items default private.
 - [GlazeVault image persistence](glazevault-image-persistence.md) — picker/camera URIs are temp; persistPieceImage copies to documentDirectory/pieces before save; throws on native failure (abort, never store temp URI).
