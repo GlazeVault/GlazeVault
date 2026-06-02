@@ -103,9 +103,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   meta: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Poppins_400Regular",
-    letterSpacing: 0.8,
+    letterSpacing: 2,
+    lineHeight: 20,
     textTransform: "uppercase",
+    paddingTop: 3,
   },
 });
