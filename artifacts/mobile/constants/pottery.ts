@@ -8,15 +8,13 @@ export const CLAY_OPTIONS = [
 ];
 
 export const FIRING_ENVIRONMENT_OPTIONS = [
-  "Oxidation",
-  "Reduction",
+  "Gas Oxidation",
+  "Gas Reduction",
   "Soda",
   "Salt",
   "Raku",
   "Wood Fire",
   "Electric",
-  "Gas Reduction",
-  "Gas Oxidation",
   "Pit Fire",
   "Saggar",
   "Other",
