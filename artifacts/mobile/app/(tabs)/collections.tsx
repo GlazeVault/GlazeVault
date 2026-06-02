@@ -203,8 +203,8 @@ const styles = StyleSheet.create({
   card: { marginBottom: 40 },
   cardImage: {
     width: "100%",
-    aspectRatio: 3 / 2,
-    borderRadius: 12,
+    aspectRatio: 4 / 5,
+    borderRadius: 24,
     overflow: "hidden",
     marginBottom: 14,
     borderWidth: 0.75,

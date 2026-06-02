@@ -183,39 +183,49 @@ export default function AddScreen() {
       <Text style={[styles.heading, { color: colors.foreground }]}>Record a Piece</Text>
       <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-      {/* Image picker */}
-      <Pressable
-        style={({ pressed }) => [
-          styles.imagePicker,
+      {/* Photo card */}
+      <View
+        style={[
+          styles.photoCard,
           {
             backgroundColor: colors.secondary,
-            borderRadius: colors.radius,
             borderColor: colors.border,
-            opacity: pressed ? 0.88 : 1,
+            borderStyle: imageUri ? "solid" : "dashed",
           },
         ]}
-        onPress={handlePickPhoto}
       >
-        {imageUri ? (
-          <>
-            <Image source={{ uri: imageUri }} style={[styles.previewImage, { borderRadius: colors.radius }]} contentFit="cover" />
-            <View style={styles.changeOverlay}>
-              <Feather name="camera" size={18} color="#FFFFFF" />
-              <Text style={styles.changeText}>Change</Text>
+        <Pressable
+          style={({ pressed }) => [
+            styles.imageWrapper,
+            { opacity: pressed && !imageUri ? 0.88 : 1 },
+          ]}
+          onPress={!imageUri ? handlePickPhoto : undefined}
+        >
+          {imageUri ? (
+            <Image
+              source={{ uri: imageUri }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+            />
+          ) : (
+            <View style={styles.placeholderInner}>
+              <View style={[styles.iconCircle, { backgroundColor: colors.accent }]}>
+                <Feather name="camera" size={24} color={colors.cobalt} />
+              </View>
+              <Text style={[styles.addPhotoTitle, { color: colors.foreground }]}>Add Photograph</Text>
+              <Text style={[styles.addPhotoSub, { color: colors.mutedForeground }]}>
+                Tap to photograph or choose from library
+              </Text>
             </View>
-          </>
-        ) : (
-          <View style={styles.placeholderInner}>
-            <View style={[styles.iconCircle, { backgroundColor: colors.accent }]}>
-              <Feather name="camera" size={24} color={colors.cobalt} />
-            </View>
-            <Text style={[styles.addPhotoTitle, { color: colors.foreground }]}>Add Photograph</Text>
-            <Text style={[styles.addPhotoSub, { color: colors.mutedForeground }]}>
-              Tap to photograph or choose from library
-            </Text>
-          </View>
-        )}
-      </Pressable>
+          )}
+        </Pressable>
+      </View>
+      {imageUri && (
+        <Pressable style={styles.changePhotoRow} onPress={handlePickPhoto}>
+          <Feather name="camera" size={13} color={colors.mutedForeground} />
+          <Text style={[styles.changePhotoText, { color: colors.mutedForeground }]}>Change photo</Text>
+        </Pressable>
+      )}
 
       <View style={styles.form}>
         <Label text="Title" />
@@ -308,22 +318,26 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 11, fontFamily: "Poppins_500Medium", letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 6 },
   heading: { fontSize: 32, fontFamily: "PlayfairDisplay_400Regular", letterSpacing: 0.4, lineHeight: 40, marginBottom: 20 },
   divider: { height: 1, width: 40, marginBottom: 28 },
-  imagePicker: {
+  photoCard: {
+    width: "100%",
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  imageWrapper: {
     width: "100%",
     aspectRatio: 4 / 5,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    overflow: "hidden",
-    marginBottom: 32,
   },
-  previewImage: { width: "100%", height: "100%" },
-  changeOverlay: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    backgroundColor: "rgba(45,45,42,0.5)",
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    paddingVertical: 12, gap: 8,
+  changePhotoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 10,
+    marginBottom: 16,
+    opacity: 0.65,
   },
-  changeText: { color: "#FFFFFF", fontFamily: "Poppins_400Regular", fontSize: 13 },
+  changePhotoText: { fontSize: 12, fontFamily: "Poppins_400Regular", letterSpacing: 0.2 },
   placeholderInner: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
   iconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   addPhotoTitle: { fontSize: 16, fontFamily: "PlayfairDisplay_400Regular", letterSpacing: 0.2 },

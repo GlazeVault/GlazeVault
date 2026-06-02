@@ -29,18 +29,17 @@ export function PotteryCard({ piece }: PotteryCardProps) {
       style={({ pressed }) => [
         styles.card,
         {
-          backgroundColor: colors.card,
-          borderRadius: colors.radius,
+          borderRadius: 24,
           opacity: pressed ? 0.95 : 1,
           transform: [{ scale: pressed ? 0.99 : 1 }],
         },
       ]}
       onPress={() => router.push(`/piece/${piece.id}`)}
     >
-      <View style={{ borderRadius: colors.radius, overflow: "hidden" }}>
+      <View style={styles.imageWrapper}>
         <Image
           source={resolveImageSource(piece.imageUri)}
-          style={styles.image}
+          style={StyleSheet.absoluteFill}
           contentFit="cover"
           transition={300}
         />
@@ -74,10 +73,10 @@ export function PotteryCard({ piece }: PotteryCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    overflow: "visible",
+    overflow: "hidden",
     marginBottom: 44,
   },
-  image: {
+  imageWrapper: {
     width: "100%",
     aspectRatio: 4 / 5,
   },
