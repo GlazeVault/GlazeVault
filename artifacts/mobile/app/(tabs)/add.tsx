@@ -18,6 +18,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SelectField } from "@/components/SelectField";
+import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
@@ -142,7 +143,15 @@ export default function AddScreen() {
       return;
     }
     setSaving(true);
-    await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), imageUri, collectionId });
+    let storedImageUri: string;
+    try {
+      storedImageUri = await persistPieceImage(imageUri);
+    } catch {
+      setSaving(false);
+      Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
+      return;
+    }
+    await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), imageUri: storedImageUri, collectionId });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setImageUri(null); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setCollectionId(undefined);
     setSaving(false);

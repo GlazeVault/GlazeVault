@@ -58,6 +58,7 @@
   "dependencies": {
     "@expo-google-fonts/playfair-display": "^0.4.2",
     "@expo-google-fonts/poppins": "^0.4.1",
+    "expo-file-system": "~19.0.23",
     "expo-sharing": "^56.0.15"
   }
 }

@@ -20,6 +20,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SelectField } from "@/components/SelectField";
+import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
 import {
   DEFAULT_PUBLIC_DATA_SETTINGS,
@@ -123,6 +124,14 @@ export default function EditPieceScreen() {
       return;
     }
     setSaving(true);
+    let storedImageUri: string;
+    try {
+      storedImageUri = await persistPieceImage(imageUri);
+    } catch {
+      setSaving(false);
+      Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
+      return;
+    }
     await updatePiece(id, {
       title: title.trim(),
       notes: notes.trim(),
@@ -132,7 +141,7 @@ export default function EditPieceScreen() {
       cone: cone.trim(),
       firingEnvironment,
       dimensions: dimensions.trim(),
-      imageUri,
+      imageUri: storedImageUri,
       visibility,
       publicDataSettings: publicData,
       collectionId,
