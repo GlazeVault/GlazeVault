@@ -20,7 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
-import { ImportedText, pickAndExtractText } from "@/constants/importText";
+import { ImportedText, pickAndExtractText, UnsupportedFileError } from "@/constants/importText";
 import { getPublicCollectionPieces, isCollectionFeatured } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
@@ -214,7 +214,11 @@ export default function ProfileScreen() {
       setImportPreview(result);
     } catch (e) {
       console.warn("Import from file failed", e);
-      Alert.alert("Import failed", e instanceof Error ? e.message : "We couldn’t read that file.");
+      if (e instanceof UnsupportedFileError) {
+        Alert.alert("PDF not supported yet", e.message);
+      } else {
+        Alert.alert("Import failed", e instanceof Error ? e.message : "We couldn’t read that file.");
+      }
     } finally {
       setImportBusy(false);
     }
@@ -248,7 +252,7 @@ export default function ProfileScreen() {
       ]}
       accessibilityRole="button"
       accessibilityLabel="Import from file"
-      accessibilityHint="Choose a .txt, .docx, or PDF file to fill this field"
+      accessibilityHint="Choose a .txt file to fill this field"
     >
       {importBusy ? (
         <ActivityIndicator size="small" color={colors.mutedForeground} />

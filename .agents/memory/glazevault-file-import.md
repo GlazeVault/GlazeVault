@@ -13,17 +13,10 @@ Used by the profile Bio / Artist Statement "Import from file" feature. Helper li
 
 **Why:** the new vs legacy expo-file-system split and the web-only `asset.file` field are both undiscoverable from the call site; getting either wrong silently breaks one platform.
 
-## .docx extraction
-- A .docx is a ZIP. Unzip with `fflate` (`unzipSync`, pure JS / Hermes-safe), read `word/document.xml`, map `</w:p>`→newline, `<w:tab/>`→tab, `<w:br/>`→newline, strip remaining tags, decode XML entities. Good enough for prose; no styling preserved.
-
-## .pdf extraction (Expo Go / Hermes, no native modules, no Worker)
-- Use **`unpdf`** (`getDocumentProxy` + `extractText(pdf,{mergePages:true})`) — its serverless pdf.js build is worker-free and canvas-free, so it runs on Hermes. Plain `pdfjs-dist` needs Worker + canvas setup that doesn't work in Expo Go.
-- unpdf only stubs `DOMMatrix`. You must polyfill the rest yourself at module load: **`Promise.withResolvers`** and **`structuredClone`** (a real recursive clone handling typed arrays/DataView/ArrayBuffer/Date/RegExp/Map/Set/cycles — NOT a JSON clone, which corrupts typed arrays). Guard each with `typeof … !== "function"` so they're no-ops on web.
-- Lazy-load pdf.js (~1.6MB) on first use: `definePDFJSModule(() => import("unpdf/pdfjs"))`, cache the promise, and **clear the cache on rejection** so a transient init failure can retry.
-- Any failure OR an empty text layer (scanned/image-only PDF) → throw one friendly `Error("Unable to read this PDF.")`.
-- **Why:** the whole PDF path is dictated by Expo Go = pure JS only; choosing the wrong lib or skipping the Hermes polyfills produces a runtime crash that never appears on web (web has all these globals).
-
-**Verified:** web e2e (Playwright upload of a real PDF) passes; native iOS/Hermes not directly testable here — the polyfills are the known risk surface if a new global (e.g. `ReadableStream`/`atob`) turns out to be needed.
+## Only `.txt` is supported on-device (PDF + docx reverted)
+- The current picker accepts `text/plain` + `application/pdf` only. PDF selection throws a typed `UnsupportedFileError` ("PDF import is coming soon. Please use a .txt file for now.") which profile.tsx shows as a friendly alert; nothing is parsed on-device.
+- **Why PDF was ripped out:** `unpdf` (serverless pdf.js) passed web e2e but **crashed Expo Go on Hermes at the top-level `import` with "Cannot read property 'default' of undefined"** — the worker-free build still isn't truly Hermes-safe, and the crash never reproduces on web (web has all the globals). Lesson: a web Playwright pass does NOT prove a native Hermes import is safe; an RN-incompatible parser can fail at *module load*, not just at call time. PDF will be done server-side later.
+- docx (`fflate` unzip of `word/document.xml`) was also removed when narrowing to txt-only; both `unpdf` and `fflate` deps uninstalled. If docx is wanted back, fflate IS Hermes-safe and was never the crash.
 
 ## Save semantics
 Import only mutates local `bio`/`statement` state; nothing persists until the user taps Save (`handleSave → updateProfile`). The Replace/Append modal choice IS the overwrite confirmation — never overwrite a non-empty field silently.
