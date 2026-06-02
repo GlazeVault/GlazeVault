@@ -76,6 +76,10 @@ export default function RootLayout() {
                         name="collection/new"
                         options={{ presentation: "modal" }}
                       />
+                      <Stack.Screen
+                        name="public-site"
+                        options={{ presentation: "card" }}
+                      />
                     </Stack>
                   </KeyboardProvider>
                 </GestureHandlerRootView>

@@ -1,5 +1,31 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+
+export type HomepageLayout = "grid" | "editorial" | "masonry";
+
+export interface PublicSiteSettings {
+  enabled: boolean;
+  featuredCollectionIds: string[];
+  homepageLayout: HomepageLayout;
+  contactEmail: string;
+  etsy: string;
+  shopify: string;
+}
+
+export const DEFAULT_PUBLIC_SITE: PublicSiteSettings = {
+  enabled: false,
+  featuredCollectionIds: [],
+  homepageLayout: "grid",
+  contactEmail: "",
+  etsy: "",
+  shopify: "",
+};
+
+export const HOMEPAGE_LAYOUTS: { key: HomepageLayout; label: string; hint: string }[] = [
+  { key: "grid", label: "Grid", hint: "Even three-column gallery" },
+  { key: "editorial", label: "Editorial", hint: "Large stacked features" },
+  { key: "masonry", label: "Masonry", hint: "Staggered two-column flow" },
+];
 
 export interface ArtistProfile {
   name: string;
@@ -8,6 +34,7 @@ export interface ArtistProfile {
   website: string;
   instagram: string;
   avatarUri?: string;
+  publicSite: PublicSiteSettings;
 }
 
 const DEFAULT_PROFILE: ArtistProfile = {
@@ -16,36 +43,60 @@ const DEFAULT_PROFILE: ArtistProfile = {
   statement: "",
   website: "",
   instagram: "",
+  publicSite: DEFAULT_PUBLIC_SITE,
 };
 
 interface ProfileContextType {
   profile: ArtistProfile;
   updateProfile: (updates: Partial<ArtistProfile>) => Promise<void>;
+  updatePublicSite: (updates: Partial<PublicSiteSettings>) => Promise<void>;
 }
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 const STORAGE_KEY = "@glazevault_profile_v1";
 
+function normalizeProfile(raw: Partial<ArtistProfile>): ArtistProfile {
+  return {
+    ...DEFAULT_PROFILE,
+    ...raw,
+    publicSite: { ...DEFAULT_PUBLIC_SITE, ...(raw.publicSite ?? {}) },
+  };
+}
+
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<ArtistProfile>(DEFAULT_PROFILE);
+  // Mirror of the latest profile so concurrent updates merge against fresh
+  // state instead of a stale render closure (prevents rapid toggle/selector
+  // saves from clobbering each other).
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((data) => {
-      if (data) setProfile(JSON.parse(data));
+      if (data) {
+        const next = normalizeProfile(JSON.parse(data));
+        profileRef.current = next;
+        setProfile(next);
+      }
     });
   }, []);
 
-  const updateProfile = useCallback(
-    async (updates: Partial<ArtistProfile>) => {
-      const updated = { ...profile, ...updates };
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      setProfile(updated);
+  const updateProfile = useCallback(async (updates: Partial<ArtistProfile>) => {
+    const updated = { ...profileRef.current, ...updates };
+    profileRef.current = updated;
+    setProfile(updated);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  }, []);
+
+  const updatePublicSite = useCallback(
+    async (updates: Partial<PublicSiteSettings>) => {
+      await updateProfile({ publicSite: { ...profileRef.current.publicSite, ...updates } });
     },
-    [profile]
+    [updateProfile]
   );
 
   return (
-    <ProfileContext.Provider value={{ profile, updateProfile }}>
+    <ProfileContext.Provider value={{ profile, updateProfile, updatePublicSite }}>
       {children}
     </ProfileContext.Provider>
   );
@@ -56,3 +107,18 @@ export function useProfile() {
   if (!ctx) throw new Error("useProfile must be used within ProfileProvider");
   return ctx;
 }
+
+/**
+ * Derives the public-facing URL slug from the artist name. Falls back to a
+ * neutral placeholder so the URL preview is never empty.
+ */
+export function publicSiteSlug(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "your-studio";
+}
+
+export const PUBLIC_SITE_DOMAIN = "glazevault.art";

@@ -16,17 +16,23 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { isPubliclyVisiblePiece } from "@/constants/privacy";
+import { isCollectionPublic, isPubliclyVisiblePiece } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
-import { useProfile } from "@/context/ProfileContext";
+import {
+  HOMEPAGE_LAYOUTS,
+  HomepageLayout,
+  PUBLIC_SITE_DOMAIN,
+  publicSiteSlug,
+  useProfile,
+} from "@/context/ProfileContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile } = useProfile();
+  const { profile, updateProfile, updatePublicSite } = useProfile();
   const { pieces } = usePottery();
   const { collections } = useCollections();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -37,11 +43,15 @@ export default function ProfileScreen() {
   const [statement, setStatement] = useState(profile.statement);
   const [website, setWebsite] = useState(profile.website);
   const [instagram, setInstagram] = useState(profile.instagram);
+  const [contactEmail, setContactEmail] = useState(profile.publicSite.contactEmail);
+  const [etsy, setEtsy] = useState(profile.publicSite.etsy);
+  const [shopify, setShopify] = useState(profile.publicSite.shopify);
   const [avatarUri, setAvatarUri] = useState(profile.avatarUri ?? "");
   const [saving, setSaving] = useState(false);
 
   const publicPieces = pieces.filter((p) => isPubliclyVisiblePiece(p, collections));
-  const hasProfile = profile.name.trim().length > 0;
+  const publicCollections = collections.filter(isCollectionPublic);
+  const site = profile.publicSite;
 
   const startEditing = () => {
     setName(profile.name);
@@ -49,6 +59,9 @@ export default function ProfileScreen() {
     setStatement(profile.statement);
     setWebsite(profile.website);
     setInstagram(profile.instagram);
+    setContactEmail(profile.publicSite.contactEmail);
+    setEtsy(profile.publicSite.etsy);
+    setShopify(profile.publicSite.shopify);
     setAvatarUri(profile.avatarUri ?? "");
     setIsEditing(true);
   };
@@ -57,10 +70,39 @@ export default function ProfileScreen() {
 
   const handleSave = async () => {
     setSaving(true);
-    await updateProfile({ name, bio, statement, website, instagram, avatarUri: avatarUri || undefined });
+    await updateProfile({
+      name,
+      bio,
+      statement,
+      website,
+      instagram,
+      avatarUri: avatarUri || undefined,
+    });
+    await updatePublicSite({ contactEmail, etsy, shopify });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setSaving(false);
     setIsEditing(false);
+  };
+
+  // Immediate-save controls. updatePublicSite merges against fresh store state,
+  // so rapid taps and the edit-form save never clobber each other.
+  const toggleSite = async () => {
+    await Haptics.selectionAsync();
+    await updatePublicSite({ enabled: !site.enabled });
+  };
+
+  const toggleFeatured = async (collectionId: string) => {
+    await Haptics.selectionAsync();
+    const current = site.featuredCollectionIds;
+    const next = current.includes(collectionId)
+      ? current.filter((cid) => cid !== collectionId)
+      : [...current, collectionId];
+    await updatePublicSite({ featuredCollectionIds: next });
+  };
+
+  const selectLayout = async (layout: HomepageLayout) => {
+    await Haptics.selectionAsync();
+    await updatePublicSite({ homepageLayout: layout });
   };
 
   const pickAvatar = async () => {
@@ -312,6 +354,261 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+
+        {/* Public Site */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Public Site</Text>
+            <View
+              style={[
+                styles.statusPill,
+                {
+                  backgroundColor: site.enabled
+                    ? "rgba(107,139,122,0.12)"
+                    : colors.secondary,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusPillText,
+                  { color: site.enabled ? colors.emerald : "#8A7B6C" },
+                ]}
+              >
+                {site.enabled ? "Live" : "Off"}
+              </Text>
+            </View>
+          </View>
+
+          {/* On / Off toggle */}
+          <Pressable
+            style={[
+              styles.siteToggleRow,
+              {
+                backgroundColor: site.enabled ? "rgba(107,139,122,0.1)" : colors.secondary,
+                borderColor: site.enabled ? "rgba(107,139,122,0.3)" : "rgba(120,110,100,0.16)",
+              },
+            ]}
+            onPress={toggleSite}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: site.enabled }}
+            accessibilityLabel="Public site"
+          >
+            <Feather
+              name={site.enabled ? "globe" : "lock"}
+              size={15}
+              color={site.enabled ? colors.emerald : colors.mutedForeground}
+            />
+            <View style={styles.siteToggleLabels}>
+              <Text
+                style={[
+                  styles.siteToggleTitle,
+                  { color: site.enabled ? colors.emerald : colors.foreground },
+                ]}
+              >
+                {site.enabled ? "Your site is live" : "Site is off"}
+              </Text>
+              <Text style={[styles.siteToggleSub, { color: colors.mutedForeground }]}>
+                A gallery built from your public collections
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.visToggle,
+                {
+                  backgroundColor: site.enabled ? colors.emerald : "rgba(120,110,100,0.18)",
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.visToggleThumb,
+                  { transform: [{ translateX: site.enabled ? 18 : 2 }] },
+                ]}
+              />
+            </View>
+          </Pressable>
+
+          {/* Public URL preview */}
+          <View style={[styles.urlRow, { borderColor: "rgba(120,110,100,0.16)" }]}>
+            <Feather name="link" size={13} color={colors.mutedForeground} />
+            <Text style={[styles.urlText, { color: colors.foreground }]} numberOfLines={1}>
+              {PUBLIC_SITE_DOMAIN}/{publicSiteSlug(isEditing ? name : profile.name)}
+            </Text>
+          </View>
+
+          {site.enabled ? (
+            <>
+              {/* Featured collections */}
+              <Text style={[styles.subLabel, { color: colors.mutedForeground }]}>
+                Featured Collections
+              </Text>
+              {publicCollections.length === 0 ? (
+                <Text style={[styles.emptyField, { color: colors.mutedForeground }]}>
+                  Make a collection public to feature it on your site
+                </Text>
+              ) : (
+                <View style={styles.chipWrap}>
+                  {publicCollections.map((c) => {
+                    const selected = site.featuredCollectionIds.includes(c.id);
+                    return (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => toggleFeatured(c.id)}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: selected ? colors.cobalt : colors.secondary,
+                            borderColor: selected ? colors.cobalt : "rgba(120,110,100,0.16)",
+                          },
+                        ]}
+                      >
+                        {selected && <Feather name="check" size={11} color="#FFFFFF" />}
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: selected ? "#FFFFFF" : colors.foreground },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {c.title}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Homepage layout */}
+              <Text style={[styles.subLabel, { color: colors.mutedForeground, marginTop: 22 }]}>
+                Homepage Layout
+              </Text>
+              <View style={styles.layoutWrap}>
+                {HOMEPAGE_LAYOUTS.map((l) => {
+                  const selected = site.homepageLayout === l.key;
+                  return (
+                    <Pressable
+                      key={l.key}
+                      onPress={() => selectLayout(l.key)}
+                      style={[
+                        styles.layoutCard,
+                        {
+                          backgroundColor: selected ? "rgba(107,127,163,0.1)" : colors.secondary,
+                          borderColor: selected ? colors.cobalt : "rgba(120,110,100,0.14)",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.layoutLabel,
+                          { color: selected ? colors.cobalt : colors.foreground },
+                        ]}
+                      >
+                        {l.label}
+                      </Text>
+                      <Text style={[styles.layoutHint, { color: colors.mutedForeground }]}>
+                        {l.hint}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {/* Contact & commerce */}
+              <Text style={[styles.subLabel, { color: colors.mutedForeground, marginTop: 22 }]}>
+                Contact & Shop
+              </Text>
+              {isEditing ? (
+                <View style={styles.linksEdit}>
+                  <View style={styles.linkEditRow}>
+                    <Feather name="mail" size={14} color={colors.mutedForeground} />
+                    <TextInput
+                      style={[styles.linkInput, { color: colors.foreground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
+                      value={contactEmail}
+                      onChangeText={setContactEmail}
+                      placeholder="hello@yourstudio.com"
+                      placeholderTextColor={colors.mutedForeground}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                    />
+                  </View>
+                  <View style={styles.linkEditRow}>
+                    <Feather name="shopping-bag" size={14} color={colors.mutedForeground} />
+                    <TextInput
+                      style={[styles.linkInput, { color: colors.foreground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
+                      value={etsy}
+                      onChangeText={setEtsy}
+                      placeholder="Etsy shop link"
+                      placeholderTextColor={colors.mutedForeground}
+                      autoCapitalize="none"
+                      keyboardType="url"
+                    />
+                  </View>
+                  <View style={styles.linkEditRow}>
+                    <Feather name="shopping-cart" size={14} color={colors.mutedForeground} />
+                    <TextInput
+                      style={[styles.linkInput, { color: colors.foreground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
+                      value={shopify}
+                      onChangeText={setShopify}
+                      placeholder="Shopify store link"
+                      placeholderTextColor={colors.mutedForeground}
+                      autoCapitalize="none"
+                      keyboardType="url"
+                    />
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.links}>
+                  {site.contactEmail ? (
+                    <View style={styles.linkRow}>
+                      <Feather name="mail" size={13} color={colors.mutedForeground} />
+                      <Text style={[styles.linkText, { color: colors.cobalt }]}>{site.contactEmail}</Text>
+                    </View>
+                  ) : null}
+                  {site.etsy ? (
+                    <View style={styles.linkRow}>
+                      <Feather name="shopping-bag" size={13} color={colors.mutedForeground} />
+                      <Text style={[styles.linkText, { color: colors.cobalt }]}>{site.etsy}</Text>
+                    </View>
+                  ) : null}
+                  {site.shopify ? (
+                    <View style={styles.linkRow}>
+                      <Feather name="shopping-cart" size={13} color={colors.mutedForeground} />
+                      <Text style={[styles.linkText, { color: colors.cobalt }]}>{site.shopify}</Text>
+                    </View>
+                  ) : null}
+                  {!site.contactEmail && !site.etsy && !site.shopify ? (
+                    <Text style={[styles.emptyField, { color: colors.mutedForeground }]}>
+                      Add a contact email and shop links
+                    </Text>
+                  ) : null}
+                </View>
+              )}
+
+              <Text style={[styles.siteHint, { color: colors.mutedForeground }]}>
+                Your name, bio, statement, website, and Instagram from above also appear on your
+                site. Only public collections, their public pieces, and the fields you allow are
+                shown.
+              </Text>
+
+              {/* Preview */}
+              <Pressable
+                style={[styles.previewBtn, { backgroundColor: colors.foreground }]}
+                onPress={() => router.push("/public-site")}
+              >
+                <Feather name="external-link" size={14} color={colors.background} />
+                <Text style={[styles.previewBtnText, { color: colors.background }]}>
+                  Preview Public Site
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <Text style={[styles.siteHint, { color: colors.mutedForeground }]}>
+              Turn on your site to feature collections, choose a layout, and share a public
+              gallery of your work.
+            </Text>
+          )}
+        </View>
       </ScrollView>
     </View>
   );
@@ -497,4 +794,89 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderBottomWidth: 0.75,
   },
+  statusPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  statusPillText: {
+    fontSize: 10,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.5,
+  },
+  siteToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 14,
+    borderWidth: 0.75,
+  },
+  siteToggleLabels: { flex: 1, gap: 2 },
+  siteToggleTitle: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
+  siteToggleSub: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
+  visToggle: {
+    width: 42,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+  },
+  visToggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#FFFFFF" },
+  urlRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 0.75,
+    marginTop: 12,
+  },
+  urlText: { flex: 1, fontSize: 13, fontFamily: "Poppins_400Regular", letterSpacing: 0.2 },
+  subLabel: {
+    fontSize: 9,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 0.75,
+    maxWidth: "100%",
+  },
+  chipText: { fontSize: 12, fontFamily: "Poppins_400Regular", letterSpacing: 0.2, flexShrink: 1 },
+  layoutWrap: { gap: 8 },
+  layoutCard: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 0.75,
+  },
+  layoutLabel: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
+  layoutHint: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2, marginTop: 2 },
+  siteHint: {
+    fontSize: 12,
+    fontFamily: "Poppins_300Light",
+    lineHeight: 19,
+    marginTop: 20,
+  },
+  previewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 26,
+    marginTop: 20,
+  },
+  previewBtnText: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.3 },
 });
