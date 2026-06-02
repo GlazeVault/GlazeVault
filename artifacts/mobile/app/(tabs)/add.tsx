@@ -97,7 +97,7 @@ export default function AddScreen() {
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [4, 5],
-      quality: 0.9,
+      quality: 1,
     });
     if (!result.canceled && result.assets[0]) {
       setImageUri(result.assets[0].uri);
@@ -113,7 +113,7 @@ export default function AddScreen() {
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 5],
-      quality: 0.9,
+      quality: 1,
     });
     if (!result.canceled && result.assets[0]) {
       setImageUri(result.assets[0].uri);
