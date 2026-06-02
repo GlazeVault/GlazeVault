@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ShareSheet } from "@/components/ShareSheet";
-import { PUBLIC_DATA_FIELDS, isPubliclyVisiblePiece } from "@/constants/privacy";
+import { PUBLIC_DATA_FIELDS } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
@@ -158,10 +158,16 @@ export default function PieceDetailScreen() {
   };
 
   // Public preview: how this piece appears to others. Only fields enabled in
-  // publicDataSettings are shown, and only when the piece is publicly visible.
+  // publicDataSettings are shown. This owner-facing preview keys off the piece's
+  // own visibility only — collection-level privacy is enforced separately at the
+  // public-site listing layer (getPublicCollectionPieces / isCollectionFeatured),
+  // so it never surfaces a private-collection piece to non-owners.
   if (isPublicView) {
-    const publiclyVisible = isPubliclyVisiblePiece(piece, collections);
-    if (!publiclyVisible) {
+    const latestPiece = pieces.find((p) => p.id === id);
+    console.log("PUBLIC PREVIEW pieceId:", id);
+    console.log("PUBLIC PREVIEW latestPiece:", latestPiece);
+    console.log("PUBLIC PREVIEW visibility:", latestPiece?.visibility);
+    if (!latestPiece || latestPiece.visibility !== "public") {
       return (
         <View style={[styles.center, { backgroundColor: colors.background }]}>
           <View style={[styles.privateCircle, { backgroundColor: colors.secondary }]}>
