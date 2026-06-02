@@ -61,6 +61,7 @@
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.23",
     "expo-sharing": "^56.0.15",
-    "fflate": "^0.8.3"
+    "fflate": "^0.8.3",
+    "unpdf": "^1.6.2"
   }
 }

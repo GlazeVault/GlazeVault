@@ -15,7 +15,15 @@ Used by the profile Bio / Artist Statement "Import from file" feature. Helper li
 
 ## .docx extraction
 - A .docx is a ZIP. Unzip with `fflate` (`unzipSync`, pure JS / Hermes-safe), read `word/document.xml`, map `</w:p>`→newline, `<w:tab/>`→tab, `<w:br/>`→newline, strip remaining tags, decode XML entities. Good enough for prose; no styling preserved.
-- **PDF is intentionally deferred** — rejected with a friendly message; needs a heavy parser to do reliably.
+
+## .pdf extraction (Expo Go / Hermes, no native modules, no Worker)
+- Use **`unpdf`** (`getDocumentProxy` + `extractText(pdf,{mergePages:true})`) — its serverless pdf.js build is worker-free and canvas-free, so it runs on Hermes. Plain `pdfjs-dist` needs Worker + canvas setup that doesn't work in Expo Go.
+- unpdf only stubs `DOMMatrix`. You must polyfill the rest yourself at module load: **`Promise.withResolvers`** and **`structuredClone`** (a real recursive clone handling typed arrays/DataView/ArrayBuffer/Date/RegExp/Map/Set/cycles — NOT a JSON clone, which corrupts typed arrays). Guard each with `typeof … !== "function"` so they're no-ops on web.
+- Lazy-load pdf.js (~1.6MB) on first use: `definePDFJSModule(() => import("unpdf/pdfjs"))`, cache the promise, and **clear the cache on rejection** so a transient init failure can retry.
+- Any failure OR an empty text layer (scanned/image-only PDF) → throw one friendly `Error("Unable to read this PDF.")`.
+- **Why:** the whole PDF path is dictated by Expo Go = pure JS only; choosing the wrong lib or skipping the Hermes polyfills produces a runtime crash that never appears on web (web has all these globals).
+
+**Verified:** web e2e (Playwright upload of a real PDF) passes; native iOS/Hermes not directly testable here — the polyfills are the known risk surface if a new global (e.g. `ReadableStream`/`atob`) turns out to be needed.
 
 ## Save semantics
 Import only mutates local `bio`/`statement` state; nothing persists until the user taps Save (`handleSave → updateProfile`). The Replace/Append modal choice IS the overwrite confirmation — never overwrite a non-empty field silently.

@@ -248,7 +248,7 @@ export default function ProfileScreen() {
       ]}
       accessibilityRole="button"
       accessibilityLabel="Import from file"
-      accessibilityHint="Choose a .txt or .docx file to fill this field"
+      accessibilityHint="Choose a .txt, .docx, or PDF file to fill this field"
     >
       {importBusy ? (
         <ActivityIndicator size="small" color={colors.mutedForeground} />
