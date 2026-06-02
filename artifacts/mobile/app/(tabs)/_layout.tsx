@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import React, { useState, type ComponentProps } from "react";
@@ -9,7 +8,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useColorScheme,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -43,10 +41,6 @@ function TabIcon({ item, active, color }: { item: NavItem; active: boolean; colo
 function GlazeTabBar({ state, navigation }: TabBarProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const isIOS = Platform.OS === "ios";
-  const isWeb = Platform.OS === "web";
   const [menuVisible, setMenuVisible] = useState(false);
 
   const activeName = state.routes[state.index]?.name;
@@ -81,22 +75,11 @@ function GlazeTabBar({ state, navigation }: TabBarProps) {
   };
 
   return (
-    <View style={styles.wrap} pointerEvents="box-none">
-      <View
-        style={[
-          styles.bar,
-          {
-            height: (isWeb ? 64 : 60) + insets.bottom,
-            paddingBottom: insets.bottom,
-            backgroundColor: isIOS ? "transparent" : colors.background,
-            borderTopColor: "rgba(120, 110, 100, 0.18)",
-          },
-        ]}
-      >
-        {isIOS ? (
-          <BlurView intensity={40} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-        ) : null}
-
+    <View
+      style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 12) }]}
+      pointerEvents="box-none"
+    >
+      <View style={styles.bar}>
         {navItem(NAV_ITEMS[0])}
         {navItem(NAV_ITEMS[1])}
 
@@ -147,19 +130,28 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    paddingHorizontal: 16,
   },
   bar: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-around",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 8,
-    overflow: "visible",
+    height: 66,
+    paddingHorizontal: 8,
+    borderRadius: 28,
+    backgroundColor: "rgba(245, 241, 232, 0.98)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(120, 110, 100, 0.10)",
+    shadowColor: "#2D2D2A",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 8,
   },
   tabItem: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "center",
     gap: 4,
   },
   tabLabel: {
