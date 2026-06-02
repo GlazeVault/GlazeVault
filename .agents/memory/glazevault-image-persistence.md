@@ -16,6 +16,8 @@ GlazeVault runs primarily on **Expo web** (the preview target) but must also wor
 
 **How to apply:** any new image field (avatar, piece, cover, etc.) must run through `persistPieceImage` on save and `resolveImageSource` on display. Avatar save must **fail-closed** (alert + abort) like piece add/edit, not swallow the error and store the temp URI.
 
+**Avatar upload (profile):** tapping the avatar opens the picker in ANY mode (not gated on edit mode) and persists immediately via `updateProfile({avatarUri})` — it does NOT wait for the text-field Save button. The original "avatar never appears" bug was exactly this gating (onPress only set in edit mode + only the Save button persisted). Guard the picker with an in-flight ref to avoid duplicate native file copies on rapid taps.
+
 # Data persistence & write ordering
 
 All three contexts (Pottery/Collections/Profile) persist full snapshots to AsyncStorage and only seed when storage is empty (never overwrite saved data with mock/demo). Required debug logs: `Saved/Loaded pieces|collections|profile`.

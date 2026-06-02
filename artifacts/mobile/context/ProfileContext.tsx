@@ -87,6 +87,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           profileRef.current = next;
           setProfile(next);
           console.log("Loaded profile", next.name || "(unnamed)");
+          if (next.avatarUri) console.log("Loaded profile avatar", next.avatarUri.slice(0, 40));
         } else {
           console.log("Loaded profile", "(none)");
         }

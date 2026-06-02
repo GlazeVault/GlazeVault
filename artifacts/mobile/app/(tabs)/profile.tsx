@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -49,6 +49,9 @@ export default function ProfileScreen() {
   const [shopify, setShopify] = useState(profile.publicSite.shopify);
   const [avatarUri, setAvatarUri] = useState(profile.avatarUri ?? "");
   const [saving, setSaving] = useState(false);
+  // Prevents overlapping picker/save runs (and duplicate native file copies)
+  // from rapid taps on the avatar.
+  const pickingAvatar = useRef(false);
 
   const featuredCollections = collections.filter(isCollectionFeatured);
   const site = profile.publicSite;
@@ -107,18 +110,46 @@ export default function ProfileScreen() {
     await updatePublicSite({ homepageLayout: layout });
   };
 
+  // Tapping the avatar (in any mode) opens the picker, copies the image into
+  // permanent storage, and saves it immediately so it survives reloads and shows
+  // right away — independent of the text-field Save button.
   const pickAvatar = async () => {
+    if (pickingAvatar.current) return;
+    pickingAvatar.current = true;
+    try {
+      await runPickAvatar();
+    } finally {
+      pickingAvatar.current = false;
+    }
+  };
+
+  const runPickAvatar = async () => {
     if (Platform.OS !== "web") {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") return;
+      if (status !== "granted") {
+        Alert.alert("Permission needed", "Allow access to your photo library.");
+        return;
+      }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.85,
+      quality: 0.7,
     });
-    if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
+    if (result.canceled || !result.assets[0]) return;
+    const picked = result.assets[0].uri;
+    setAvatarUri(picked);
+    try {
+      const stored = await persistPieceImage(picked);
+      setAvatarUri(stored);
+      await updateProfile({ avatarUri: stored });
+      console.log("Saved profile avatar", stored.slice(0, 40));
+    } catch (e) {
+      console.warn("Failed to persist avatar", e);
+      setAvatarUri(profile.avatarUri ?? "");
+      Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
+    }
   };
 
   const initial = (isEditing ? name : profile.name).trim().charAt(0).toUpperCase();
@@ -166,12 +197,13 @@ export default function ProfileScreen() {
 
         {/* Avatar */}
         <View style={styles.avatarSection}>
-          <Pressable onPress={isEditing ? pickAvatar : undefined} style={styles.avatarWrap}>
+          <Pressable onPress={pickAvatar} style={styles.avatarWrap}>
             {(isEditing ? avatarUri : profile.avatarUri) ? (
               <Image
                 source={resolveImageSource(isEditing ? avatarUri : profile.avatarUri)}
                 style={styles.avatar}
                 contentFit="cover"
+                transition={250}
               />
             ) : (
               <View style={[styles.avatarPlaceholder, { backgroundColor: colors.secondary }]}>
@@ -182,11 +214,9 @@ export default function ProfileScreen() {
                 )}
               </View>
             )}
-            {isEditing && (
-              <View style={[styles.avatarEditBadge, { backgroundColor: colors.foreground }]}>
-                <Feather name="camera" size={10} color={colors.background} />
-              </View>
-            )}
+            <View style={[styles.avatarEditBadge, { backgroundColor: colors.foreground }]}>
+              <Feather name="camera" size={10} color={colors.background} />
+            </View>
           </Pressable>
         </View>
 
