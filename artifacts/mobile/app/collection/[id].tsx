@@ -98,9 +98,9 @@ function GalleryTile({
   const isPrivate = piece.visibility === "private";
   const isFeature = variant === "feature" || variant === "spread";
 
-  const meta = [piece.clay, piece.glaze, piece.cone, piece.firingEnvironment || piece.firing]
-    .filter(Boolean)
-    .join("  ·  ");
+  // Keep the gallery quiet: show just the essentials (material · cone). The
+  // full firing details live on the piece detail page.
+  const meta = [piece.clay, piece.cone].filter(Boolean).join("  ·  ");
 
   const handleFavorite = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -601,43 +601,24 @@ export default function CollectionDetailScreen() {
               </>
             ) : (
               <View style={styles.viewBadgeRow}>
-                <View
-                  style={[
-                    styles.viewBadge,
-                    {
-                      backgroundColor:
-                        collection.visibility === "public"
-                          ? "rgba(107,139,122,0.12)"
-                          : colors.secondary,
-                    },
-                  ]}
-                >
+                <View style={styles.viewBadge}>
                   <Feather
                     name={collection.visibility === "public" ? "globe" : "lock"}
-                    size={11}
-                    color={
-                      collection.visibility === "public" ? colors.emerald : "#8A7B6C"
-                    }
+                    size={10}
+                    color="#9C8E7E"
                   />
-                  <Text
-                    style={[
-                      styles.viewBadgeText,
-                      {
-                        color:
-                          collection.visibility === "public" ? colors.emerald : "#8A7B6C",
-                      },
-                    ]}
-                  >
+                  <Text style={[styles.viewBadgeText, { color: "#9C8E7E" }]}>
                     {collection.visibility === "public" ? "Public" : "Private"}
                   </Text>
                 </View>
                 {isCollectionFeatured(collection) ? (
-                  <View
-                    style={[styles.viewBadge, { backgroundColor: "rgba(107,127,163,0.12)" }]}
-                  >
-                    <Feather name="star" size={11} color={colors.cobalt} />
-                    <Text style={[styles.viewBadgeText, { color: colors.cobalt }]}>Featured</Text>
-                  </View>
+                  <>
+                    <Text style={styles.viewBadgeDot}>·</Text>
+                    <View style={styles.viewBadge}>
+                      <Feather name="star" size={10} color="#9C8E7E" />
+                      <Text style={[styles.viewBadgeText, { color: "#9C8E7E" }]}>Featured</Text>
+                    </View>
+                  </>
                 ) : null}
               </View>
             )}
@@ -1007,11 +988,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   divider: { height: 1, width: 40, marginBottom: 16 },
-  dividerFull: { height: 1, marginTop: 20, marginBottom: 0 },
+  dividerFull: {
+    height: 1,
+    width: 28,
+    alignSelf: "center",
+    marginTop: 44,
+    marginBottom: 8,
+  },
   intro: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Poppins_300Light",
-    lineHeight: 22,
+    lineHeight: 27,
+    letterSpacing: 0.2,
+    maxWidth: 330,
   },
   introInput: {
     fontSize: 14,
@@ -1130,24 +1119,22 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   tileMeta: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Poppins_300Light",
-    letterSpacing: 1.6,
-    textTransform: "uppercase",
-    opacity: 0.85,
+    letterSpacing: 0.4,
+    opacity: 0.6,
   },
-  viewBadgeRow: { flexDirection: "row", marginTop: 14, gap: 8 },
+  viewBadgeRow: { flexDirection: "row", alignItems: "center", marginTop: 14, gap: 10 },
   viewBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    gap: 5,
   },
+  viewBadgeDot: { fontSize: 11, color: "#C2B6A6" },
   viewBadgeText: {
     fontSize: 11,
-    fontFamily: "Poppins_500Medium",
-    letterSpacing: 0.4,
+    fontFamily: "Poppins_400Regular",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
   },
 });
