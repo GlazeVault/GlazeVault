@@ -318,8 +318,10 @@ export default function CollectionDetailScreen() {
 
   console.log("Loaded collection cover:", collection.coverImageUri);
 
-  // Display fallback order: explicit cover -> first piece in this collection.
-  const firstPieceImage = collectionPieces[0]?.imageUri ?? "";
+  // Display fallback order: explicit cover -> first piece in this collection
+  // that actually has a photo (skipping imageless pieces so the banner never
+  // falls back to a blank/placeholder while later pieces do have images).
+  const firstPieceImage = collectionPieces.find((p) => p.imageUri)?.imageUri ?? "";
   const headerCover = (collection.coverImageUri || firstPieceImage) || "";
   // The cover image acts as a banner/intro. While editing only the explicit
   // selection is shown (so Remove visibly clears it); otherwise the resolved

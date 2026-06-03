@@ -27,9 +27,6 @@ interface PublicPiece {
   title: string;
   imageUri: string;
   clay: string;
-  glaze: string;
-  cone: string;
-  firingEnvironment: string;
   dimensions: string;
   year: string;
   publicDataSettings: PublicDataSettings;

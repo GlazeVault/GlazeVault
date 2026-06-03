@@ -30,26 +30,21 @@ export const DEFAULT_PUBLIC_DATA_SETTINGS: PublicDataSettings = {
   showPrice: false,
 };
 
+// The public surfaces are intentionally gallery-like: only artwork-identity
+// fields are ever shown publicly. Technical/firing data (glaze name + recipe,
+// cone, firing environment, firing notes, price) stays in the owner's private
+// studio record and is deliberately NOT offered as a public toggle here.
 export const PUBLIC_DATA_FIELDS: { key: keyof PublicDataSettings; label: string }[] = [
   { key: "showTitle", label: "Title" },
   { key: "showPhotos", label: "Photos" },
   { key: "showDescription", label: "Studio Notes" },
   { key: "showClayBody", label: "Clay Body" },
-  { key: "showGlazeName", label: "Glaze Name" },
-  { key: "showGlazeRecipe", label: "Glaze Recipe" },
-  { key: "showCone", label: "Cone" },
-  { key: "showFiringEnvironment", label: "Firing Environment" },
-  { key: "showFiringNotes", label: "Firing Notes" },
   { key: "showDimensions", label: "Dimensions" },
   { key: "showYear", label: "Year" },
-  { key: "showPrice", label: "Price" },
 ];
 
 export interface PublicMetaPiece {
   clay: string;
-  glaze: string;
-  cone: string;
-  firingEnvironment: string;
   dimensions: string;
   year: string;
   publicDataSettings: PublicDataSettings;
@@ -59,20 +54,19 @@ export interface PublicMetaPiece {
  * Builds the single quiet metadata line shown on EVERY public surface
  * (portfolio cards, public collection display, piece detail, fullscreen viewer).
  *
- * It is driven entirely by the piece's own `publicDataSettings` toggles — there
- * is no hardcoded field subset — so a field renders iff its toggle is on AND it
- * has a value. Empty/disabled fields are dropped (no gaps), and because every
- * surface calls this one function the same string renders identically across the
- * app. Order reads as a ceramics caption: material → surface → firing → form →
- * year, e.g. "Stoneware · 12 × 12 × 14 in · 2025".
+ * The public portfolio is deliberately gallery-like, so this line is limited to
+ * the three artwork-identity fields — clay body · dimensions · year — each still
+ * gated by its own `publicDataSettings` toggle. Technical/firing data (glaze,
+ * cone, firing environment, recipe, firing notes) is intentionally never shown
+ * publicly; it lives only on the owner's private studio record. Empty/disabled
+ * fields are dropped (no gaps), and because every surface calls this one function
+ * the same string renders identically across the app, e.g.
+ * "Stoneware · 12 × 12 × 14 in · 2025".
  */
 export function buildPublicMetaLine(piece: PublicMetaPiece): string {
   const s = piece.publicDataSettings;
   return [
     s.showClayBody ? piece.clay : "",
-    s.showGlazeName ? piece.glaze : "",
-    s.showCone ? piece.cone : "",
-    s.showFiringEnvironment ? piece.firingEnvironment : "",
     s.showDimensions ? piece.dimensions : "",
     s.showYear ? piece.year : "",
   ]

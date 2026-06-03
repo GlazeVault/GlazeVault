@@ -25,34 +25,33 @@ surfaces that swipe across pieces) must filter through `isPubliclyVisiblePiece` 
 `Pressable` that opens the viewer, and `ImageViewer` is rendered inside the public
 return branch (it is a separate render path from the owner branch).
 
-## Public metadata is TOGGLE-DRIVEN via one shared helper (supersedes curated subset)
+## Public metadata = clay · dimensions · year ONLY (curated gallery subset)
 The public meta line is built by the single shared helper `buildPublicMetaLine(piece)`
-in `constants/privacy.ts`. It joins, with "  ·  ", every field whose
-`publicDataSettings` flag is ON **and** whose value is non-empty, in order
-`clay · glaze · cone · firingEnvironment · dimensions · year`. Empty/disabled fields
-drop out (`.filter(Boolean)` guards separators), so a piece with only clay/dim/year
-reads "Stoneware · 12 × 12 × 14 in · 2025", while one with only glaze/cone/firing
-reads "Turquoise matt · Cone 10 · Gas Reduction". EVERY public surface calls this one
-helper: the public detail line (`publicMeta` in piece/[id].tsx isPublicView), the
-fullscreen `ImageViewer` caption (same file), and the public-site portfolio cards
-(`renderCaption` in public-site.tsx).
+in `constants/privacy.ts`. It joins, with "  ·  ", ONLY `clay · dimensions · year`,
+each still gated by its own `publicDataSettings` toggle (`showClayBody`/`showDimensions`/
+`showYear`) and dropped if empty (`.filter(Boolean)`), e.g. "Stoneware · 12 × 12 × 14 in
+· 2025". Technical/firing fields (glaze name + recipe, cone, firing environment, firing
+notes, price) are **never** shown on any public surface — they live only on the owner's
+private studio record (the owner `piece/[id]` InfoRows). EVERY public surface calls this
+one helper: the public detail line (`publicMeta` in piece/[id].tsx isPublicView), the
+fullscreen `ImageViewer` caption, and the public-site portfolio cards (`renderCaption`/
+`renderTile` in public-site.tsx).
 
-**Why:** the earlier decision hardcoded a curated `clay · dimensions · year` subset
-and ignored the glaze/cone/firing toggles. The user explicitly reversed this: any
-field that is enabled AND has data must render, consistently across all public
-surfaces. The real bug it caused — a piece (the "Mug") with empty clay/dim/year but
-populated+toggled glaze/cone/firing showed ONLY its title, because the hardcoded
-subset produced an empty line. The minimal/editorial feel lives in the STYLE (serif
-title + one quiet " · " line, no labels/ALL-CAPS), not in restricting which toggles
-are honored.
+**Why:** this requirement has PING-PONGED — curated subset → toggle-driven-all-fields →
+back to curated. The CURRENT and authoritative rule is the curated `clay·dim·year`
+subset: the user wants a gallery-like portfolio with technical data kept private. A
+piece with only glaze/cone/firing populated (e.g. an old "Mug") will now show just its
+title publicly — that is INTENDED, not a bug. Do not "fix" it by re-adding technical
+fields to the public line.
 
-**How to apply:** never hardcode a public field subset again — route every public
-metadata line through `buildPublicMetaLine`. When adding a new public-display field,
-add it to the helper's array AND add its `show*` flag to `showAllPublicDetails()` in
-piece/[id].tsx (or "Show all" silently omits it), and list the field on the
-`PublicPiece` interface in public-site.tsx. The owner `/collection/[id]` view is NOT
-a public surface — it shows the owner's full data (with private badges) and must NOT
-be gated by `publicDataSettings`.
+**How to apply:** to keep the toggle UI honest, `PUBLIC_DATA_FIELDS` (the per-piece
+public-toggle list rendered in piece/[id].tsx and edit/[id].tsx) is trimmed to only the
+publicly-displayable fields: Title, Photos, Studio Notes, Clay Body, Dimensions, Year.
+`PublicMetaPiece` and `showAllPublicDetails()` are kept in lockstep with this set; the
+full `PublicDataSettings` TYPE still carries every key (defaults) so dataService round-
+trips are unaffected. The owner `/collection/[id]` view is NOT a public surface — it
+shows the owner's full data (with private badges) and must NOT be gated by
+`publicDataSettings`.
 
 ## Public-site portfolio cards carry the same whispered caption
 The public-site portfolio tiles (`renderTile` in public-site.tsx) render a caption

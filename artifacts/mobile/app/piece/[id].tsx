@@ -201,8 +201,9 @@ export default function PieceDetailScreen() {
     });
   };
 
-  // Quick action: reveal the common public details in one tap. Recipe + firing
-  // notes stay OFF (they're the sensitive fields kept private by default).
+  // Quick action: reveal the public-facing details in one tap. Only the
+  // gallery-friendly fields exist publicly — technical/firing data is never
+  // shared, so it is intentionally absent here.
   const showAllPublicDetails = async () => {
     await Haptics.selectionAsync();
     await updatePiece(piece.id, {
@@ -212,9 +213,6 @@ export default function PieceDetailScreen() {
         showPhotos: true,
         showDescription: true,
         showClayBody: true,
-        showGlazeName: true,
-        showCone: true,
-        showFiringEnvironment: true,
         showDimensions: true,
         showYear: true,
       },

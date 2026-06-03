@@ -41,7 +41,10 @@ export default function CollectionsScreen() {
   const getCoverForCollection = (collection: { id: string; coverImageUri?: string }) => {
     if (collection.coverImageUri) return collection.coverImageUri;
     const collectionPieces = getPiecesForCollection(collection.id);
-    return collectionPieces[0]?.imageUri ?? null;
+    // Fall back to the first piece that actually HAS a photo — not just the
+    // first piece, which may be imageless and would leave the cover blank even
+    // when later pieces in the collection have images.
+    return collectionPieces.find((p) => p.imageUri)?.imageUri ?? null;
   };
 
   return (
