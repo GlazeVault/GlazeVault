@@ -24,7 +24,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
-import { isCollectionInPortfolio } from "@/constants/privacy";
+import { isCollectionPublic, isPubliclyVisiblePiece } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
@@ -229,13 +229,13 @@ export default function CollectionDetailScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const collection = getCollection(id);
-  const collectionPieces = pieces.filter((p) => p.collectionId === id);
+  const collectionPieces = pieces.filter((p) => p.collectionIds.includes(id));
 
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(collection?.title ?? "");
   const [intro, setIntro] = useState(collection?.intro ?? "");
-  const [inPortfolio, setInPortfolio] = useState<boolean>(
-    collection ? isCollectionInPortfolio(collection) : false
+  const [isPublic, setIsPublic] = useState<boolean>(
+    collection ? isCollectionPublic(collection) : false
   );
   const [coverImageUri, setCoverImageUri] = useState(collection?.coverImageUri ?? "");
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
@@ -339,11 +339,12 @@ export default function CollectionDetailScreen() {
       return;
     }
     setSaving(true);
-    // One switch: portfolio membership is the only publishing control.
+    // Collections organize pieces. A public collection becomes part of the
+    // broader public archive; it is independent of per-piece Portfolio curation.
     await updateCollection(id, {
       title: title.trim(),
       intro: intro.trim(),
-      featuredOnSite: inPortfolio,
+      visibility: isPublic ? "public" : "private",
       coverImageUri: coverImageUri || undefined,
     });
     setSaving(false);
@@ -482,34 +483,34 @@ export default function CollectionDetailScreen() {
                 style={[
                   styles.visibilityRow,
                   {
-                    backgroundColor: inPortfolio ? "rgba(107,139,122,0.1)" : colors.secondary,
-                    borderColor: inPortfolio
+                    backgroundColor: isPublic ? "rgba(107,139,122,0.1)" : colors.secondary,
+                    borderColor: isPublic
                       ? "rgba(107,139,122,0.3)"
                       : "rgba(120,110,100,0.16)",
                   },
                 ]}
-                onPress={() => setInPortfolio((v) => !v)}
+                onPress={() => setIsPublic((v) => !v)}
                 accessibilityRole="switch"
-                accessibilityState={{ checked: inPortfolio }}
-                accessibilityLabel="Show in portfolio"
+                accessibilityState={{ checked: isPublic }}
+                accessibilityLabel="Public collection"
               >
                 <Feather
-                  name={inPortfolio ? "globe" : "lock"}
+                  name={isPublic ? "globe" : "lock"}
                   size={14}
-                  color={inPortfolio ? colors.emerald : colors.mutedForeground}
+                  color={isPublic ? colors.emerald : colors.mutedForeground}
                 />
                 <View style={styles.visibilityLabels}>
                   <Text
                     style={[
                       styles.visibilityTitle,
-                      { color: inPortfolio ? colors.emerald : colors.foreground },
+                      { color: isPublic ? colors.emerald : colors.foreground },
                     ]}
                   >
-                    {inPortfolio ? "Show in Portfolio" : "Hidden from Portfolio"}
+                    {isPublic ? "Public collection" : "Private collection"}
                   </Text>
                   <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
-                    {inPortfolio
-                      ? "Photographed pieces here appear on your public site"
+                    {isPublic
+                      ? "Anyone can browse this collection's public pieces"
                       : "Kept private — only you can see it"}
                   </Text>
                 </View>
@@ -518,14 +519,14 @@ export default function CollectionDetailScreen() {
                     styles.visToggle,
                     {
                       backgroundColor:
-                        inPortfolio ? colors.emerald : "rgba(120,110,100,0.18)",
+                        isPublic ? colors.emerald : "rgba(120,110,100,0.18)",
                     },
                   ]}
                 >
                   <View
                     style={[
                       styles.visToggleThumb,
-                      { transform: [{ translateX: inPortfolio ? 18 : 2 }] },
+                      { transform: [{ translateX: isPublic ? 18 : 2 }] },
                     ]}
                   />
                 </View>
@@ -534,12 +535,12 @@ export default function CollectionDetailScreen() {
               <View style={styles.viewBadgeRow}>
                 <View style={styles.viewBadge}>
                   <Feather
-                    name={isCollectionInPortfolio(collection) ? "globe" : "lock"}
+                    name={isCollectionPublic(collection) ? "globe" : "lock"}
                     size={10}
                     color="#9C8E7E"
                   />
                   <Text style={[styles.viewBadgeText, { color: "#9C8E7E" }]}>
-                    {isCollectionInPortfolio(collection) ? "In Portfolio" : "Private"}
+                    {isCollectionPublic(collection) ? "Public" : "Private"}
                   </Text>
                 </View>
               </View>
@@ -597,7 +598,7 @@ export default function CollectionDetailScreen() {
                     piece={item.left}
                     variant="pair"
                     fromCollectionId={id}
-                    published={isCollectionInPortfolio(collection) && !!item.left.imageUri}
+                    published={isPubliclyVisiblePiece(item.left)}
                     colors={colors}
                   />
                 </View>
@@ -606,7 +607,7 @@ export default function CollectionDetailScreen() {
                     piece={item.right}
                     variant="pair"
                     fromCollectionId={id}
-                    published={isCollectionInPortfolio(collection) && !!item.right.imageUri}
+                    published={isPubliclyVisiblePiece(item.right)}
                     colors={colors}
                   />
                 </View>
@@ -616,7 +617,7 @@ export default function CollectionDetailScreen() {
                 piece={item.piece}
                 variant={item.kind}
                 fromCollectionId={id}
-                published={isCollectionInPortfolio(collection) && !!item.piece.imageUri}
+                published={isPubliclyVisiblePiece(item.piece)}
                 colors={colors}
               />
             )}
@@ -638,7 +639,7 @@ export default function CollectionDetailScreen() {
             onPress={() => {
               setTitle(collection.title);
               setIntro(collection.intro);
-              setInPortfolio(isCollectionInPortfolio(collection));
+              setIsPublic(isCollectionPublic(collection));
               setCoverImageUri(collection.coverImageUri ?? "");
               setIsEditing(true);
             }}

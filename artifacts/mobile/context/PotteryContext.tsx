@@ -22,16 +22,39 @@ export interface PotteryPiece {
   imageUri: string;
   createdAt: string;
   isFavorite: boolean;
-  collectionId?: string;
+  // Organization: a piece can live in zero or more collections.
+  collectionIds: string[];
+  // Curation: hand-picked for the public Portfolio (a subset of public pieces).
+  featuredInPortfolio: boolean;
+  // Discovery: viewable on public, non-owner surfaces at all.
+  isPublic: boolean;
+  // Soft-retired: kept in the owner's archive, hidden from every public surface.
+  archived: boolean;
 }
 
 interface PotteryContextType {
   pieces: PotteryPiece[];
   addPiece: (
-    piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite">
+    piece: Omit<
+      PotteryPiece,
+      | "id"
+      | "createdAt"
+      | "isFavorite"
+      | "collectionIds"
+      | "featuredInPortfolio"
+      | "isPublic"
+      | "archived"
+    > &
+      Partial<
+        Pick<
+          PotteryPiece,
+          "collectionIds" | "featuredInPortfolio" | "isPublic" | "archived"
+        >
+      >
   ) => Promise<PotteryPiece>;
   updatePiece: (id: string, updates: Partial<PotteryPiece>) => Promise<void>;
   deletePiece: (id: string) => Promise<void>;
+  addPieceToCollection: (collectionId: string, pieceId: string) => Promise<void>;
   removePieceFromCollection: (collectionId: string, pieceId: string) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   getPiece: (id: string) => PotteryPiece | undefined;
@@ -66,14 +89,14 @@ function isDemoSeedPiece(p: Pick<PotteryPiece, "id" | "imageUri">): boolean {
 
 function normalizePiece(
   p: Partial<PotteryPiece> & {
-    // Legacy publishing fields from older cached/remote rows. Publishing is now
-    // collection-driven, so these are stripped off and never stored on the model.
-    isPublic?: boolean;
+    // Legacy fields from older cached/remote rows.
     visibility?: unknown;
     publicDataSettings?: unknown;
+    // Pre-multi-collection rows stored a single optional collection id.
+    collectionId?: string;
   } & Pick<PotteryPiece, "id">
 ): PotteryPiece {
-  const { isPublic, visibility, publicDataSettings, ...rest } = p;
+  const { visibility, publicDataSettings, collectionId, ...rest } = p;
   const base = {
     notes: "",
     clay: "",
@@ -86,8 +109,16 @@ function normalizePiece(
     imageUri: "",
     createdAt: new Date().toISOString(),
     isFavorite: false,
+    collectionIds: [],
+    featuredInPortfolio: false,
+    isPublic: false,
+    archived: false,
     ...rest,
   } as PotteryPiece;
+  // Migrate single `collectionId` → `collectionIds[]` when the array is absent.
+  if (!Array.isArray(base.collectionIds) || base.collectionIds.length === 0) {
+    base.collectionIds = collectionId ? [collectionId] : [];
+  }
   if (!base.firingEnvironment && base.firing) {
     base.firingEnvironment = base.firing;
   }
@@ -217,11 +248,30 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
 
   const addPiece = useCallback(
     async (
-      piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite">
+      piece: Omit<
+        PotteryPiece,
+        | "id"
+        | "createdAt"
+        | "isFavorite"
+        | "collectionIds"
+        | "featuredInPortfolio"
+        | "isPublic"
+        | "archived"
+      > &
+        Partial<
+          Pick<
+            PotteryPiece,
+            "collectionIds" | "featuredInPortfolio" | "isPublic" | "archived"
+          >
+        >
     ) => {
       const current = piecesRef.current;
       const firingEnvironment = piece.firingEnvironment || piece.firing || "";
       const newPiece: PotteryPiece = {
+        collectionIds: [],
+        featuredInPortfolio: false,
+        isPublic: false,
+        archived: false,
         ...piece,
         firingEnvironment,
         firing: firingEnvironment,
@@ -264,13 +314,33 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
     [persist, removePieceRemote]
   );
 
+  const addPieceToCollection = useCallback(
+    async (collectionId: string, pieceId: string) => {
+      let changed: PotteryPiece | undefined;
+      await persist(
+        piecesRef.current.map((p) => {
+          if (p.id === pieceId && !p.collectionIds.includes(collectionId)) {
+            changed = { ...p, collectionIds: [...p.collectionIds, collectionId] };
+            return changed;
+          }
+          return p;
+        })
+      );
+      if (changed) await pushPieceRemote(changed);
+    },
+    [persist, pushPieceRemote]
+  );
+
   const removePieceFromCollection = useCallback(
     async (collectionId: string, pieceId: string) => {
       let changed: PotteryPiece | undefined;
       await persist(
         piecesRef.current.map((p) => {
-          if (p.id === pieceId && p.collectionId === collectionId) {
-            changed = { ...p, collectionId: undefined };
+          if (p.id === pieceId && p.collectionIds.includes(collectionId)) {
+            changed = {
+              ...p,
+              collectionIds: p.collectionIds.filter((id) => id !== collectionId),
+            };
             return changed;
           }
           return p;
@@ -301,7 +371,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const getPiece = useCallback((id: string) => piecesRef.current.find((p) => p.id === id), []);
 
   return (
-    <PotteryContext.Provider value={{ pieces, addPiece, updatePiece, deletePiece, removePieceFromCollection, toggleFavorite, getPiece }}>
+    <PotteryContext.Provider value={{ pieces, addPiece, updatePiece, deletePiece, addPieceToCollection, removePieceFromCollection, toggleFavorite, getPiece }}>
       {children}
     </PotteryContext.Provider>
   );

@@ -2,12 +2,11 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { isPubliclyVisiblePiece } from "@/constants/privacy";
+import { isPortfolioPiece, isPubliclyVisiblePiece } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
-import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -20,10 +19,15 @@ interface PotteryCardProps {
 export function PotteryCard({ piece, fromCollectionId, showVisibility = true }: PotteryCardProps) {
   const colors = useColors();
   const { toggleFavorite } = usePottery();
-  const { collections } = useCollections();
-  // Public iff the piece's collection is in the portfolio and it has a photo —
-  // there is no per-piece visibility flag anymore.
-  const isPrivate = !isPubliclyVisiblePiece(piece, collections);
+  // Per-piece curation/visibility. Status badge priority is calm and singular:
+  // archived → featured → public → private.
+  const isFeatured = isPortfolioPiece(piece);
+  const isPublic = isPubliclyVisiblePiece(piece);
+
+  // T006: preserve each pot's natural silhouette. Start at the editorial 4:5
+  // ratio, then relax to the image's true ratio (clamped) once it loads so tall
+  // vases and wide bowls aren't cropped into the same rectangle.
+  const [aspectRatio, setAspectRatio] = useState(4 / 5);
 
   const handleFavorite = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -61,7 +65,7 @@ export function PotteryCard({ piece, fromCollectionId, showVisibility = true }: 
         })
       }
     >
-      <View style={styles.imageWrapper}>
+      <View style={[styles.imageWrapper, { aspectRatio }]}>
         <Image
           source={resolveImageSource(piece.imageUri)}
           style={StyleSheet.absoluteFill}
@@ -69,6 +73,13 @@ export function PotteryCard({ piece, fromCollectionId, showVisibility = true }: 
           transition={250}
           cachePolicy="memory-disk"
           recyclingKey={piece.id}
+          onLoad={(e) => {
+            const { width, height } = e.source;
+            if (width > 0 && height > 0) {
+              // Clamp so extreme ratios stay graceful in the editorial grid.
+              setAspectRatio(Math.min(Math.max(width / height, 0.62), 1.4));
+            }
+          }}
         />
       </View>
 
@@ -85,15 +96,25 @@ export function PotteryCard({ piece, fromCollectionId, showVisibility = true }: 
       </Pressable>
 
       {showVisibility &&
-        (isPrivate ? (
-          <View style={styles.privateBadge}>
-            <Feather name="lock" size={11} color="#8A7B6C" />
-            <Text style={styles.privateBadgeText}>Private</Text>
+        (piece.archived ? (
+          <View style={styles.statusBadge}>
+            <Feather name="archive" size={11} color="#8A7B6C" />
+            <Text style={[styles.statusBadgeText, { color: "#8A7B6C" }]}>Archived</Text>
+          </View>
+        ) : isFeatured ? (
+          <View style={styles.statusBadge}>
+            <Feather name="star" size={11} color={colors.emerald} />
+            <Text style={[styles.statusBadgeText, { color: colors.emerald }]}>Featured</Text>
+          </View>
+        ) : isPublic ? (
+          <View style={styles.statusBadge}>
+            <Feather name="globe" size={11} color={colors.cobalt} />
+            <Text style={[styles.statusBadgeText, { color: colors.cobalt }]}>Public</Text>
           </View>
         ) : (
-          <View style={styles.publicBadge}>
-            <Feather name="globe" size={11} color={colors.emerald} />
-            <Text style={[styles.publicBadgeText, { color: colors.emerald }]}>Public</Text>
+          <View style={styles.statusBadge}>
+            <Feather name="lock" size={11} color="#8A7B6C" />
+            <Text style={[styles.statusBadgeText, { color: "#8A7B6C" }]}>Private</Text>
           </View>
         ))}
 
@@ -134,7 +155,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  privateBadge: {
+  statusBadge: {
     position: "absolute",
     top: 14,
     left: 14,
@@ -148,27 +169,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "rgba(120,110,100,0.12)",
   },
-  privateBadgeText: {
-    fontSize: 10,
-    fontFamily: "Poppins_400Regular",
-    letterSpacing: 0.5,
-    color: "#8A7B6C",
-  },
-  publicBadge: {
-    position: "absolute",
-    top: 14,
-    left: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: "rgba(253,250,245,0.6)",
-    borderWidth: 0.5,
-    borderColor: "rgba(120,110,100,0.12)",
-  },
-  publicBadgeText: {
+  statusBadgeText: {
     fontSize: 10,
     fontFamily: "Poppins_400Regular",
     letterSpacing: 0.5,

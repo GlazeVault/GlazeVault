@@ -7,8 +7,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   buildPublicMetaLine,
+  getPortfolioPieces,
   getPublicCollectionPieces,
-  isCollectionInPortfolio,
+  isCollectionPublic,
 } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
@@ -71,11 +72,16 @@ export default function PublicSiteScreen() {
   const site = profile.publicSite;
   const layout: HomepageLayout = site.homepageLayout;
 
-  // Privacy: only collections shown in the portfolio, each reduced to its public
-  // pieces (any piece in the collection that has a photo). Portfolio membership
-  // lives on the collection itself via a single switch.
-  const featured = collections
-    .filter(isCollectionInPortfolio)
+  // The curated Portfolio is now driven at the piece level: every piece the
+  // artist has hand-picked via "Feature in Portfolio" (which are, by invariant,
+  // public and photographed). This is the headline of the public site.
+  const portfolioPieces = getPortfolioPieces(pieces) as PublicPiece[];
+
+  // Beyond the curated portfolio, public collections form a broader public
+  // archive. Each is reduced to its publicly visible pieces. Collection public/
+  // private is independent of portfolio curation.
+  const publicCollections = collections
+    .filter(isCollectionPublic)
     .map((c) => {
       const cp = getPublicCollectionPieces(c, pieces) as PublicPiece[];
       // Prefer the artist-chosen cover. Otherwise fall back to a piece that has
@@ -88,6 +94,8 @@ export default function PublicSiteScreen() {
       return { collection: c, pieces: cp, coverUri, coverPieceId, gridPieces };
     })
     .filter((entry) => entry.pieces.length > 0);
+
+  const hasContent = portfolioPieces.length > 0 || publicCollections.length > 0;
 
   const links: { icon: keyof typeof Feather.glyphMap; label: string }[] = [];
   if (site.contactEmail.trim()) links.push({ icon: "mail", label: site.contactEmail.trim() });
@@ -292,19 +300,39 @@ export default function PublicSiteScreen() {
 
         <View style={[styles.divider, { backgroundColor: "rgba(120,110,100,0.12)" }]} />
 
-        {/* Featured collections */}
-        {featured.length === 0 ? (
+        {!hasContent ? (
           <View style={styles.empty}>
             <View style={[styles.emptyCircle, { backgroundColor: colors.secondary }]}>
               <Feather name="layers" size={20} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Nothing in your portfolio yet</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              Turn on “Show in Portfolio” for a collection with photographed pieces to fill your site.
+              Open a photographed piece and turn on “Feature in Portfolio” to fill your site.
             </Text>
           </View>
-        ) : (
-          featured.map(({ collection, pieces: cp, coverUri, coverPieceId, gridPieces }, index) => (
+        ) : null}
+
+        {/* Curated portfolio — hand-picked pieces */}
+        {portfolioPieces.length > 0 ? (
+          <View style={styles.collectionSection}>
+            <View style={styles.collectionHeader}>
+              <Text style={[styles.collectionIndex, { color: colors.emerald }]}>
+                Curated
+              </Text>
+              <Text style={[styles.collectionTitle, { color: colors.foreground }]}>
+                Selected Works
+              </Text>
+              <Text style={[styles.collectionMeta, { color: colors.mutedForeground }]}>
+                {`${portfolioPieces.length} ${portfolioPieces.length === 1 ? "piece" : "pieces"}`}
+              </Text>
+            </View>
+            {renderPieces(portfolioPieces, 0)}
+          </View>
+        ) : null}
+
+        {/* Public collections — broader public archive */}
+        {publicCollections.length > 0 ? (
+          publicCollections.map(({ collection, pieces: cp, coverUri, coverPieceId, gridPieces }, index) => (
             <View key={collection.id} style={styles.collectionSection}>
               {index > 0 ? (
                 <View style={styles.chapterBreak}>
@@ -353,7 +381,7 @@ export default function PublicSiteScreen() {
               {gridPieces.length > 0 ? renderPieces(gridPieces, index) : null}
             </View>
           ))
-        )}
+        ) : null}
       </ScrollView>
 
       {/* Floating back */}

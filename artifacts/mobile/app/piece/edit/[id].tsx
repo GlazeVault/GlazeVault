@@ -86,7 +86,7 @@ export default function EditPieceScreen() {
   );
   const [dimensions, setDimensions] = useState(piece?.dimensions ?? "");
   const [year, setYear] = useState(piece?.year ?? "");
-  const [collectionId, setCollectionId] = useState<string | undefined>(piece?.collectionId);
+  const [collectionIds, setCollectionIds] = useState<string[]>(piece?.collectionIds ?? []);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
   const [cropSource, setCropSource] = useState<
     { uri: string; width?: number; height?: number } | null
@@ -140,7 +140,7 @@ export default function EditPieceScreen() {
       dimensions: dimensions.trim(),
       year: year.trim(),
       imageUri: storedImageUri,
-      collectionId,
+      collectionIds,
     });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setSaving(false);
@@ -275,22 +275,24 @@ export default function EditPieceScreen() {
             <Feather
               name="layers"
               size={14}
-              color={collectionId ? colors.cobalt : colors.mutedForeground}
-              style={{ opacity: collectionId ? 1 : 0.6 }}
+              color={collectionIds.length > 0 ? colors.cobalt : colors.mutedForeground}
+              style={{ opacity: collectionIds.length > 0 ? 1 : 0.6 }}
             />
             <Text
               style={[
                 styles.collectionRowText,
                 {
                   flex: 1,
-                  color: collectionId ? colors.cobalt : colors.mutedForeground,
-                  fontFamily: collectionId ? "Poppins_400Regular" : "Poppins_300Light",
+                  color: collectionIds.length > 0 ? colors.cobalt : colors.mutedForeground,
+                  fontFamily: collectionIds.length > 0 ? "Poppins_400Regular" : "Poppins_300Light",
                 },
               ]}
             >
-              {collectionId
-                ? (collections.find((c) => c.id === collectionId)?.title ?? "Unknown collection")
-                : "Add to Collection"}
+              {collectionIds.length === 0
+                ? "Add to Collections"
+                : collectionIds.length === 1
+                  ? (collections.find((c) => c.id === collectionIds[0])?.title ?? "1 collection")
+                  : `${collectionIds.length} collections`}
             </Text>
             <Feather name="chevron-right" size={13} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
           </Pressable>
@@ -331,40 +333,19 @@ export default function EditPieceScreen() {
                 <View style={[styles.handle, { backgroundColor: "rgba(120,110,100,0.2)" }]} />
 
                 <Text style={[styles.sheetTitle, { color: colors.foreground }]}>
-                  Collection
+                  Collections
                 </Text>
                 <Text style={[styles.sheetSub, { color: colors.mutedForeground }]}>
                   {collections.length === 0
                     ? "Create a collection first from the Collections tab."
-                    : "Choose a collection for this piece."}
+                    : "A piece can belong to any number of collections."}
                 </Text>
 
                 <View style={[styles.sheetDivider, { backgroundColor: "rgba(120,110,100,0.1)" }]} />
 
                 <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }} bounces={false}>
-                  {/* None / remove option */}
-                  {collectionId && (
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.collectionOption,
-                        {
-                          backgroundColor: pressed ? colors.secondary : "transparent",
-                          borderColor: "rgba(120,110,100,0.1)",
-                        },
-                      ]}
-                      onPress={() => { setCollectionId(undefined); setCollectionPickerVisible(false); }}
-                    >
-                      <View style={[styles.optionIconCircle, { backgroundColor: colors.secondary }]}>
-                        <Feather name="x" size={14} color={colors.mutedForeground} />
-                      </View>
-                      <Text style={[styles.optionTitle, { color: colors.mutedForeground }]}>
-                        Remove from collection
-                      </Text>
-                    </Pressable>
-                  )}
-
                   {collections.map((col) => {
-                    const selected = collectionId === col.id;
+                    const selected = collectionIds.includes(col.id);
                     return (
                       <Pressable
                         key={col.id}
@@ -379,8 +360,13 @@ export default function EditPieceScreen() {
                               : "rgba(120,110,100,0.1)",
                           },
                         ]}
-                        onPress={() => { setCollectionId(col.id); setCollectionPickerVisible(false); }}
-                        disabled={selected}
+                        onPress={() =>
+                          setCollectionIds((prev) =>
+                            prev.includes(col.id)
+                              ? prev.filter((id) => id !== col.id)
+                              : [...prev, col.id]
+                          )
+                        }
                       >
                         <View
                           style={[

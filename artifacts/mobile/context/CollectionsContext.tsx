@@ -13,7 +13,9 @@ export interface Collection {
   title: string;
   intro: string;
   createdAt: string;
-  featuredOnSite: boolean;
+  // Collections organize work; they may be browsable publicly or kept private.
+  // This is independent of the Portfolio (which is curated at the piece level).
+  visibility: "public" | "private";
   // Optional artist-chosen cover image (web: base64 data URI, native: relative
   // pieces/ path). When absent, surfaces fall back to a public piece image.
   coverImageUri?: string;
@@ -22,8 +24,8 @@ export interface Collection {
 interface CollectionsContextType {
   collections: Collection[];
   addCollection: (
-    c: Omit<Collection, "id" | "createdAt" | "featuredOnSite"> & {
-      featuredOnSite?: boolean;
+    c: Omit<Collection, "id" | "createdAt" | "visibility"> & {
+      visibility?: "public" | "private";
     }
   ) => Promise<Collection>;
   updateCollection: (id: string, updates: Partial<Collection>) => Promise<void>;
@@ -94,12 +96,14 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
       try {
         const data = await AsyncStorage.getItem(STORAGE_KEY);
         if (data) {
-          const parsed = JSON.parse(data) as Partial<Collection>[];
-          // Backward compat: collections saved before site-featuring default to
-          // not featured.
-          cached = parsed.map((c) => ({
+          const parsed = JSON.parse(data) as (Partial<Collection> & {
+            featuredOnSite?: boolean;
+          })[];
+          // Backward compat: collections saved before the public/private toggle
+          // default to private. The old `featuredOnSite` flag is dropped.
+          cached = parsed.map(({ featuredOnSite: _drop, ...c }) => ({
             ...(c as Collection),
-            featuredOnSite: c.featuredOnSite ?? false,
+            visibility: c.visibility ?? "private",
           }));
           collectionsRef.current = cached;
           setCollections(cached);
@@ -149,13 +153,13 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
 
   const addCollection = useCallback(
     async (
-      c: Omit<Collection, "id" | "createdAt" | "featuredOnSite"> & {
-        featuredOnSite?: boolean;
+      c: Omit<Collection, "id" | "createdAt" | "visibility"> & {
+        visibility?: "public" | "private";
       }
     ): Promise<Collection> => {
       const newCol: Collection = {
         ...c,
-        featuredOnSite: c.featuredOnSite ?? false,
+        visibility: c.visibility ?? "private",
         id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
         createdAt: new Date().toISOString(),
       };

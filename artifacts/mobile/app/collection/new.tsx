@@ -17,7 +17,6 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
-import { isCollectionInPortfolio } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
@@ -27,7 +26,7 @@ export default function NewCollectionScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { addCollection, getCollection, updateCollection } = useCollections();
-  const { updatePiece } = usePottery();
+  const { addPieceToCollection } = usePottery();
   const { editId, attachPieceId } = useLocalSearchParams<{
     editId?: string;
     attachPieceId?: string;
@@ -36,8 +35,8 @@ export default function NewCollectionScreen() {
 
   const [title, setTitle] = useState(existing?.title ?? "");
   const [intro, setIntro] = useState(existing?.intro ?? "");
-  const [inPortfolio, setInPortfolio] = useState<boolean>(
-    existing ? isCollectionInPortfolio(existing) : false
+  const [isPublic, setIsPublic] = useState<boolean>(
+    existing ? existing.visibility === "public" : false
   );
   const [coverImageUri, setCoverImageUri] = useState(existing?.coverImageUri ?? "");
   const [saving, setSaving] = useState(false);
@@ -48,7 +47,7 @@ export default function NewCollectionScreen() {
     if (existing) {
       setTitle(existing.title);
       setIntro(existing.intro);
-      setInPortfolio(isCollectionInPortfolio(existing));
+      setIsPublic(existing.visibility === "public");
       setCoverImageUri(existing.coverImageUri ?? "");
     }
   }, [existing?.id]);
@@ -83,28 +82,28 @@ export default function NewCollectionScreen() {
       return;
     }
     setSaving(true);
-    // One switch: portfolio membership is the only publishing control.
-    const portfolioFields = {
-      featuredOnSite: inPortfolio,
-    };
+    // Collections carry their own public/private state, independent of the
+    // per-piece Portfolio/Public curation.
+    const visibility: "public" | "private" = isPublic ? "public" : "private";
     if (existing && editId) {
       await updateCollection(editId, {
         title: title.trim(),
         intro: intro.trim(),
-        ...portfolioFields,
+        visibility,
         coverImageUri: coverImageUri || undefined,
       });
     } else {
       const created = await addCollection({
         title: title.trim(),
         intro: intro.trim(),
-        ...portfolioFields,
+        visibility,
         coverImageUri: coverImageUri || undefined,
       });
-      // When opened from the post-save prompt, link the new piece to this
-      // freshly created collection so it lands in the portfolio in one step.
+      // When opened from the post-save prompt, file the new piece into this
+      // freshly created collection. This is organization only — it does NOT
+      // publish or feature the piece.
       if (attachPieceId) {
-        await updatePiece(attachPieceId, { collectionId: created.id });
+        await addPieceToCollection(created.id, attachPieceId);
       }
     }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -214,39 +213,39 @@ export default function NewCollectionScreen() {
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>Portfolio</Text>
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>Visibility</Text>
           <Pressable
             style={[
               styles.visibilityRow,
               {
-                backgroundColor: inPortfolio ? "rgba(107,139,122,0.1)" : colors.secondary,
-                borderColor: inPortfolio
+                backgroundColor: isPublic ? "rgba(107,139,122,0.1)" : colors.secondary,
+                borderColor: isPublic
                   ? "rgba(107,139,122,0.3)"
                   : "rgba(120,110,100,0.16)",
               },
             ]}
-            onPress={() => setInPortfolio((v) => !v)}
+            onPress={() => setIsPublic((v) => !v)}
             accessibilityRole="switch"
-            accessibilityState={{ checked: inPortfolio }}
-            accessibilityLabel="Show in portfolio"
+            accessibilityState={{ checked: isPublic }}
+            accessibilityLabel="Public collection"
           >
             <Feather
-              name={inPortfolio ? "globe" : "lock"}
+              name={isPublic ? "globe" : "lock"}
               size={14}
-              color={inPortfolio ? colors.emerald : colors.mutedForeground}
+              color={isPublic ? colors.emerald : colors.mutedForeground}
             />
             <View style={styles.visibilityLabels}>
               <Text
                 style={[
                   styles.visibilityTitle,
-                  { color: inPortfolio ? colors.emerald : colors.foreground },
+                  { color: isPublic ? colors.emerald : colors.foreground },
                 ]}
               >
-                {inPortfolio ? "Show in Portfolio" : "Hidden from Portfolio"}
+                {isPublic ? "Public Collection" : "Private Collection"}
               </Text>
               <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
-                {inPortfolio
-                  ? "Photographed pieces here appear on your public site"
+                {isPublic
+                  ? "Anyone with the link can browse this series"
                   : "Kept private — only you can see it"}
               </Text>
             </View>
@@ -254,14 +253,14 @@ export default function NewCollectionScreen() {
               style={[
                 styles.visToggle,
                 {
-                  backgroundColor: inPortfolio ? colors.emerald : "rgba(120,110,100,0.18)",
+                  backgroundColor: isPublic ? colors.emerald : "rgba(120,110,100,0.18)",
                 },
               ]}
             >
               <View
                 style={[
                   styles.visToggleThumb,
-                  { transform: [{ translateX: inPortfolio ? 18 : 2 }] },
+                  { transform: [{ translateX: isPublic ? 18 : 2 }] },
                 ]}
               />
             </View>
@@ -271,7 +270,7 @@ export default function NewCollectionScreen() {
         <View style={[styles.hint, { backgroundColor: colors.secondary, borderColor: "rgba(120,110,100,0.12)" }]}>
           <Feather name="info" size={13} color={colors.mutedForeground} style={{ marginTop: 1 }} />
           <Text style={[styles.hintText, { color: colors.mutedForeground }]}>
-            Add pieces to this collection from each piece's edit screen.
+            Collections organize your work. To feature a piece in your Portfolio, open the piece and turn on “Feature in Portfolio.”
           </Text>
         </View>
       </KeyboardAwareScrollView>

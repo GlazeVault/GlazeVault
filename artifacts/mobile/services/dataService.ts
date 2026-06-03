@@ -109,6 +109,20 @@ function guessContentType(uri: string): string {
 
 // ── Pieces ──────────────────────────────────────────────────────────────────
 
+// The new piece state (multi-collection membership + curation/discovery flags)
+// is stored as a JSON blob in the existing `public_data_settings` column. That
+// column was a deprecated leftover from the old per-piece publishing model and
+// is otherwise unused, so we repurpose it as a generic meta blob — this lets the
+// app persist the new fields WITHOUT a Supabase schema change. The single
+// `collection_id` column is still written (first membership) for back-compat and
+// as a fallback read source for rows saved before this blob existed.
+type PieceMeta = {
+  collectionIds?: string[];
+  featuredInPortfolio?: boolean;
+  isPublic?: boolean;
+  archived?: boolean;
+};
+
 type PieceRow = {
   id: string;
   title: string;
@@ -124,13 +138,9 @@ type PieceRow = {
   created_at: string;
   is_favorite: boolean;
   collection_id: string | null;
+  public_data_settings: PieceMeta | null;
 };
 
-// NOTE: the `pieces` table still has legacy `visibility` and
-// `public_data_settings` columns (NOT NULL DEFAULT 'private' / nullable). They
-// are intentionally no longer read or written here — publishing is
-// collection-driven. Upserts omit them, so existing rows keep their values and
-// new rows fall back to the column defaults. See supabase/schema.sql.
 function pieceToRow(p: PotteryPiece): PieceRow {
   return {
     id: p.id,
@@ -146,11 +156,23 @@ function pieceToRow(p: PotteryPiece): PieceRow {
     image_url: p.imageUri,
     created_at: p.createdAt,
     is_favorite: p.isFavorite,
-    collection_id: p.collectionId ?? null,
+    collection_id: p.collectionIds[0] ?? null,
+    public_data_settings: {
+      collectionIds: p.collectionIds,
+      featuredInPortfolio: p.featuredInPortfolio,
+      isPublic: p.isPublic,
+      archived: p.archived,
+    },
   };
 }
 
 function rowToPiece(r: PieceRow): PotteryPiece {
+  const meta = (r.public_data_settings ?? {}) as PieceMeta;
+  const collectionIds = Array.isArray(meta.collectionIds)
+    ? meta.collectionIds.filter((id): id is string => typeof id === "string")
+    : r.collection_id
+      ? [r.collection_id]
+      : [];
   return {
     id: r.id,
     title: r.title ?? "",
@@ -165,7 +187,10 @@ function rowToPiece(r: PieceRow): PotteryPiece {
     imageUri: r.image_url ?? "",
     createdAt: r.created_at ?? new Date().toISOString(),
     isFavorite: r.is_favorite ?? false,
-    collectionId: r.collection_id ?? undefined,
+    collectionIds,
+    featuredInPortfolio: !!meta.featuredInPortfolio,
+    isPublic: !!meta.isPublic,
+    archived: !!meta.archived,
   };
 }
 
@@ -206,20 +231,21 @@ type CollectionRow = {
   title: string;
   intro: string;
   created_at: string;
-  featured_on_site: boolean;
+  // The collection's public/private state maps to the existing `visibility`
+  // text column. The legacy `featured_on_site` column is no longer read or
+  // written — "Show in Portfolio" moved to the piece level. It is left in place
+  // (defaults to false) so omitting it from upserts is safe.
+  visibility: "public" | "private";
   cover_image_url: string | null;
 };
 
-// As with pieces, the `collections` table keeps a legacy `visibility` column
-// (NOT NULL DEFAULT 'private') that is no longer read or written. Portfolio
-// membership (`featured_on_site`) is the only publishing control.
 function collectionToRow(c: Collection): CollectionRow {
   return {
     id: c.id,
     title: c.title,
     intro: c.intro,
     created_at: c.createdAt,
-    featured_on_site: c.featuredOnSite,
+    visibility: c.visibility,
     cover_image_url: c.coverImageUri ?? null,
   };
 }
@@ -230,7 +256,7 @@ function rowToCollection(r: CollectionRow): Collection {
     title: r.title ?? "",
     intro: r.intro ?? "",
     createdAt: r.created_at ?? new Date().toISOString(),
-    featuredOnSite: r.featured_on_site ?? false,
+    visibility: r.visibility === "public" ? "public" : "private",
     coverImageUri: r.cover_image_url ?? undefined,
   };
 }

@@ -11,6 +11,7 @@ The mobile app (`artifacts/mobile`) uses Supabase as source of truth and AsyncSt
 - Seeding only happens when NOT configured (so the cloud DB is never polluted with seed data).
 - `dataService.ts` imports context types with `import type` only — avoids a runtime import cycle.
 - Schema (`supabase/schema.sql`) grants `anon` full read/write + a public `images` bucket. Acceptable ONLY for the no-auth single-artist MVP; unsafe for multi-user.
+- **No-DDL column repurpose (sandbox can't run Supabase DDL).** Piece curation flags `{collectionIds, featuredInPortfolio, isPublic, archived}` are stashed in the EXISTING `pieces.public_data_settings` jsonb column; `pieces.collection_id` keeps the first id for back-compat read. Collection public/private uses the EXISTING `collections.visibility` text column (`featured_on_site` left unused). See `glazevault-privacy.md`. **How to apply:** add new piece flags into that jsonb blob rather than new columns unless a real Supabase migration is run.
 
 **Why the reconciliation is the way it is.** Startup is cache-first (instant paint) then remote load. Conflicts are **remote-wins** per the user's explicit spec ("load Supabase first, fallback to cache only if offline"). To avoid silently losing a just-added record whose remote push failed, startup additionally preserves **cache-only creations** (ids absent from remote): they're merged into state and pushed up. 
 

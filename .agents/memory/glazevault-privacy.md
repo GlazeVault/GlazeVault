@@ -1,44 +1,43 @@
 ---
-name: GlazeVault privacy / visibility model
-description: How piece + collection visibility and public-surface gating work after the Portfolio Publishing Redesign
+name: GlazeVault privacy / curation model
+description: How per-piece visibility/featuring and collection visibility gate public surfaces after Collection↔Portfolio separation
 ---
 
-# Privacy model (collection-driven)
+# Curation model (per-piece)
 
-Publishing is driven entirely by the **collection**, not the piece. There are NO per-piece publishing controls anymore (the piece visibility toggle and the per-field "Public Display Settings" were removed).
+Collection (organization) and Portfolio (curation) are SEPARATE concerns.
 
-## Single rule
-A piece is public IFF its parent collection is in the portfolio AND the piece has an `imageUri`. The one source of truth is `isPubliclyVisiblePiece(piece, collections)` in `constants/privacy.ts`.
+- **Collection** = how a piece is organized. A piece can belong to many collections (`piece.collectionIds: string[]`). Collections have their own independent visibility (`Collection.visibility: "public" | "private"`).
+- **Portfolio** = a curated set chosen per-PIECE via `piece.featuredInPortfolio`.
+- Adding/removing a piece to/from a collection is PURE organization — it must NEVER change `isPublic`/`featuredInPortfolio`.
 
-- `isCollectionInPortfolio(c) = !!c.featuredOnSite` — the ONE collection switch ("Show in Portfolio").
-- `getPublicCollectionPieces` = pieces matching `collectionId` AND having `imageUri`.
-- Pieces with no collection (or a deleted one) are NEVER public.
+## Piece flags + coupling (the invariant)
+`piece` has `featuredInPortfolio`, `isPublic`, `archived`. The toggles are kept coupled so **Portfolio ⊆ Public**:
+- Enable Feature → `{ featuredInPortfolio: true, isPublic: true }`.
+- Disable Public → `{ isPublic: false, featuredInPortfolio: false }`.
+**Why:** a featured piece must always be publicly viewable; un-publishing must not leave a dangling featured-but-private piece. **How to apply:** any new surface that writes these two flags must preserve this coupling.
 
-**How to apply:** every public/non-owner surface (listing OR detail) must gate through `isPubliclyVisiblePiece` (or `getPublicCollectionPieces`). The owner-facing `/piece/[id]?public=1` preview ALSO uses `isPubliclyVisiblePiece` now (no special-case on piece visibility anymore).
+`archived` excludes a piece from Portfolio AND every public surface, but keeps the data (no deletion). Minimal archive/restore action only; no separate browsing section.
+
+## Helper signatures (all single-arg, PIECE/COLLECTION only)
+In `constants/privacy.ts`:
+- `isPortfolioPiece(piece)` — featured + has image + not archived.
+- `isPubliclyVisiblePiece(piece)` — public + has image + not archived. SINGLE source of truth for public gating (listings AND `/piece/[id]?public=1` preview).
+- `isCollectionPublic(collection)` — `collection.visibility === "public"`.
+- `getCollectionPieces(collection, pieces)` / `getPublicCollectionPieces(collection, pieces)` / `getPortfolioPieces(pieces)`.
+Do NOT reintroduce the old two-arg `isPubliclyVisiblePiece(piece, collections)` or any collection-driven publishing helper (`isCollectionInPortfolio`, `featuredOnSite`).
+
+## Persistence (NO Supabase DDL — sandbox can't run it)
+- Piece flags `{collectionIds, featuredInPortfolio, isPublic, archived}` are stashed in the EXISTING `pieces.public_data_settings` jsonb column; `collection_id` keeps the first id for back-compat/fallback read. See `glazevault-supabase.md`.
+- Collection public/private uses the EXISTING `collections.visibility` text column; `featured_on_site` column is left unused (not dropped).
+- `normalizePiece` migrates legacy rows: `collectionId → [collectionId]`, and defaults `featuredInPortfolio/isPublic/archived` to FALSE.
+
+## Migration is conservative → Portfolio starts EMPTY
+Existing pieces default to not-featured, not-public, not-archived. **Tell the user the Portfolio starts empty and they curate it.** **Why:** no accidental public exposure on upgrade.
 
 ## Fixed public fields
-Public output is a FIXED set: **Title, Photo, Clay, Dimensions, Year**. No user toggles.
-- `buildPublicMetaLine(piece)` always renders `clay · dimensions · year`.
-- **Public piece detail must render ONLY title + photo + buildPublicMetaLine.** Do NOT render `notes` (Studio Notes), glaze, cone, firing, etc. on any `?public=1` surface. **Why:** the architect flagged that the public view was leaking `piece.notes` — a privacy violation, since public-site tiles route into `/piece/[id]?public=1`. **How to apply:** when adding anything to the public branch, confirm the field is in the fixed set; everything else is owner-only.
-
-## Legacy fields REMOVED from the app model (DB columns retained)
-The legacy publishing fields were dropped from the TypeScript model — do NOT reintroduce them:
-- `piece.visibility`, `piece.publicDataSettings`, and `Collection.visibility` are gone from `PotteryPiece`/`Collection`, `addPiece`/`addCollection` seeding, the edit/collection screens, and the Supabase `pieceToRow`/`collectionToRow`/`rowTo*` mappers.
-- `PublicDataSettings` type + `DEFAULT_PUBLIC_DATA_SETTINGS` were DELETED from `constants/privacy.ts`. `PUBLIC_DATA_FIELDS` / `isPiecePublic` / `isCollectionPublic` / `isCollectionFeatured` were removed in the redesign — none of these exist; use `isPubliclyVisiblePiece` / `isCollectionInPortfolio`.
-- The Supabase columns `pieces.visibility`, `pieces.public_data_settings`, `collections.visibility` are STILL in `supabase/schema.sql` (not dropped). **Why kept:** safe round-trip of existing rows. Upserts omit them; `visibility` is `NOT NULL DEFAULT 'private'` so new rows fall back to the default, `public_data_settings` is nullable. **How to apply:** never add these back to the row types/mappers; if you ever drop the columns, do it as a deliberate Supabase migration.
-- `normalizePiece` (PotteryContext) destructures and discards legacy `isPublic`/`visibility`/`publicDataSettings` so they never leak from old cached/remote rows into the model.
-
-## collectionId vs pieceIds (intentional)
-One collection per piece via `collectionId` (no `pieceIds[]` array). Membership is computed from `collectionId`. Don't add `pieceIds[]` unless multi-collection membership is genuinely needed.
-
-## Post-save "Add to a Collection?" prompt
-On Add Piece save, if no collection was chosen, prompt: Choose a Collection / Create New / Later.
-- `addPiece` returns the created `PotteryPiece` (so the new id is available).
-- "Choose a Collection" → navigate to `/piece/[id]` (assign via its collection row).
-- "Create New" → `/collection/new?attachPieceId=<id>`; that screen links the piece via `updatePiece(attachPieceId, { collectionId })` AFTER `addCollection` (which returns the new `Collection`).
+Public output is a FIXED set: **Title, Photo, Clay, Dimensions, Year** via `buildPublicMetaLine(piece)`. Public piece detail renders ONLY title + photo + meta line — NEVER `notes`/glaze/cone/firing on any `?public=1` surface.
 
 ## Public Site (generated gallery)
-- Lives inside Profile + a `/public-site` preview route. Featuring is the collection's `featuredOnSite` (the "Show in Portfolio" switch) — surfaced via `isCollectionInPortfolio`.
-- Filter chain at render (defense in depth): `collections.filter(isCollectionInPortfolio)` → `getPublicCollectionPieces` → tiles render image when `imageUri` exists, title always shown.
-- Collection cover precedence: artist-chosen `coverImageUri` → first public piece with `imageUri` → placeholder. Artist cover is a deliberate gallery choice, not gated by piece privacy; fallback only inspects already-public pieces.
-- ProfileContext writes must stay race-safe via `profileRef` + `updatePublicSite(partial)` (see prior note — unchanged by this redesign).
+- Curated Portfolio = `getPortfolioPieces(pieces)` (featured pieces). Optional public-collections section gated by `isCollectionPublic`.
+- `hasContent` empty-state when neither portfolio pieces nor public collections exist.

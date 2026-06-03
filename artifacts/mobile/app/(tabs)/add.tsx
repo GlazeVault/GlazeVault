@@ -157,18 +157,19 @@ export default function AddScreen() {
       Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
       return;
     }
-    const created = await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), year: year.trim(), imageUri: storedImageUri, collectionId });
+    const created = await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), year: year.trim(), imageUri: storedImageUri, collectionIds: collectionId ? [collectionId] : [] });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const wasUncollected = !collectionId;
     setImageUri(null); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear())); setCollectionId(undefined);
     setSaving(false);
     router.replace("/");
-    // Pieces only become public through a collection that's in the portfolio.
-    // When the piece isn't in one yet, nudge the maker to add it — Later is fine.
+    // Collections are purely organizational now (a piece's portfolio/public state
+    // is set on the piece itself). When the piece isn't in one yet, gently offer
+    // to file it into a series — Later is always fine.
     if (wasUncollected) {
       Alert.alert(
         "Add this piece to a Collection?",
-        "Collections are how pieces appear in your portfolio. You can always do this later.",
+        "Collections help you organize your work into series and projects. You can always do this later.",
         [
           {
             text: "Choose a Collection",

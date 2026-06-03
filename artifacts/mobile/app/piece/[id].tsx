@@ -18,7 +18,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ImageViewer, type ViewerItem } from "@/components/ImageViewer";
 import { ShareSheet } from "@/components/ShareSheet";
-import { buildPublicMetaLine, isPubliclyVisiblePiece } from "@/constants/privacy";
+import {
+  buildPublicMetaLine,
+  isPortfolioPiece,
+  isPubliclyVisiblePiece,
+} from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
@@ -48,7 +52,14 @@ export default function PieceDetailScreen() {
   const params = useLocalSearchParams<{ id: string; from?: string; public?: string }>();
   const { id, from } = params;
   const isPublicView = params.public === "1";
-  const { pieces, updatePiece, toggleFavorite, deletePiece, removePieceFromCollection } = usePottery();
+  const {
+    pieces,
+    updatePiece,
+    toggleFavorite,
+    deletePiece,
+    addPieceToCollection,
+    removePieceFromCollection,
+  } = usePottery();
   const { collections } = useCollections();
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -68,26 +79,27 @@ export default function PieceDetailScreen() {
     );
   }
 
-  const currentCollection = collections.find((c) => c.id === piece.collectionId) ?? null;
+  // A piece can now belong to many collections. Keep the full membership list
+  // for the collection row + picker.
+  const pieceCollections = collections.filter((c) => piece.collectionIds.includes(c.id));
 
   // Pieces the fullscreen viewer can swipe through. In the public preview we keep
   // it to this piece alone so private work is never reachable; when opened from a
   // collection we stay within that collection; otherwise the whole archive.
   const galleryPieces = (() => {
     if (isPublicView) {
-      // Public gallery: swipe only across publicly visible pieces that have a
-      // photo, in the same collection. Never reach a private piece (or one in a
-      // private collection) — that gate lives in isPubliclyVisiblePiece.
-      if (!piece.collectionId) return [piece];
+      // Public gallery: swipe only across publicly visible pieces that share a
+      // collection with this one. Never reach a private/archived piece — that
+      // gate lives in isPubliclyVisiblePiece.
+      if (piece.collectionIds.length === 0) return [piece];
       const siblings = pieces.filter(
         (p) =>
-          p.collectionId === piece.collectionId &&
-          isPubliclyVisiblePiece(p, collections) &&
-          !!p.imageUri,
+          p.collectionIds.some((cid) => piece.collectionIds.includes(cid)) &&
+          isPubliclyVisiblePiece(p),
       );
       return siblings.some((p) => p.id === piece.id) ? siblings : [piece];
     }
-    const scoped = from ? pieces.filter((p) => p.collectionId === from) : pieces;
+    const scoped = from ? pieces.filter((p) => p.collectionIds.includes(from)) : pieces;
     return scoped.some((p) => p.id === piece.id) ? scoped : [piece];
   })();
   const viewerItems: ViewerItem[] = galleryPieces.map((p) => {
@@ -154,24 +166,49 @@ export default function PieceDetailScreen() {
     );
   };
 
-  const handleSelectCollection = async (collectionId: string | undefined) => {
-    setUpdatingCollection(true);
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await updatePiece(piece.id, { collectionId });
-    setUpdatingCollection(false);
-    setCollectionPickerVisible(false);
-  };
-
-  const handleRemoveFromCollection = async () => {
-    if (!piece.collectionId) return;
+  // Toggle membership of a single collection. Adding a piece to a collection is
+  // pure organization — it never auto-publishes or features the piece.
+  const handleToggleCollection = async (collectionId: string) => {
     setUpdatingCollection(true);
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      await removePieceFromCollection(piece.collectionId, piece.id);
-      setCollectionPickerVisible(false);
+      if (piece.collectionIds.includes(collectionId)) {
+        await removePieceFromCollection(collectionId, piece.id);
+      } else {
+        await addPieceToCollection(collectionId, piece.id);
+      }
     } finally {
       setUpdatingCollection(false);
     }
+  };
+
+  // Portfolio curation + public visibility, kept coupled so Portfolio ⊆ Public:
+  //  - Featuring a piece also makes it public.
+  //  - Un-publishing a piece also un-features it.
+  const isFeatured = isPortfolioPiece(piece);
+  const isPublic = isPubliclyVisiblePiece(piece);
+
+  const handleToggleFeature = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (piece.featuredInPortfolio) {
+      await updatePiece(piece.id, { featuredInPortfolio: false });
+    } else {
+      await updatePiece(piece.id, { featuredInPortfolio: true, isPublic: true });
+    }
+  };
+
+  const handleTogglePublic = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (piece.isPublic) {
+      await updatePiece(piece.id, { isPublic: false, featuredInPortfolio: false });
+    } else {
+      await updatePiece(piece.id, { isPublic: true });
+    }
+  };
+
+  const handleToggleArchive = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await updatePiece(piece.id, { archived: !piece.archived });
   };
 
   const formattedDate = new Date(piece.createdAt).toLocaleDateString("en-US", {
@@ -180,12 +217,12 @@ export default function PieceDetailScreen() {
     year: "numeric",
   });
 
-  // Public preview: how this piece appears to others. A piece is public iff its
-  // collection is in the portfolio AND it has a photo — there are no per-piece
-  // publishing controls. isPubliclyVisiblePiece is the single source of truth.
+  // Public preview: how this piece appears to others. A piece is publicly
+  // visible iff it is marked Public, has a photo, and is not archived — curation
+  // and publishing are now per-piece. isPubliclyVisiblePiece is the source of truth.
   if (isPublicView) {
     const latestPiece = pieces.find((p) => p.id === id);
-    if (!latestPiece || !isPubliclyVisiblePiece(latestPiece, collections)) {
+    if (!latestPiece || !isPubliclyVisiblePiece(latestPiece)) {
       return (
         <View style={[styles.center, { backgroundColor: colors.background }]}>
           <View style={[styles.privateCircle, { backgroundColor: colors.secondary }]}>
@@ -193,7 +230,7 @@ export default function PieceDetailScreen() {
           </View>
           <Text style={[styles.privateTitle, { color: colors.foreground }]}>This piece is private</Text>
           <Text style={[styles.privateText, { color: colors.mutedForeground }]}>
-            Add its collection to your portfolio to publish it.
+            Turn on “Public” for this piece to publish it.
           </Text>
           <Pressable
             style={({ pressed }) => [styles.privateBack, { opacity: pressed ? 0.6 : 1 }]}
@@ -360,52 +397,133 @@ export default function PieceDetailScreen() {
             </Text>
           </View>
 
-          {/* Publish status — derived from the piece's collection, not a per-piece
-              toggle. A piece is public iff its collection is in the portfolio and
-              it has a photo. Publishing is managed on the collection. */}
-          {(() => {
-            const isPublished = isPubliclyVisiblePiece(piece, collections);
-            return (
-              <View
+          {/* Curation & visibility — per-piece, kept coupled (Portfolio ⊆ Public).
+              These are independent of which collections the piece belongs to. */}
+          {piece.archived ? (
+            <View
+              style={[
+                styles.visibilityRow,
+                {
+                  backgroundColor: colors.secondary,
+                  borderColor: "rgba(120,110,100,0.16)",
+                },
+              ]}
+            >
+              <Feather name="archive" size={14} color={colors.mutedForeground} />
+              <View style={styles.visibilityLabels}>
+                <Text style={[styles.visibilityTitle, { color: colors.foreground }]}>
+                  Archived
+                </Text>
+                <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
+                  Hidden from your portfolio and public site, but kept here
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.toggleGroup}>
+              {/* Feature in Portfolio */}
+              <Pressable
                 style={[
                   styles.visibilityRow,
                   {
-                    backgroundColor: isPublished ? "rgba(107,139,122,0.1)" : colors.secondary,
-                    borderColor: isPublished ? "rgba(107,139,122,0.3)" : "rgba(120,110,100,0.16)",
+                    backgroundColor: isFeatured ? "rgba(107,139,122,0.1)" : colors.secondary,
+                    borderColor: isFeatured ? "rgba(107,139,122,0.3)" : "rgba(120,110,100,0.16)",
+                    opacity: piece.imageUri ? 1 : 0.55,
                   },
                 ]}
-                accessibilityRole="text"
-                accessibilityLabel={isPublished ? "In your portfolio" : "Not in your portfolio"}
+                onPress={piece.imageUri ? handleToggleFeature : undefined}
+                disabled={!piece.imageUri}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: isFeatured, disabled: !piece.imageUri }}
+                accessibilityLabel="Feature in Portfolio"
               >
                 <Feather
-                  name={isPublished ? "globe" : "lock"}
+                  name="star"
                   size={14}
-                  color={isPublished ? colors.emerald : colors.mutedForeground}
+                  color={isFeatured ? colors.emerald : colors.mutedForeground}
                 />
                 <View style={styles.visibilityLabels}>
                   <Text
                     style={[
                       styles.visibilityTitle,
-                      { color: isPublished ? colors.emerald : colors.foreground },
+                      { color: isFeatured ? colors.emerald : colors.foreground },
                     ]}
                   >
-                    {isPublished ? "In Portfolio" : "Not in Portfolio"}
+                    Feature in Portfolio
                   </Text>
                   <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
-                    {isPublished
-                      ? "Shown on your public site"
-                      : currentCollection
-                        ? !piece.imageUri
-                          ? "Add a photo to show it publicly"
-                          : "Turn on “Show in Portfolio” for its collection"
-                        : "Add it to a collection that’s in your portfolio"}
+                    {!piece.imageUri
+                      ? "Add a photo to feature this piece"
+                      : isFeatured
+                        ? "Hand-picked for your curated portfolio"
+                        : "Show this piece among your selected works"}
                   </Text>
                 </View>
-              </View>
-            );
-          })()}
+                <View
+                  style={[
+                    styles.visToggle,
+                    { backgroundColor: isFeatured ? colors.emerald : "rgba(120,110,100,0.18)" },
+                  ]}
+                >
+                  <View
+                    style={[styles.visToggleThumb, { transform: [{ translateX: isFeatured ? 18 : 2 }] }]}
+                  />
+                </View>
+              </Pressable>
 
-          {isPubliclyVisiblePiece(piece, collections) ? (
+              {/* Public */}
+              <Pressable
+                style={[
+                  styles.visibilityRow,
+                  {
+                    backgroundColor: isPublic ? "rgba(107,127,163,0.1)" : colors.secondary,
+                    borderColor: isPublic ? "rgba(107,127,163,0.3)" : "rgba(120,110,100,0.16)",
+                    opacity: piece.imageUri ? 1 : 0.55,
+                  },
+                ]}
+                onPress={piece.imageUri ? handleTogglePublic : undefined}
+                disabled={!piece.imageUri}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: isPublic, disabled: !piece.imageUri }}
+                accessibilityLabel="Public"
+              >
+                <Feather
+                  name={isPublic ? "globe" : "lock"}
+                  size={14}
+                  color={isPublic ? colors.cobalt : colors.mutedForeground}
+                />
+                <View style={styles.visibilityLabels}>
+                  <Text
+                    style={[
+                      styles.visibilityTitle,
+                      { color: isPublic ? colors.cobalt : colors.foreground },
+                    ]}
+                  >
+                    {isPublic ? "Public" : "Private"}
+                  </Text>
+                  <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
+                    {!piece.imageUri
+                      ? "Add a photo to make this piece public"
+                      : isPublic
+                        ? "Viewable in your public collections and archive"
+                        : "Only you can see this piece"}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.visToggle,
+                    { backgroundColor: isPublic ? colors.cobalt : "rgba(120,110,100,0.18)" },
+                  ]}
+                >
+                  <View
+                    style={[styles.visToggleThumb, { transform: [{ translateX: isPublic ? 18 : 2 }] }]}
+                  />
+                </View>
+              </Pressable>
+            </View>
+          )}
+
+          {isPublic && !piece.archived ? (
             <Pressable
               style={({ pressed }) => [styles.previewBtn, { opacity: pressed ? 0.6 : 1 }]}
               onPress={() => router.push(`/piece/${piece.id}?public=1`)}
@@ -429,23 +547,28 @@ export default function PieceDetailScreen() {
             ]}
             onPress={() => setCollectionPickerVisible(true)}
           >
-            <View style={[styles.collectionAccent, { backgroundColor: colors.cobalt, opacity: currentCollection ? 1 : 0.35 }]} />
+            <View style={[styles.collectionAccent, { backgroundColor: colors.cobalt, opacity: pieceCollections.length > 0 ? 1 : 0.35 }]} />
             <Feather
               name="layers"
               size={13}
-              color={currentCollection ? colors.cobalt : colors.mutedForeground}
-              style={{ opacity: currentCollection ? 1 : 0.7 }}
+              color={pieceCollections.length > 0 ? colors.cobalt : colors.mutedForeground}
+              style={{ opacity: pieceCollections.length > 0 ? 1 : 0.7 }}
             />
             <Text
               style={[
                 styles.collectionRowText,
                 {
-                  color: currentCollection ? colors.cobalt : colors.mutedForeground,
-                  fontFamily: currentCollection ? "Poppins_400Regular" : "Poppins_300Light",
+                  color: pieceCollections.length > 0 ? colors.cobalt : colors.mutedForeground,
+                  fontFamily: pieceCollections.length > 0 ? "Poppins_400Regular" : "Poppins_300Light",
                 },
               ]}
+              numberOfLines={1}
             >
-              {currentCollection ? `Collection · ${currentCollection.title}` : "Add to Collection"}
+              {pieceCollections.length === 0
+                ? "Add to Collections"
+                : pieceCollections.length === 1
+                  ? `Collection · ${pieceCollections[0].title}`
+                  : `${pieceCollections.length} collections`}
             </Text>
             <Feather name="chevron-right" size={13} color={colors.mutedForeground} style={{ opacity: 0.5 }} />
           </Pressable>
@@ -530,13 +653,30 @@ export default function PieceDetailScreen() {
 
             <Pressable
               style={({ pressed }) => [
+                styles.archiveLink,
+                { opacity: pressed ? 0.5 : 0.85 },
+              ]}
+              onPress={handleToggleArchive}
+            >
+              <Feather
+                name={piece.archived ? "rotate-ccw" : "archive"}
+                size={13}
+                color={colors.mutedForeground}
+              />
+              <Text style={[styles.archiveLinkText, { color: colors.mutedForeground }]}>
+                {piece.archived ? "Restore piece" : "Archive piece"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
                 styles.deleteLink,
                 { opacity: pressed ? 0.5 : 0.7 },
               ]}
               onPress={handleContextRemove}
             >
               <Text style={[styles.deleteLinkText, { color: colors.mutedForeground }]}>
-                {from ? "Remove from collection" : "Remove from archive"}
+                {from ? "Remove from collection" : "Delete piece"}
               </Text>
             </Pressable>
           </View>
@@ -566,12 +706,12 @@ export default function PieceDetailScreen() {
                 <View style={[styles.handle, { backgroundColor: "rgba(120,110,100,0.2)" }]} />
 
                 <Text style={[styles.sheetTitle, { color: colors.foreground }]}>
-                  Add to Collection
+                  Collections
                 </Text>
                 <Text style={[styles.sheetSub, { color: colors.mutedForeground }]}>
                   {collections.length === 0
                     ? "Create a collection first from the Collections tab."
-                    : "Choose a collection for this piece."}
+                    : "Organize this piece into one or more collections. This won’t publish it."}
                 </Text>
 
                 <View style={[styles.sheetDivider, { backgroundColor: "rgba(120,110,100,0.1)" }]} />
@@ -581,33 +721,9 @@ export default function PieceDetailScreen() {
                   style={{ maxHeight: 320 }}
                   bounces={false}
                 >
-                  {/* None option */}
-                  {piece.collectionId && (
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.collectionOption,
-                        {
-                          backgroundColor: pressed ? colors.secondary : "transparent",
-                          borderColor: "rgba(120,110,100,0.1)",
-                        },
-                      ]}
-                      onPress={handleRemoveFromCollection}
-                      disabled={updatingCollection}
-                    >
-                      <View style={[styles.optionIconCircle, { backgroundColor: colors.secondary }]}>
-                        <Feather name="x" size={14} color={colors.mutedForeground} />
-                      </View>
-                      <View style={styles.optionLabels}>
-                        <Text style={[styles.optionTitle, { color: colors.mutedForeground }]}>
-                          Remove from collection
-                        </Text>
-                      </View>
-                    </Pressable>
-                  )}
-
-                  {/* Existing collections */}
+                  {/* Existing collections — multi-select toggle */}
                   {collections.map((col) => {
-                    const isSelected = piece.collectionId === col.id;
+                    const isSelected = piece.collectionIds.includes(col.id);
                     return (
                       <Pressable
                         key={col.id}
@@ -624,8 +740,8 @@ export default function PieceDetailScreen() {
                               : "rgba(120,110,100,0.1)",
                           },
                         ]}
-                        onPress={() => handleSelectCollection(col.id)}
-                        disabled={updatingCollection || isSelected}
+                        onPress={() => handleToggleCollection(col.id)}
+                        disabled={updatingCollection}
                       >
                         <View
                           style={[
@@ -661,9 +777,19 @@ export default function PieceDetailScreen() {
                             </Text>
                           ) : null}
                         </View>
-                        {isSelected && (
-                          <Feather name="check" size={15} color={colors.cobalt} />
-                        )}
+                        <View
+                          style={[
+                            styles.optionCheckbox,
+                            {
+                              backgroundColor: isSelected ? colors.cobalt : "transparent",
+                              borderColor: isSelected ? colors.cobalt : "rgba(120,110,100,0.3)",
+                            },
+                          ]}
+                        >
+                          {isSelected && (
+                            <Feather name="check" size={12} color={colors.background} />
+                          )}
+                        </View>
                       </Pressable>
                     );
                   })}
@@ -803,6 +929,19 @@ const styles = StyleSheet.create({
   visibilityLabels: { flex: 1, gap: 2 },
   visibilityTitle: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
   visibilitySub: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
+  toggleGroup: { gap: 0 },
+  visToggle: {
+    width: 38,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: "center",
+  },
+  visToggleThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#fff",
+  },
   collectionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -902,12 +1041,32 @@ const styles = StyleSheet.create({
   },
   shareBtn: { borderWidth: 0 },
   actionBtnText: { fontSize: 13, fontFamily: "Poppins_400Regular", letterSpacing: 0.3 },
+  archiveLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+  },
+  archiveLinkText: {
+    fontSize: 12,
+    fontFamily: "Poppins_400Regular",
+    letterSpacing: 0.2,
+  },
   deleteLink: { alignItems: "center", paddingVertical: 4 },
   deleteLinkText: {
     fontSize: 12,
     fontFamily: "Poppins_300Light",
     textDecorationLine: "underline",
     letterSpacing: 0.2,
+  },
+  optionCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
   },
   // Modal
   modalOverlay: {

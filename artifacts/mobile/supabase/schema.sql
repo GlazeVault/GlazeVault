@@ -23,12 +23,14 @@ create table if not exists public.pieces (
   image_url            text not null default '',
   created_at           timestamptz not null default now(),
   is_favorite          boolean not null default false,
-  -- DEPRECATED: `visibility` and `public_data_settings` are legacy per-piece
-  -- publishing fields. Publishing is now collection-driven, so the app no longer
-  -- reads or writes these columns. They are kept (not dropped) so existing rows
-  -- round-trip safely; the NOT NULL DEFAULT / nullable shapes let upserts that
-  -- omit them succeed. Safe to drop in a future migration once no old clients remain.
+  -- `visibility` is a legacy per-piece publishing column, no longer read/written.
   visibility           text not null default 'private',
+  -- REPURPOSED: `public_data_settings` (originally the old per-field publishing
+  -- toggles) is now a generic JSON meta blob holding the piece's organization +
+  -- curation state: { collectionIds: text[], featuredInPortfolio, isPublic,
+  -- archived }. This lets the app store multi-collection membership and the
+  -- Portfolio/Public flags WITHOUT a schema change. `collection_id` keeps the
+  -- first membership for back-compat and as a fallback when the blob is absent.
   public_data_settings jsonb,
   collection_id        text
 );
@@ -43,9 +45,9 @@ create table if not exists public.collections (
   title             text not null default '',
   intro             text not null default '',
   created_at        timestamptz not null default now(),
-  -- DEPRECATED: legacy publishing field, no longer read/written by the app.
-  -- Portfolio membership (`featured_on_site`) is the only publishing control.
-  -- Kept for safe round-trip of existing rows; droppable in a future migration.
+  -- The collection's public/private state (independent of the Portfolio, which is
+  -- now curated per-piece). The legacy `featured_on_site` column is no longer
+  -- read/written; it is left in place (default false) so omitting it is safe.
   visibility        text not null default 'private',
   featured_on_site  boolean not null default false,
   cover_image_url   text

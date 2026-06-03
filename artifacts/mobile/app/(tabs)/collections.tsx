@@ -36,7 +36,7 @@ export default function CollectionsScreen() {
     : collections;
 
   const getPiecesForCollection = (collectionId: string) =>
-    pieces.filter((p) => p.collectionId === collectionId);
+    pieces.filter((p) => p.collectionIds.includes(collectionId));
 
   const getCoverForCollection = (collection: { id: string; coverImageUri?: string }) => {
     if (collection.coverImageUri) return collection.coverImageUri;

@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
 import { ImportedText, pickAndExtractText, UnsupportedFileError } from "@/constants/importText";
-import { getPublicCollectionPieces, isCollectionInPortfolio } from "@/constants/privacy";
+import { getPublicCollectionPieces, isCollectionPublic } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import {
@@ -64,7 +64,7 @@ export default function ProfileScreen() {
   // from rapid taps on the avatar.
   const pickingAvatar = useRef(false);
 
-  const featuredCollections = collections.filter(isCollectionInPortfolio);
+  const featuredCollections = collections.filter(isCollectionPublic);
   const site = profile.publicSite;
 
   const startEditing = () => {
@@ -436,7 +436,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-              Portfolio Collections
+              Public Collections
             </Text>
             {featuredCollections.length > 0 && (
               <View style={[styles.countBadge, { backgroundColor: "rgba(107,127,163,0.1)" }]}>
@@ -450,10 +450,10 @@ export default function ProfileScreen() {
             <View style={[styles.publicEmpty, { borderColor: "rgba(120,110,100,0.12)" }]}>
               <Feather name="star" size={16} color={colors.mutedForeground} style={{ opacity: 0.35, marginBottom: 8 }} />
               <Text style={[styles.publicEmptyText, { color: colors.mutedForeground }]}>
-                No collections in your portfolio yet
+                No public collections yet
               </Text>
               <Text style={[styles.publicEmptyHint, { color: colors.mutedForeground }]}>
-                Open a collection and turn on “Show in Portfolio”
+                Open a collection and set it to Public
               </Text>
             </View>
           ) : (
