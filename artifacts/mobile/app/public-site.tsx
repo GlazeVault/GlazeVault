@@ -188,8 +188,29 @@ export default function PublicSiteScreen() {
             </Text>
           </View>
         ) : (
-          featured.map(({ collection, pieces: cp, coverUri, coverPieceId }) => (
+          featured.map(({ collection, pieces: cp, coverUri, coverPieceId }, index) => (
             <View key={collection.id} style={styles.collectionSection}>
+              {index > 0 ? (
+                <View style={styles.chapterBreak}>
+                  <View style={[styles.chapterRule, { backgroundColor: "rgba(120,110,100,0.18)" }]} />
+                </View>
+              ) : null}
+              <View style={styles.collectionHeader}>
+                <Text style={[styles.collectionIndex, { color: colors.emerald }]}>
+                  {`${String(index + 1).padStart(2, "0")} · Collection`}
+                </Text>
+                <Text style={[styles.collectionTitle, { color: colors.foreground }]}>
+                  {collection.title}
+                </Text>
+                <Text style={[styles.collectionMeta, { color: colors.mutedForeground }]}>
+                  {`${cp.length} ${cp.length === 1 ? "piece" : "pieces"}`}
+                </Text>
+                {collection.intro.trim() ? (
+                  <Text style={[styles.collectionIntro, { color: colors.mutedForeground }]}>
+                    {collection.intro.trim()}
+                  </Text>
+                ) : null}
+              </View>
               {coverUri ? (
                 <Pressable
                   style={({ pressed }) => [styles.coverWrap, { opacity: pressed ? 0.9 : 1 }]}
@@ -212,14 +233,6 @@ export default function PublicSiteScreen() {
                   <Feather name="layers" size={26} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
                 </View>
               )}
-              <Text style={[styles.collectionTitle, { color: colors.foreground }]}>
-                {collection.title}
-              </Text>
-              {collection.intro.trim() ? (
-                <Text style={[styles.collectionIntro, { color: colors.mutedForeground }]}>
-                  {collection.intro.trim()}
-                </Text>
-              ) : null}
               {renderPieces(cp)}
             </View>
           ))
@@ -326,35 +339,60 @@ const styles = StyleSheet.create({
   linkRow: { flexDirection: "row", alignItems: "center", gap: 9, maxWidth: "100%" },
   linkText: { fontSize: 13, fontFamily: "Poppins_300Light", flexShrink: 1 },
   divider: { height: 1, marginVertical: 32 },
-  collectionSection: { marginBottom: 48 },
+  collectionSection: { marginBottom: 8 },
+  chapterBreak: {
+    alignItems: "center",
+    marginTop: 52,
+    marginBottom: 52,
+  },
+  chapterRule: {
+    width: 36,
+    height: 1,
+  },
+  collectionHeader: {
+    marginBottom: 22,
+  },
+  collectionIndex: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 2.5,
+    textTransform: "uppercase",
+    marginBottom: 12,
+  },
   coverWrap: {
     width: "100%",
     aspectRatio: 16 / 10,
     borderRadius: 14,
     overflow: "hidden",
-    marginBottom: 16,
+    marginBottom: 6,
   },
   coverPlaceholder: {
     width: "100%",
     aspectRatio: 16 / 10,
     borderRadius: 14,
     overflow: "hidden",
-    marginBottom: 16,
+    marginBottom: 6,
     alignItems: "center",
     justifyContent: "center",
   },
   collectionTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontFamily: "PlayfairDisplay_400Regular",
     letterSpacing: 0.3,
-    lineHeight: 32,
+    lineHeight: 34,
+  },
+  collectionMeta: {
+    fontSize: 11,
+    fontFamily: "Poppins_400Regular",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    marginTop: 10,
   },
   collectionIntro: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: "Poppins_300Light",
-    lineHeight: 21,
-    marginTop: 8,
-    marginBottom: 18,
+    lineHeight: 22,
+    marginTop: 12,
   },
   // Grid layout
   gridWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 18 },
