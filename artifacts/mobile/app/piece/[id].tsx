@@ -102,12 +102,19 @@ export default function PieceDetailScreen() {
   })();
   const viewerItems: ViewerItem[] = galleryPieces.map((p) => {
     if (isPublicView) {
-      // Captions honor each piece's own public display settings.
+      // Captions honor each piece's own public display settings, but stay
+      // curated: material plus a single secondary detail (dimensions, else cone).
       const s = p.publicDataSettings;
+      const secondary =
+        s.showDimensions && p.dimensions
+          ? p.dimensions
+          : s.showCone && p.cone
+            ? p.cone
+            : "";
       return {
         uri: p.imageUri,
         title: s.showTitle ? p.title : undefined,
-        materials: [s.showClayBody && p.clay, s.showGlazeName && p.glaze]
+        materials: [s.showClayBody ? p.clay : "", secondary]
           .filter(Boolean)
           .join("  ·  "),
       };
@@ -250,17 +257,17 @@ export default function PieceDetailScreen() {
       );
     }
 
-    const infoRows = [
-      pds.showClayBody && { label: "Clay", value: piece.clay, accent: colors.cobalt },
-      pds.showGlazeName && { label: "Glaze", value: piece.glaze, accent: colors.emerald },
-      pds.showCone && { label: "Cone", value: piece.cone, accent: colors.primary },
-      pds.showFiringEnvironment && {
-        label: "Firing Environment",
-        value: piece.firingEnvironment || piece.firing,
-        accent: colors.cobalt,
-      },
-      pds.showDimensions && { label: "Dimensions", value: piece.dimensions, accent: colors.mutedForeground },
-    ].filter((r): r is { label: string; value: string; accent: string } => Boolean(r && r.value));
+    // Curated public metadata: keep it quiet and editorial — material plus a
+    // single secondary detail (dimensions preferred, otherwise cone). The full
+    // technical fields remain on the owner's private studio record below.
+    const publicMaterial = pds.showClayBody ? piece.clay : "";
+    const publicSecondary =
+      pds.showDimensions && piece.dimensions
+        ? piece.dimensions
+        : pds.showCone && piece.cone
+          ? piece.cone
+          : "";
+    const publicMeta = [publicMaterial, publicSecondary].filter(Boolean).join("  ·  ");
 
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -318,12 +325,10 @@ export default function PieceDetailScreen() {
               <Text style={[styles.title, { color: colors.foreground }]}>{piece.title}</Text>
             ) : null}
 
-            {infoRows.length > 0 ? (
-              <View style={[styles.infoCard, { borderColor: "rgba(120, 110, 100, 0.14)", marginTop: 8 }]}>
-                {infoRows.map((row) => (
-                  <InfoRow key={row.label} label={row.label} value={row.value} accent={row.accent} />
-                ))}
-              </View>
+            {publicMeta ? (
+              <Text style={[styles.publicMeta, { color: colors.mutedForeground }]}>
+                {publicMeta}
+              </Text>
             ) : null}
 
             {pds.showDescription && piece.notes ? (
@@ -905,6 +910,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     lineHeight: 40,
     marginBottom: 10,
+  },
+  publicMeta: {
+    fontSize: 13,
+    fontFamily: "Poppins_300Light",
+    letterSpacing: 0.6,
+    lineHeight: 20,
+    marginTop: 2,
+    marginBottom: 12,
+    opacity: 0.8,
   },
   metaRow: {
     flexDirection: "row",

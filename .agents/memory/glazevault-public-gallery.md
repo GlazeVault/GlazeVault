@@ -24,3 +24,21 @@ surfaces that swipe across pieces) must filter through `isPubliclyVisiblePiece` 
 `showPhotos`, never bare `collectionId` equality. The public hero is itself a
 `Pressable` that opens the viewer, and `ImageViewer` is rendered inside the public
 return branch (it is a separate render path from the owner branch).
+
+## Curated public metadata (monograph, not database)
+Public-facing piece metadata is deliberately reduced to ONE quiet line: material
+(clay) + a single secondary detail — dimensions preferred, else cone — joined by
+" · " (e.g. "Stoneware · 7 × 7 × 5 in", "Porcelain · Cone 10"). Glaze and firing
+environment are intentionally NOT shown on any public surface. Both the public
+detail line (`publicMeta` in piece/[id].tsx isPublicView) and the fullscreen
+`ImageViewer` caption use the same formula and must stay in lockstep.
+
+**Why:** the public portfolio should read artwork-first; long technical strings
+("STONEWARE · NO GLAZE · CONE 6 · ELECTRIC") feel inventory-like. Owner/private
+detail branch keeps the FULL `InfoRow` card (clay/glaze/cone/firing/dimensions) —
+nothing was deleted, only the public projection was curated.
+
+**How to apply:** still respect `publicDataSettings` toggles (include a field only
+if its `show*` flag is on AND the value is non-empty; `.filter(Boolean)` guards
+separators). Do not reintroduce glaze/firing to public surfaces; if adding a new
+public surface, reuse the same material + dimensions-or-cone formula.
