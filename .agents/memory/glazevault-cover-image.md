@@ -10,3 +10,8 @@ description: How collection cover images are chosen, displayed, and deduped
   - Public site falls back to first PUBLIC piece that allows photos (`showPhotos`), never a private/hidden image.
 - Dedup (`activeCover`/`gridPieces`): the resolved displayed cover (incl. fallback in view mode; only explicit selection in edit mode) is filtered out of the gallery grid so it never appears twice.
 **Why:** edit mode shows only the explicit selection so Remove visibly clears; view mode resolves the fallback so a coverless collection still gets a banner without duplicating its first piece below.
+
+## Web upload trap (cover/avatar/piece pickers)
+On web (preview iframe), ImagePicker returns a `blob:` URI. `fetch(blob:)` FAILS inside the sandboxed preview iframe, so `persistPieceImage` (which fetches the blob) silently throws and the image is never applied.
+**Fix pattern (must use for every web image picker):** call `launchImageLibraryAsync({ base64: Platform.OS === "web" })` and build a `data:` URI from `asset.base64` directly — never fetch the blob. Native still uses `persistPieceImage`.
+Cover upload also persists immediately via `updateCollection` (not deferred to Save). `uploadImage` skips http(s) URIs, so a later Save never re-uploads. `readImageBytes`/`uploadImage` both accept `data:` URIs.

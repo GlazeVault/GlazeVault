@@ -29,6 +29,8 @@ import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
+import { uploadImage } from "@/services/dataService";
+import { isSupabaseConfigured } from "@/services/supabase";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -244,20 +246,61 @@ export default function CollectionDetailScreen() {
     if (pickingCover.current) return;
     pickingCover.current = true;
     try {
+      console.log("Choose cover upload pressed");
+      if (Platform.OS !== "web") {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission needed", "Allow access to your photo library.");
+          return;
+        }
+      }
+      // On web the picker's `uri` is a blob: URL that can't be fetched inside the
+      // sandboxed preview iframe, so we request base64 and build a permanent
+      // data: URI directly — the same pattern that works for the profile avatar.
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [16, 10],
         quality: 0.85,
+        base64: Platform.OS === "web",
       });
-      if (!result.canceled && result.assets[0]?.uri) {
-        const stored = await persistPieceImage(result.assets[0].uri);
-        setCoverImageUri(stored);
-        setCoverPickerOpen(false);
+      if (result.canceled || !result.assets?.[0]?.uri) {
+        return;
       }
+      const asset = result.assets[0];
+      const selectedUri = asset.uri;
+      console.log("Selected cover URI:", selectedUri.slice(0, 64));
+
+      // Turn the picked image into a stable URI:
+      //  - web   → base64 data: URI (survives reload, no blob fetch)
+      //  - native → copy into documentDirectory and store a relative path
+      let stored: string;
+      if (Platform.OS === "web") {
+        if (!asset.base64) throw new Error("Picker returned no base64 data on web");
+        stored = `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}`;
+      } else {
+        stored = await persistPieceImage(selectedUri);
+      }
+
+      // Upload to Supabase Storage so the cover survives across devices and app
+      // restarts. Falls back to the local stable URI if Supabase isn't set up.
+      let uploadedUrl = stored;
+      if (isSupabaseConfigured) {
+        uploadedUrl = (await uploadImage(stored, "collections")) ?? stored;
+      }
+      console.log("Uploaded cover URL:", uploadedUrl.slice(0, 80));
+
+      // Show it immediately and close the sheet.
+      setCoverImageUri(uploadedUrl);
+      setCoverPickerOpen(false);
+
+      // Persist right away (Supabase + local cache) so it survives a restart
+      // even if the user never presses Save.
+      console.log("Saving collection cover:", collection?.id, uploadedUrl.slice(0, 80));
+      await updateCollection(collection!.id, { coverImageUri: uploadedUrl });
     } catch (e) {
-      console.warn("Failed to pick collection cover", e);
-      Alert.alert("Couldn't add image", "Something went wrong choosing that image.");
+      console.warn("Failed to upload collection cover", e);
+      Alert.alert("Cover image could not be saved. Please try again.");
     } finally {
       pickingCover.current = false;
     }
@@ -272,6 +315,8 @@ export default function CollectionDetailScreen() {
       </View>
     );
   }
+
+  console.log("Loaded collection cover:", collection.coverImageUri);
 
   // Display fallback order: explicit cover -> first piece in this collection.
   const firstPieceImage = collectionPieces[0]?.imageUri ?? "";
