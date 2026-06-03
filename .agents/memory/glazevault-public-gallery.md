@@ -25,31 +25,40 @@ surfaces that swipe across pieces) must filter through `isPubliclyVisiblePiece` 
 `Pressable` that opens the viewer, and `ImageViewer` is rendered inside the public
 return branch (it is a separate render path from the owner branch).
 
-## Curated public metadata (monograph, not database)
-Public-facing piece metadata is deliberately reduced to ONE quiet line:
-`clay · dimensions · year`, joined by " · " (e.g. "Stoneware · 12 × 12 × 14 in ·
-2026"). Cone, glaze and firing environment are intentionally NOT shown on any
-public surface (cone was previously the dimensions-fallback — it was dropped from
-public when the `year` field landed). Both the public detail line (`publicMeta` in
-piece/[id].tsx isPublicView) and the fullscreen `ImageViewer` caption use the same
-formula and must stay in lockstep.
+## Public metadata is TOGGLE-DRIVEN via one shared helper (supersedes curated subset)
+The public meta line is built by the single shared helper `buildPublicMetaLine(piece)`
+in `constants/privacy.ts`. It joins, with "  ·  ", every field whose
+`publicDataSettings` flag is ON **and** whose value is non-empty, in order
+`clay · glaze · cone · firingEnvironment · dimensions · year`. Empty/disabled fields
+drop out (`.filter(Boolean)` guards separators), so a piece with only clay/dim/year
+reads "Stoneware · 12 × 12 × 14 in · 2025", while one with only glaze/cone/firing
+reads "Turquoise matt · Cone 10 · Gas Reduction". EVERY public surface calls this one
+helper: the public detail line (`publicMeta` in piece/[id].tsx isPublicView), the
+fullscreen `ImageViewer` caption (same file), and the public-site portfolio cards
+(`renderCaption` in public-site.tsx).
 
-**Why:** the public portfolio should read artwork-first; long technical strings
-("STONEWARE · NO GLAZE · CONE 6 · ELECTRIC") feel inventory-like. Owner/private
-detail branch keeps the FULL `InfoRow` card (clay/glaze/cone/firing/dimensions/year)
-— nothing was deleted, only the public projection was curated.
+**Why:** the earlier decision hardcoded a curated `clay · dimensions · year` subset
+and ignored the glaze/cone/firing toggles. The user explicitly reversed this: any
+field that is enabled AND has data must render, consistently across all public
+surfaces. The real bug it caused — a piece (the "Mug") with empty clay/dim/year but
+populated+toggled glaze/cone/firing showed ONLY its title, because the hardcoded
+subset produced an empty line. The minimal/editorial feel lives in the STYLE (serif
+title + one quiet " · " line, no labels/ALL-CAPS), not in restricting which toggles
+are honored.
 
-**How to apply:** still respect `publicDataSettings` toggles (include a field only
-if its `show*` flag is on AND the value is non-empty — `showClayBody`/
-`showDimensions`/`showYear`; `.filter(Boolean)` guards separators). When adding a
-new public-display field, also add its `show*` flag to `showAllPublicDetails()` in
-piece/[id].tsx or "Show all" silently omits it. Do not reintroduce
-glaze/firing/cone to public surfaces.
+**How to apply:** never hardcode a public field subset again — route every public
+metadata line through `buildPublicMetaLine`. When adding a new public-display field,
+add it to the helper's array AND add its `show*` flag to `showAllPublicDetails()` in
+piece/[id].tsx (or "Show all" silently omits it), and list the field on the
+`PublicPiece` interface in public-site.tsx. The owner `/collection/[id]` view is NOT
+a public surface — it shows the owner's full data (with private badges) and must NOT
+be gated by `publicDataSettings`.
 
 ## Public-site portfolio cards carry the same whispered caption
 The public-site portfolio tiles (`renderTile` in public-site.tsx) render a caption
 BENEATH each image — serif title (PlayfairDisplay) + the same `clay · dimensions ·
-year` line — across all three layouts (catalog/editorial/masonry). The earlier
+year` line built via the shared `buildPublicMetaLine` helper (see the toggle-driven
+section above) — across all three layouts (catalog/editorial/masonry). The earlier
 "silent cards" pass removed all text; this restored minimal artwork identity.
 
 **Why:** image-only cards read as too anonymous/atmospheric; a quiet exhibition-

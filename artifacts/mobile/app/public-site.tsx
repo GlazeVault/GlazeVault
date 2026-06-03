@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   PublicDataSettings,
+  buildPublicMetaLine,
   getPublicCollectionPieces,
   isCollectionFeatured,
 } from "@/constants/privacy";
@@ -26,6 +27,9 @@ interface PublicPiece {
   title: string;
   imageUri: string;
   clay: string;
+  glaze: string;
+  cone: string;
+  firingEnvironment: string;
   dimensions: string;
   year: string;
   publicDataSettings: PublicDataSettings;
@@ -99,19 +103,12 @@ export default function PublicSiteScreen() {
   const initial = profile.name.trim().charAt(0).toUpperCase();
 
   // A quiet, editorial caption beneath each piece: serif title + a single
-  // whispered metadata line (clay · dimensions · year). Each field honors the
-  // piece's own publicDataSettings and is dropped when its flag is off or the
-  // value is empty, so nothing ever reads like a database row.
+  // whispered metadata line built from the piece's own publicDataSettings via the
+  // shared buildPublicMetaLine helper, so cards, collections and the detail page
+  // always render the exact same string. Empty/disabled fields drop out.
   const renderCaption = (piece: PublicPiece) => {
     const title = piece.publicDataSettings.showTitle ? piece.title.trim() : "";
-    const meta = [
-      piece.publicDataSettings.showClayBody ? piece.clay : "",
-      piece.publicDataSettings.showDimensions ? piece.dimensions : "",
-      piece.publicDataSettings.showYear ? piece.year : "",
-    ]
-      .map((s) => (s ?? "").trim())
-      .filter(Boolean)
-      .join("  ·  ");
+    const meta = buildPublicMetaLine(piece);
     if (!title && !meta) return null;
     return (
       <View style={styles.caption}>

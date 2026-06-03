@@ -45,6 +45,42 @@ export const PUBLIC_DATA_FIELDS: { key: keyof PublicDataSettings; label: string 
   { key: "showPrice", label: "Price" },
 ];
 
+export interface PublicMetaPiece {
+  clay: string;
+  glaze: string;
+  cone: string;
+  firingEnvironment: string;
+  dimensions: string;
+  year: string;
+  publicDataSettings: PublicDataSettings;
+}
+
+/**
+ * Builds the single quiet metadata line shown on EVERY public surface
+ * (portfolio cards, public collection display, piece detail, fullscreen viewer).
+ *
+ * It is driven entirely by the piece's own `publicDataSettings` toggles — there
+ * is no hardcoded field subset — so a field renders iff its toggle is on AND it
+ * has a value. Empty/disabled fields are dropped (no gaps), and because every
+ * surface calls this one function the same string renders identically across the
+ * app. Order reads as a ceramics caption: material → surface → firing → form →
+ * year, e.g. "Stoneware · 12 × 12 × 14 in · 2025".
+ */
+export function buildPublicMetaLine(piece: PublicMetaPiece): string {
+  const s = piece.publicDataSettings;
+  return [
+    s.showClayBody ? piece.clay : "",
+    s.showGlazeName ? piece.glaze : "",
+    s.showCone ? piece.cone : "",
+    s.showFiringEnvironment ? piece.firingEnvironment : "",
+    s.showDimensions ? piece.dimensions : "",
+    s.showYear ? piece.year : "",
+  ]
+    .map((v) => (v ?? "").trim())
+    .filter(Boolean)
+    .join("  ·  ");
+}
+
 export function isPiecePublic(piece: { visibility: Visibility }): boolean {
   return piece.visibility === "public";
 }

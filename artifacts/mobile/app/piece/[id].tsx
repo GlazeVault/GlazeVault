@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ImageViewer, type ViewerItem } from "@/components/ImageViewer";
 import { ShareSheet } from "@/components/ShareSheet";
-import { PUBLIC_DATA_FIELDS, isPubliclyVisiblePiece } from "@/constants/privacy";
+import { PUBLIC_DATA_FIELDS, buildPublicMetaLine, isPubliclyVisiblePiece } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
@@ -102,20 +102,14 @@ export default function PieceDetailScreen() {
   })();
   const viewerItems: ViewerItem[] = galleryPieces.map((p) => {
     if (isPublicView) {
-      // Captions honor each piece's own public display settings, but stay
-      // curated: clay · dimensions · year. The full technical record stays
-      // private (firing, glaze, cone live only on the owner's studio view).
+      // Captions honor each piece's own public display toggles via the shared
+      // buildPublicMetaLine helper, so the fullscreen viewer reads identically to
+      // the detail page and the portfolio cards.
       const s = p.publicDataSettings;
       return {
         uri: p.imageUri,
         title: s.showTitle ? p.title : undefined,
-        materials: [
-          s.showClayBody ? p.clay : "",
-          s.showDimensions ? p.dimensions : "",
-          s.showYear ? p.year : "",
-        ]
-          .filter(Boolean)
-          .join("  ·  "),
+        materials: buildPublicMetaLine(p),
       };
     }
     return {
@@ -257,16 +251,11 @@ export default function PieceDetailScreen() {
       );
     }
 
-    // Curated public metadata: keep it quiet and editorial — clay · dimensions ·
-    // year only (e.g. "Stoneware · 12 × 12 × 14 in · 2026"). The full technical
-    // fields (firing, glaze, cone) remain on the owner's private studio record.
-    const publicMeta = [
-      pds.showClayBody ? piece.clay : "",
-      pds.showDimensions ? piece.dimensions : "",
-      pds.showYear ? piece.year : "",
-    ]
-      .filter(Boolean)
-      .join("  ·  ");
+    // One quiet, editorial metadata line driven entirely by this piece's public
+    // display toggles (shared with the portfolio cards + fullscreen viewer via
+    // buildPublicMetaLine), so any enabled field that has a value shows, and the
+    // same string renders identically on every public surface.
+    const publicMeta = buildPublicMetaLine(piece);
 
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
