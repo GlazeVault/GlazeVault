@@ -1,0 +1,9 @@
+---
+name: GlazeVault image cropper
+description: In-app 4:5 crop preview contract and why saved crop matches every surface
+---
+- Custom `components/ImageCropper.tsx` replaced the OS cropper (`allowsEditing`/`aspect`). Pickers now use `allowsEditing:false, quality:1` and pass `{uri,width,height}` to the cropper; output flows unchanged through `persistPieceImage`.
+- **Contract that guarantees "preview == saved, no re-crop":** every piece-image surface renders 4:5 — PotteryCard, add/edit form previews, and the detail hero (all `aspectRatio 4/5`, contentFit cover) — and fullscreen ImageViewer uses contentFit="contain". So exporting a precisely-4:5 cropped file matches all of them with zero further cropping. **Why:** if any surface used a different ratio with cover, it would silently re-crop and break the promise. If you change the card/hero ratio, change the cropper `aspectRatio` in lockstep.
+- Crop math (cover baseline + pan/zoom → source pixels): `coverScale=max(fw/iw,fh/ih)`, `effScale=coverScale*s`, `cropW=fw/effScale`, `cropH=fh/effScale`, `originX=iw/2-(fw/2+tx)/effScale` (same for Y). Translation clamped to `±(baseW*s-fw)/2` so the frame is always covered.
+- Cropping needs TRUE source pixel dims. We pass them from the picker asset; the `RNImage.getSize` fallback, on failure, cancels (never fabricates dims) — fabricated dims are the only realistic preview/export mismatch path.
+- expo-image-manipulator (~14.x, SDK54) new API: `ImageManipulator.manipulate(uri).crop(rect).resize({width}).renderAsync()` then `.saveAsync({compress,format})`. Works web (canvas) + native. Install via `expo install`, not the raw package tool, so the SDK-compatible version is picked.

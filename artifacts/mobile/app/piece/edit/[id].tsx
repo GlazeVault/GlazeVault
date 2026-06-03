@@ -19,6 +19,7 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ImageCropper } from "@/components/ImageCropper";
 import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
@@ -97,6 +98,9 @@ export default function EditPieceScreen() {
   const isPublic = visibility === "public";
   const [collectionId, setCollectionId] = useState<string | undefined>(piece?.collectionId);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
+  const [cropSource, setCropSource] = useState<
+    { uri: string; width?: number; height?: number } | null
+  >(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -112,11 +116,13 @@ export default function EditPieceScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [4, 5],
-      quality: 0.9,
+      allowsEditing: false,
+      quality: 1,
     });
-    if (!result.canceled && result.assets[0]) setImageUri(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setCropSource({ uri: asset.uri, width: asset.width, height: asset.height });
+    }
   };
 
   const handleSave = async () => {
@@ -395,6 +401,18 @@ export default function EditPieceScreen() {
           </View>
         </View>
       </KeyboardAwareScrollView>
+
+      <ImageCropper
+        visible={!!cropSource}
+        uri={cropSource?.uri ?? null}
+        sourceWidth={cropSource?.width}
+        sourceHeight={cropSource?.height}
+        onCancel={() => setCropSource(null)}
+        onConfirm={(uri) => {
+          setImageUri(uri);
+          setCropSource(null);
+        }}
+      />
 
       {/* Collection picker modal */}
       <Modal

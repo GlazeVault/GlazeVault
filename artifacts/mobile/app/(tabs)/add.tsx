@@ -17,6 +17,7 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ImageCropper } from "@/components/ImageCropper";
 import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
@@ -75,6 +76,9 @@ export default function AddScreen() {
   const { collections } = useCollections();
   const insets = useSafeAreaInsets();
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [cropSource, setCropSource] = useState<
+    { uri: string; width?: number; height?: number } | null
+  >(null);
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [clay, setClay] = useState("");
@@ -97,12 +101,12 @@ export default function AddScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [4, 5],
-      quality: 0.7,
+      allowsEditing: false,
+      quality: 1,
     });
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      setCropSource({ uri: asset.uri, width: asset.width, height: asset.height });
     }
   };
 
@@ -113,12 +117,12 @@ export default function AddScreen() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 5],
-      quality: 0.7,
+      allowsEditing: false,
+      quality: 1,
     });
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      setCropSource({ uri: asset.uri, width: asset.width, height: asset.height });
     }
   };
 
@@ -328,6 +332,18 @@ export default function AddScreen() {
           </Text>
         </Pressable>
       </View>
+
+      <ImageCropper
+        visible={!!cropSource}
+        uri={cropSource?.uri ?? null}
+        sourceWidth={cropSource?.width}
+        sourceHeight={cropSource?.height}
+        onCancel={() => setCropSource(null)}
+        onConfirm={(uri) => {
+          setImageUri(uri);
+          setCropSource(null);
+        }}
+      />
     </KeyboardAwareScrollView>
   );
 }
