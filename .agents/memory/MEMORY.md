@@ -13,3 +13,4 @@
 - [GlazeVault Supabase persistence](glazevault-supabase.md) — Supabase=source of truth, AsyncStorage=cache; gated on EXPO_PUBLIC_* (restart expo after change); remote-wins but cache-only creations preserved; NO offline edit/delete sync queue (intentional).
 - [GlazeVault context reactivity](glazevault-context-reactivity.md) — getPiece reads a non-reactive ref; rendered must-stay-fresh values (badges/toggles) must read the reactive `pieces` list; getPiece ok only for one-shot form init.
 - [GlazeVault search](glazevault-search.md) — local-only substring filter on both tabs via shared SearchBar; no dedicated search screen/route by design.
+- [GlazeVault mobile jest setup](glazevault-mobile-jest.md) — jest-expo+RTL render tests; pnpm transformIgnore quirks, exact react/rtr version lockstep, no jest.resetModules with top-level RTL import, mock-prefix rule.
