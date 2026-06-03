@@ -50,31 +50,28 @@ const PotteryContext = createContext<PotteryContextType | undefined>(undefined);
 
 const STORAGE_KEY = "@glazevault_pieces_v2";
 
-// The seed piece originally shipped with a fabricated, AI-style description in
-// its `notes`. We no longer seed prose, and any already-stored copy of this
-// exact text is cleared on load (see normalizePiece) so it never masquerades as
-// the user's own notes. Matched verbatim so genuine user notes are never touched.
-const LEGACY_SEED_DEMO_NOTES =
-  "A quiet morning piece. The turquoise matt glaze pools gently at the foot, revealing the warm stoneware body beneath. Thrown on the wheel in a single session.";
+// GlazeVault originally shipped with one demo "Blue Mug" seed piece
+// (id "seed-blue-mug", a bundled `@seed/blue-mug` image). We no longer seed any
+// demo data. Any lingering copy of that demo — in the local cache OR pushed up
+// to Supabase by an earlier version — is stripped on load (see isDemoSeedPiece)
+// so it can never reappear or overwrite a real piece. We match only the
+// untouched demo image, so a real photo the user attached to this record is
+// preserved and never dropped.
+const DEMO_SEED_ID = "seed-blue-mug";
+// The one demo image that escaped into Supabase (now deleted) lived at this
+// storage object; this marker lets us purge any cached copy of it too.
+const DEMO_IMAGE_MARKER = "1780452984113-h6pjefo";
 
-const SEED_PIECES: PotteryPiece[] = [
-  {
-    id: "seed-blue-mug",
-    title: "Blue Mug",
-    notes: "",
-    clay: "Stoneware",
-    glaze: "Turquoise Matt",
-    firing: "Gas Reduction",
-    cone: "Cone 6",
-    firingEnvironment: "Gas Reduction",
-    dimensions: "9 cm H × 8 cm W",
-    imageUri: "@seed/blue-mug",
-    createdAt: new Date("2026-05-12").toISOString(),
-    isFavorite: false,
-    visibility: "private",
-    publicDataSettings: { ...DEFAULT_PUBLIC_DATA_SETTINGS },
-  },
-];
+// True only for the *untouched* demo seed: the reserved demo id paired with the
+// bundled demo ref, the (deleted) demo storage object, or no image at all. A
+// real image the user attached to this record — a `data:` URI on web, a
+// `pieces/...` relative path on native, or any other uploaded URL — is NOT
+// matched, so genuine user photos are preserved and allowed to sync.
+function isDemoSeedPiece(p: Pick<PotteryPiece, "id" | "imageUri">): boolean {
+  if (p.id !== DEMO_SEED_ID) return false;
+  const uri = p.imageUri ?? "";
+  return uri === "" || uri.startsWith("@seed/") || uri.includes(DEMO_IMAGE_MARKER);
+}
 
 function normalizePiece(
   p: Partial<PotteryPiece> & { isPublic?: boolean } & Pick<PotteryPiece, "id">
@@ -96,17 +93,6 @@ function normalizePiece(
   } as PotteryPiece;
   if (!base.firingEnvironment && base.firing) {
     base.firingEnvironment = base.firing;
-  }
-  // One-time cleanup: drop the legacy seeded demo description so it no longer
-  // surfaces as if it were the user's own notes. Scoped to the untouched seed
-  // piece (original id + photo) AND a verbatim text match, so genuine
-  // user-entered notes are never cleared.
-  if (
-    base.id === "seed-blue-mug" &&
-    base.imageUri === "@seed/blue-mug" &&
-    base.notes === LEGACY_SEED_DEMO_NOTES
-  ) {
-    base.notes = "";
   }
   // Backward compat: migrate legacy `isPublic` flag → `visibility`.
   if (rest.visibility == null && isPublic != null) {
@@ -145,6 +131,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   // the cache (offline buffer) and logged.
   const pushPieceRemote = useCallback(
     async (piece: PotteryPiece) => {
+      console.log("Saving piece images:", piece.id, piece.imageUri);
       if (!isSupabaseConfigured) return;
       try {
         const saved = await savePieceRemote(piece);
@@ -173,33 +160,24 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      // 1. Local cache first — instant paint + offline fallback.
+      // 1. Local cache first — instant paint + offline fallback. No demo data is
+      //    ever seeded; the retired demo seed piece is stripped here so it never
+      //    repaints or gets re-synced up to Supabase.
       let cached: PotteryPiece[] = [];
       try {
         const data = await AsyncStorage.getItem(STORAGE_KEY);
         if (data) {
           const parsed = JSON.parse(data) as Array<Partial<PotteryPiece> & Pick<PotteryPiece, "id">>;
-          cached = parsed.map(normalizePiece);
+          cached = parsed.map(normalizePiece).filter((p) => !isDemoSeedPiece(p));
           piecesRef.current = cached;
           setPieces(cached);
           console.log("Loaded pieces", cached.length);
-        } else if (!isSupabaseConfigured) {
-          // Only seed when there is no backend to be the source of truth.
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_PIECES));
-          cached = SEED_PIECES;
-          piecesRef.current = SEED_PIECES;
-          setPieces(SEED_PIECES);
-          console.log("Loaded pieces", SEED_PIECES.length, "(seeded)");
+          cached.forEach((p) => console.log("Loaded piece images:", p.id, p.imageUri));
         } else {
           console.log("Loaded pieces", 0);
         }
       } catch (e) {
         console.warn("Failed to load pieces", e);
-        if (!isSupabaseConfigured) {
-          cached = SEED_PIECES;
-          piecesRef.current = SEED_PIECES;
-          setPieces(SEED_PIECES);
-        }
       }
 
       // 2. Supabase is the source of truth when configured + reachable.
@@ -210,7 +188,10 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
       //    remote-wins — full offline conflict/delete sync is a future step.
       if (isSupabaseConfigured) {
         try {
-          const remote = await loadPiecesRemote();
+          // Defensively strip the demo seed from remote too, so an old copy
+          // pushed up by a previous version can't repaint or be re-synced.
+          const remote = (await loadPiecesRemote()).filter((p) => !isDemoSeedPiece(p));
+          remote.forEach((p) => console.log("Loaded piece images:", p.id, p.imageUri));
           if (remote.length > 0) {
             const remoteIds = new Set(remote.map((p) => p.id));
             const localOnly = cached.filter((p) => !remoteIds.has(p.id));

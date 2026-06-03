@@ -1,0 +1,131 @@
+Yes, reload the Supabase schema cache and verify the tables are visible to PostgREST.
+Do not change the existing schema structure.
+Fix the issue where uploaded piece images are being replaced by the default blue mug demo image.
+
+Problem:
+Even after I replace a piece image with my own uploaded cup image, the app keeps changing it back to the blue mug sample image.
+
+Requirements:
+1. Search the codebase for all references to:
+- Blue Mug
+- Turquoise Matt
+- default image
+- sample image
+- seed image
+- demo piece
+- placeholder mug
+- fallback image
+
+2. Remove any logic that overwrites user-uploaded piece images with sample/demo images.
+
+3. If a piece already has imageUrls, photos, imageUri, or uploadedImages:
+- preserve those user images
+- never replace them
+
+4. Only use neutral empty placeholder UI when no image exists.
+Do NOT use the blue mug image as fallback.
+
+5. On save:
+- save the uploaded image URL/URI to the piece record
+- persist it to Supabase
+- update local state immediately
+
+6. On load:
+- load the image from Supabase/local cache
+- do not seed or overwrite existing image fields
+
+7. Migration cleanup:
+- remove the blue mug demo image from existing seeded records if it was automatically inserted
+- do not touch real user-uploaded images
+
+8. Add temporary logs:
+console.log("Saving piece images:", piece.id, piece.imageUrls)
+console.log("Loaded piece images:", piece.id, piece.imageUrls)
+
+The app must always show the user-uploaded image, not the blue mug sample.
+Fix the issue where uploaded piece images are being replaced by the default blue mug demo image.
+
+Problem:
+Even after I replace a piece image with my own uploaded cup image, the app keeps changing it back to the blue mug sample image.
+
+Requirements:
+1. Search the codebase for all references to:
+- Blue Mug
+- Turquoise Matt
+- default image
+- sample image
+- seed image
+- demo piece
+- placeholder mug
+- fallback image
+
+2. Remove any logic that overwrites user-uploaded piece images with sample/demo images.
+
+3. If a piece already has imageUrls, photos, imageUri, or uploadedImages:
+- preserve those user images
+- never replace them
+
+4. Only use neutral empty placeholder UI when no image exists.
+Do NOT use the blue mug image as fallback.
+
+5. On save:
+- save the uploaded image URL/URI to the piece record
+- persist it to Supabase
+- update local state immediately
+
+6. On load:
+- load the image from Supabase/local cache
+- do not seed or overwrite existing image fields
+
+7. Migration cleanup:
+- remove the blue mug demo image from existing seeded records if it was automatically inserted
+- do not touch real user-uploaded images
+
+8. Add temporary logs:
+console.log("Saving piece images:", piece.id, piece.imageUrls)
+console.log("Loaded piece images:", piece.id, piece.imageUrls)
+
+The app must always show the user-uploaded image, not the blue mug sample.
+Fix the issue where uploaded piece images are being replaced by the default blue mug demo image.
+
+Problem:
+Even after I replace a piece image with my own uploaded cup image, the app keeps changing it back to the blue mug sample image.
+
+Requirements:
+1. Search the codebase for all references to:
+- Blue Mug
+- Turquoise Matt
+- default image
+- sample image
+- seed image
+- demo piece
+- placeholder mug
+- fallback image
+
+2. Remove any logic that overwrites user-uploaded piece images with sample/demo images.
+
+3. If a piece already has imageUrls, photos, imageUri, or uploadedImages:
+- preserve those user images
+- never replace them
+
+4. Only use neutral empty placeholder UI when no image exists.
+Do NOT use the blue mug image as fallback.
+
+5. On save:
+- save the uploaded image URL/URI to the piece record
+- persist it to Supabase
+- update local state immediately
+
+6. On load:
+- load the image from Supabase/local cache
+- do not seed or overwrite existing image fields
+
+7. Migration cleanup:
+- remove the blue mug demo image from existing seeded records if it was automatically inserted
+- do not touch real user-uploaded images
+
+8. Add temporary logs:
+console.log("Saving piece images:", piece.id, piece.imageUrls)
+console.log("Loaded piece images:", piece.id, piece.imageUrls)
+
+The app must always show the user-uploaded image, not the blue mug sample.

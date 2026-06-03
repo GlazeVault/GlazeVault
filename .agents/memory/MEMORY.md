@@ -1,7 +1,7 @@
 - [GlazeVault collections model](glazevault-collections-model.md) — single `collectionId` per piece; removing a relation must never deletePiece; collection deletion must cascade-unlink pieces at the call site.
 - [GlazeVault firing metadata](glazevault-firing-metadata.md) — `firing`/`firingEnvironment` kept in lockstep in PotteryContext; display fallback `firingEnvironment || firing`; never write only one.
 - [GlazeVault navigation](glazevault-navigation.md) — custom JS tabBar (not NativeTabs) for center + FAB; + opens AddMenu; navigate to /add (tab) vs push /collection/new (modal).
-- [GlazeVault seed data](glazevault-seed-data.md) — seed pieces must not carry fabricated prose in editable fields (notes); Edit form is fine, the bug is in seed data; legacy seed notes cleaned in normalizePiece by fingerprint+verbatim match.
+- [GlazeVault seed data](glazevault-seed-data.md) — demo seeding fully removed; purge retired blue-mug demo by IMAGE signature (not id alone) from cache+remote so user photos under the seed id survive.
 - [GlazeVault privacy](glazevault-privacy.md) — piece visibility is source of truth; public surfaces must use isPubliclyVisiblePiece (gates by parent collection); kept collectionId not pieceIds; new items default private.
 - [GlazeVault file-text import](glazevault-file-import.md) — web reads DOM asset.file (not fetch blob:); native uses new File().text(); docx via fflate unzip of word/document.xml; pdf deferred; import mutates only local state until Save.
 - [GlazeVault image viewer](glazevault-image-viewer.md) — fullscreen viewer swipes across pieces (one image each); public preview scopes to single piece; per-page zoom must be reset on reopen (Modal/FlatList cells stay mounted).
