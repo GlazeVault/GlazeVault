@@ -45,3 +45,20 @@ if its `show*` flag is on AND the value is non-empty — `showClayBody`/
 new public-display field, also add its `show*` flag to `showAllPublicDetails()` in
 piece/[id].tsx or "Show all" silently omits it. Do not reintroduce
 glaze/firing/cone to public surfaces.
+
+## Public-site portfolio cards carry the same whispered caption
+The public-site portfolio tiles (`renderTile` in public-site.tsx) render a caption
+BENEATH each image — serif title (PlayfairDisplay) + the same `clay · dimensions ·
+year` line — across all three layouts (catalog/editorial/masonry). The earlier
+"silent cards" pass removed all text; this restored minimal artwork identity.
+
+**Why:** image-only cards read as too anonymous/atmospheric; a quiet exhibition-
+catalog caption gives archival presence without a database/card-UI feel.
+
+**How to apply:** the data field is `clay` (NOT `clayBody` — that name only exists
+as the `showClayBody` flag). Tiles are a column: `Pressable(tileCol) > tileImage box
+(absoluteFill Image) > caption`. Tile styles are split into a wrapper/layout style
+(flex/width/margin, e.g. `catalogLargeCol`) and an image-box style (aspectRatio, e.g.
+`catalogLargeImg`); keep that split when adding tile variants or the caption width
+won't match the image. The local `PublicPiece` interface must list any piece field
+the caption reads (objects are full PotteryPiece cast by `getPublicCollectionPieces`).

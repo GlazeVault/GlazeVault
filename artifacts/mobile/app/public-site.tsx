@@ -25,6 +25,9 @@ interface PublicPiece {
   id: string;
   title: string;
   imageUri: string;
+  clay: string;
+  dimensions: string;
+  year: string;
   publicDataSettings: PublicDataSettings;
 }
 
@@ -95,27 +98,61 @@ export default function PublicSiteScreen() {
 
   const initial = profile.name.trim().charAt(0).toUpperCase();
 
-  const renderTile = (piece: PublicPiece, tileStyle: object) => {
+  // A quiet, editorial caption beneath each piece: serif title + a single
+  // whispered metadata line (clay · dimensions · year). Each field honors the
+  // piece's own publicDataSettings and is dropped when its flag is off or the
+  // value is empty, so nothing ever reads like a database row.
+  const renderCaption = (piece: PublicPiece) => {
+    const title = piece.publicDataSettings.showTitle ? piece.title.trim() : "";
+    const meta = [
+      piece.publicDataSettings.showClayBody ? piece.clay : "",
+      piece.publicDataSettings.showDimensions ? piece.dimensions : "",
+      piece.publicDataSettings.showYear ? piece.year : "",
+    ]
+      .map((s) => (s ?? "").trim())
+      .filter(Boolean)
+      .join("  ·  ");
+    if (!title && !meta) return null;
+    return (
+      <View style={styles.caption}>
+        {title ? (
+          <Text style={[styles.captionTitle, { color: colors.foreground }]} numberOfLines={2}>
+            {title}
+          </Text>
+        ) : null}
+        {meta ? (
+          <Text style={[styles.captionMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+            {meta}
+          </Text>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderTile = (piece: PublicPiece, imageStyle: object, wrapperStyle?: object) => {
     return (
       <Pressable
         key={piece.id}
-        style={({ pressed }) => [tileStyle, { opacity: pressed ? 0.85 : 1 }]}
+        style={({ pressed }) => [styles.tileCol, wrapperStyle, { opacity: pressed ? 0.85 : 1 }]}
         onPress={() => router.push(`/piece/${piece.id}?public=1`)}
       >
-        {piece.publicDataSettings.showPhotos ? (
-          <Image
-            source={resolveImageSource(piece.imageUri)}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            transition={220}
-            cachePolicy="memory-disk"
-            recyclingKey={piece.id}
-          />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, styles.tilePlaceholder, { backgroundColor: colors.secondary }]}>
-            <Feather name="image" size={18} color={colors.mutedForeground} style={{ opacity: 0.3 }} />
-          </View>
-        )}
+        <View style={[styles.tileImage, imageStyle]}>
+          {piece.publicDataSettings.showPhotos ? (
+            <Image
+              source={resolveImageSource(piece.imageUri)}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={220}
+              cachePolicy="memory-disk"
+              recyclingKey={piece.id}
+            />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, styles.tilePlaceholder, { backgroundColor: colors.secondary }]}>
+              <Feather name="image" size={18} color={colors.mutedForeground} style={{ opacity: 0.3 }} />
+            </View>
+          )}
+        </View>
+        {renderCaption(piece)}
       </Pressable>
     );
   };
@@ -136,7 +173,7 @@ export default function PublicSiteScreen() {
       const wideRow = rowIndex % 3 === 2 && remaining >= 2;
       if (wideRow) {
         rows.push(
-          <View key={`row-${rowIndex}`}>{renderTile(cp[i], styles.catalogWide)}</View>,
+          <View key={`row-${rowIndex}`}>{renderTile(cp[i], styles.catalogWideImg, styles.fullWidth)}</View>,
         );
         i += 1;
       } else if (remaining === 1) {
@@ -148,7 +185,7 @@ export default function PublicSiteScreen() {
             key={`row-${rowIndex}`}
             style={[styles.catalogSoloRow, alignEnd ? styles.soloEnd : styles.soloStart]}
           >
-            {renderTile(cp[i], [styles.catalogSolo, alignEnd ? styles.catalogSoloDrop : null])}
+            {renderTile(cp[i], styles.catalogSoloImg, [styles.catalogSoloCol, alignEnd ? styles.catalogSoloDrop : null])}
           </View>,
         );
         i += 1;
@@ -160,13 +197,13 @@ export default function PublicSiteScreen() {
           <View key={`row-${rowIndex}`} style={styles.catalogPairRow}>
             {largeLeft ? (
               <>
-                {renderTile(a, styles.catalogLarge)}
-                {renderTile(b, [styles.catalogSmall, styles.catalogStagger])}
+                {renderTile(a, styles.catalogLargeImg, styles.catalogLargeCol)}
+                {renderTile(b, styles.catalogSmallImg, [styles.catalogSmallCol, styles.catalogStagger])}
               </>
             ) : (
               <>
-                {renderTile(a, [styles.catalogSmall, styles.catalogStaggerDeep])}
-                {renderTile(b, styles.catalogLarge)}
+                {renderTile(a, styles.catalogSmallImg, [styles.catalogSmallCol, styles.catalogStaggerDeep])}
+                {renderTile(b, styles.catalogLargeImg, styles.catalogLargeCol)}
               </>
             )}
           </View>,
@@ -182,7 +219,7 @@ export default function PublicSiteScreen() {
     if (layout === "editorial") {
       return (
         <View style={styles.editorialWrap}>
-          {collectionPieces.map((p) => renderTile(p, styles.editorialTile))}
+          {collectionPieces.map((p) => renderTile(p, styles.editorialImg, styles.fullWidth))}
         </View>
       );
     }
@@ -192,10 +229,10 @@ export default function PublicSiteScreen() {
       return (
         <View style={styles.masonryWrap}>
           <View style={styles.masonryCol}>
-            {colA.map((p, i) => renderTile(p, [styles.masonryTile, i % 2 === 0 ? styles.masonryTall : styles.masonryShort]))}
+            {colA.map((p, i) => renderTile(p, [styles.masonryImg, i % 2 === 0 ? styles.masonryTall : styles.masonryShort], styles.fullWidth))}
           </View>
           <View style={styles.masonryCol}>
-            {colB.map((p, i) => renderTile(p, [styles.masonryTile, i % 2 === 0 ? styles.masonryShort : styles.masonryTall]))}
+            {colB.map((p, i) => renderTile(p, [styles.masonryImg, i % 2 === 0 ? styles.masonryShort : styles.masonryTall], styles.fullWidth))}
           </View>
         </View>
       );
@@ -489,31 +526,47 @@ const styles = StyleSheet.create({
     marginTop: 8,
     opacity: 0.8,
   },
+  // Shared tile structure: a column holding an image box + a quiet caption.
+  tileCol: {},
+  tileImage: { width: "100%", borderRadius: 12, overflow: "hidden" },
+  fullWidth: { width: "100%" },
+  caption: { marginTop: 14, gap: 5, paddingHorizontal: 2 },
+  captionTitle: {
+    fontFamily: "PlayfairDisplay_400Regular",
+    fontSize: 16,
+    letterSpacing: 0.3,
+    lineHeight: 22,
+  },
+  captionMeta: {
+    fontFamily: "Poppins_300Light",
+    fontSize: 11,
+    letterSpacing: 0.8,
+    lineHeight: 16,
+    opacity: 0.65,
+  },
   // Catalog layout (asymmetric art-book rhythm)
-  catalogWrap: { gap: 30, marginTop: 18 },
+  catalogWrap: { gap: 40, marginTop: 18 },
   catalogPairRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
-  catalogLarge: { flex: 1.6, aspectRatio: 0.82, borderRadius: 12, overflow: "hidden" },
-  catalogSmall: { flex: 1, aspectRatio: 0.92, borderRadius: 12, overflow: "hidden" },
+  catalogLargeCol: { flex: 1.6 },
+  catalogLargeImg: { aspectRatio: 0.82 },
+  catalogSmallCol: { flex: 1 },
+  catalogSmallImg: { aspectRatio: 0.92 },
   catalogStagger: { marginTop: 30 },
   catalogStaggerDeep: { marginTop: 48 },
-  catalogWide: { width: "100%", aspectRatio: 16 / 9, borderRadius: 12, overflow: "hidden" },
+  catalogWideImg: { aspectRatio: 16 / 9 },
   catalogSoloRow: { flexDirection: "row" },
   soloStart: { justifyContent: "flex-start" },
   soloEnd: { justifyContent: "flex-end" },
-  catalogSolo: { width: "68%", aspectRatio: 0.86, borderRadius: 12, overflow: "hidden" },
+  catalogSoloCol: { width: "68%" },
+  catalogSoloImg: { aspectRatio: 0.86 },
   catalogSoloDrop: { marginTop: 36 },
   // Editorial layout
-  editorialWrap: { gap: 12, marginTop: 14 },
-  editorialTile: {
-    width: "100%",
-    aspectRatio: 4 / 3,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
+  editorialWrap: { gap: 20, marginTop: 14 },
+  editorialImg: { aspectRatio: 4 / 3 },
   // Masonry layout
-  masonryWrap: { flexDirection: "row", gap: 6, marginTop: 14 },
-  masonryCol: { flex: 1, gap: 6 },
-  masonryTile: { width: "100%", borderRadius: 10, overflow: "hidden" },
+  masonryWrap: { flexDirection: "row", gap: 10, marginTop: 14 },
+  masonryCol: { flex: 1, gap: 18 },
+  masonryImg: { borderRadius: 10 },
   masonryTall: { aspectRatio: 0.78 },
   masonryShort: { aspectRatio: 1.1 },
   tilePlaceholder: { alignItems: "center", justifyContent: "center" },
