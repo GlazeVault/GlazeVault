@@ -38,8 +38,9 @@ export default function CollectionsScreen() {
   const getPiecesForCollection = (collectionId: string) =>
     pieces.filter((p) => p.collectionId === collectionId);
 
-  const getCoverForCollection = (collectionId: string) => {
-    const collectionPieces = getPiecesForCollection(collectionId);
+  const getCoverForCollection = (collection: { id: string; coverImageUri?: string }) => {
+    if (collection.coverImageUri) return collection.coverImageUri;
+    const collectionPieces = getPiecesForCollection(collection.id);
     return collectionPieces[0]?.imageUri ?? null;
   };
 
@@ -121,7 +122,7 @@ export default function CollectionsScreen() {
           )
         }
         renderItem={({ item }) => {
-          const cover = getCoverForCollection(item.id);
+          const cover = getCoverForCollection(item);
           const count = getPiecesForCollection(item.id).length;
           return (
             <Pressable
@@ -142,7 +143,9 @@ export default function CollectionsScreen() {
                     source={resolveImageSource(cover)}
                     style={StyleSheet.absoluteFill}
                     contentFit="cover"
-                    transition={200}
+                    transition={220}
+                    cachePolicy="memory-disk"
+                    recyclingKey={cover}
                   />
                 ) : (
                   <View style={styles.cardPlaceholder}>
@@ -253,7 +256,7 @@ const styles = StyleSheet.create({
   card: { marginBottom: 40 },
   cardImage: {
     width: "100%",
-    aspectRatio: 4 / 5,
+    aspectRatio: 16 / 10,
     borderRadius: 24,
     overflow: "hidden",
     marginBottom: 14,

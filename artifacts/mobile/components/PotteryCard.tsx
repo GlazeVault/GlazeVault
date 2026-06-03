@@ -53,7 +53,9 @@ export function PotteryCard({ piece, fromCollectionId, showVisibility }: Pottery
           source={resolveImageSource(piece.imageUri)}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
-          transition={300}
+          transition={250}
+          cachePolicy="memory-disk"
+          recyclingKey={piece.id}
         />
       </View>
 

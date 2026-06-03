@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ImageViewer, type ViewerItem } from "@/components/ImageViewer";
 import { ShareSheet } from "@/components/ShareSheet";
-import { PUBLIC_DATA_FIELDS } from "@/constants/privacy";
+import { PUBLIC_DATA_FIELDS, isPubliclyVisiblePiece } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
@@ -85,15 +85,39 @@ export default function PieceDetailScreen() {
   // it to this piece alone so private work is never reachable; when opened from a
   // collection we stay within that collection; otherwise the whole archive.
   const galleryPieces = (() => {
-    if (isPublicView) return [piece];
+    if (isPublicView) {
+      // Public gallery: swipe only across publicly visible, photo-allowed pieces
+      // in the same collection. Never reach a private piece or a hidden photo.
+      if (!piece.collectionId) return [piece];
+      const siblings = pieces.filter(
+        (p) =>
+          p.collectionId === piece.collectionId &&
+          isPubliclyVisiblePiece(p, collections) &&
+          p.publicDataSettings.showPhotos,
+      );
+      return siblings.some((p) => p.id === piece.id) ? siblings : [piece];
+    }
     const scoped = from ? pieces.filter((p) => p.collectionId === from) : pieces;
     return scoped.some((p) => p.id === piece.id) ? scoped : [piece];
   })();
-  const viewerItems: ViewerItem[] = galleryPieces.map((p) => ({
-    uri: p.imageUri,
-    title: p.title,
-    materials: [p.clay, p.glaze].filter(Boolean).join("  ·  "),
-  }));
+  const viewerItems: ViewerItem[] = galleryPieces.map((p) => {
+    if (isPublicView) {
+      // Captions honor each piece's own public display settings.
+      const s = p.publicDataSettings;
+      return {
+        uri: p.imageUri,
+        title: s.showTitle ? p.title : undefined,
+        materials: [s.showClayBody && p.clay, s.showGlazeName && p.glaze]
+          .filter(Boolean)
+          .join("  ·  "),
+      };
+    }
+    return {
+      uri: p.imageUri,
+      title: p.title,
+      materials: [p.clay, p.glaze].filter(Boolean).join("  ·  "),
+    };
+  });
   const viewerIndex = Math.max(
     0,
     galleryPieces.findIndex((p) => p.id === piece.id),
@@ -241,12 +265,28 @@ export default function PieceDetailScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
         >
           {pds.showPhotos ? (
-            <Image
-              source={resolveImageSource(piece.imageUri)}
-              style={styles.heroImage}
-              contentFit="cover"
-              transition={200}
-            />
+            <Pressable
+              onPress={() => setViewerVisible(true)}
+              accessibilityRole="imagebutton"
+              accessibilityLabel={`View ${pds.showTitle && piece.title ? piece.title : "piece"} fullscreen`}
+            >
+              <Image
+                source={resolveImageSource(piece.imageUri)}
+                style={styles.heroImage}
+                contentFit="cover"
+                transition={220}
+                cachePolicy="memory-disk"
+                recyclingKey={piece.id}
+              />
+              {galleryPieces.length > 1 ? (
+                <View style={styles.galleryHint}>
+                  <Feather name="layers" size={11} color="#FFFFFF" />
+                  <Text style={styles.galleryHintText}>
+                    {viewerIndex + 1} / {galleryPieces.length}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
           ) : (
             <View style={[styles.heroImage, styles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
               <Feather name="image" size={26} color={colors.mutedForeground} style={{ opacity: 0.3 }} />
@@ -280,6 +320,13 @@ export default function PieceDetailScreen() {
           visible={shareVisible}
           onClose={() => setShareVisible(false)}
           pieceTitle={pds.showTitle ? piece.title : "Untitled piece"}
+        />
+
+        <ImageViewer
+          visible={viewerVisible}
+          items={viewerItems}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerVisible(false)}
         />
       </View>
     );
@@ -329,8 +376,18 @@ export default function PieceDetailScreen() {
             source={resolveImageSource(piece.imageUri)}
             style={styles.heroImage}
             contentFit="cover"
-            transition={200}
+            transition={220}
+            cachePolicy="memory-disk"
+            recyclingKey={piece.id}
           />
+          {galleryPieces.length > 1 ? (
+            <View style={styles.galleryHint}>
+              <Feather name="layers" size={11} color="#FFFFFF" />
+              <Text style={styles.galleryHintText}>
+                {viewerIndex + 1} / {galleryPieces.length}
+              </Text>
+            </View>
+          ) : null}
         </Pressable>
 
         {/* Content */}
@@ -779,6 +836,24 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   heroImage: { width: "100%", aspectRatio: 4 / 5 },
+  galleryHint: {
+    position: "absolute",
+    bottom: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 13,
+    backgroundColor: "rgba(19,16,13,0.55)",
+  },
+  galleryHintText: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.4,
+    color: "#FFFFFF",
+  },
   content: { paddingHorizontal: 28, paddingTop: 28 },
   eyebrow: {
     fontSize: 10,

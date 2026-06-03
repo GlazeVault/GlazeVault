@@ -135,7 +135,9 @@ export default function CollectionDetailScreen() {
                     source={resolveImageSource(coverImageUri)}
                     style={StyleSheet.absoluteFill}
                     contentFit="cover"
-                    transition={200}
+                    transition={220}
+                    cachePolicy="memory-disk"
+                    recyclingKey={coverImageUri}
                   />
                   <View style={styles.coverActions}>
                     <Pressable
@@ -174,7 +176,9 @@ export default function CollectionDetailScreen() {
                   source={resolveImageSource(collection.coverImageUri)}
                   style={StyleSheet.absoluteFill}
                   contentFit="cover"
-                  transition={200}
+                  transition={220}
+                  cachePolicy="memory-disk"
+                  recyclingKey={collection.coverImageUri}
                 />
               </View>
             ) : null}

@@ -28,10 +28,6 @@ interface PublicPiece {
   publicDataSettings: PublicDataSettings;
 }
 
-function pieceLabel(p: PublicPiece): string | null {
-  return p.publicDataSettings.showTitle && p.title.trim() ? p.title : null;
-}
-
 export default function PublicSiteScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -68,7 +64,6 @@ export default function PublicSiteScreen() {
   const initial = profile.name.trim().charAt(0).toUpperCase();
 
   const renderTile = (piece: PublicPiece, tileStyle: object) => {
-    const label = pieceLabel(piece);
     return (
       <Pressable
         key={piece.id}
@@ -80,20 +75,15 @@ export default function PublicSiteScreen() {
             source={resolveImageSource(piece.imageUri)}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
-            transition={200}
+            transition={220}
+            cachePolicy="memory-disk"
+            recyclingKey={piece.id}
           />
         ) : (
           <View style={[StyleSheet.absoluteFill, styles.tilePlaceholder, { backgroundColor: colors.secondary }]}>
             <Feather name="image" size={18} color={colors.mutedForeground} style={{ opacity: 0.3 }} />
           </View>
         )}
-        {label ? (
-          <View style={styles.tileOverlay}>
-            <Text style={styles.tileTitle} numberOfLines={1}>
-              {label}
-            </Text>
-          </View>
-        ) : null}
       </Pressable>
     );
   };
@@ -212,7 +202,9 @@ export default function PublicSiteScreen() {
                     source={resolveImageSource(coverUri)}
                     style={StyleSheet.absoluteFill}
                     contentFit="cover"
-                    transition={200}
+                    transition={220}
+                    cachePolicy="memory-disk"
+                    recyclingKey={coverUri}
                   />
                 </Pressable>
               ) : null}
@@ -329,8 +321,8 @@ const styles = StyleSheet.create({
   links: { gap: 10, alignItems: "center", marginBottom: 4 },
   linkRow: { flexDirection: "row", alignItems: "center", gap: 9, maxWidth: "100%" },
   linkText: { fontSize: 13, fontFamily: "Poppins_300Light", flexShrink: 1 },
-  divider: { height: 1, marginVertical: 28 },
-  collectionSection: { marginBottom: 36 },
+  divider: { height: 1, marginVertical: 32 },
+  collectionSection: { marginBottom: 48 },
   coverWrap: {
     width: "100%",
     aspectRatio: 16 / 10,
@@ -339,20 +331,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   collectionTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: "PlayfairDisplay_400Regular",
     letterSpacing: 0.3,
-    lineHeight: 30,
+    lineHeight: 32,
   },
   collectionIntro: {
     fontSize: 13,
     fontFamily: "Poppins_300Light",
-    lineHeight: 20,
-    marginTop: 6,
-    marginBottom: 16,
+    lineHeight: 21,
+    marginTop: 8,
+    marginBottom: 18,
   },
   // Grid layout
-  gridWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 14 },
+  gridWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 18 },
   gridTile: {
     width: "31.5%",
     aspectRatio: 1,
@@ -374,16 +366,6 @@ const styles = StyleSheet.create({
   masonryTall: { aspectRatio: 0.78 },
   masonryShort: { aspectRatio: 1.1 },
   tilePlaceholder: { alignItems: "center", justifyContent: "center" },
-  tileOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(45,45,42,0.48)",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  tileTitle: { fontSize: 10, fontFamily: "Poppins_400Regular", color: "#FFFFFF", letterSpacing: 0.2 },
   empty: { alignItems: "center", paddingTop: 12, gap: 10 },
   emptyCircle: {
     width: 52,
