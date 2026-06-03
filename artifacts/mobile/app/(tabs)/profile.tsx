@@ -461,7 +461,7 @@ export default function ProfileScreen() {
               {featuredCollections.map((c) => {
                 const cp = getPublicCollectionPieces(c, pieces);
                 const coverUri =
-                  c.coverImageUri || cp.find((p) => p.publicDataSettings.showPhotos)?.imageUri;
+                  c.coverImageUri || cp.find((p) => p.imageUri)?.imageUri;
                 return (
                   <Pressable
                     key={c.id}

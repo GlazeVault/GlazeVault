@@ -86,14 +86,15 @@ export default function PieceDetailScreen() {
   // collection we stay within that collection; otherwise the whole archive.
   const galleryPieces = (() => {
     if (isPublicView) {
-      // Public gallery: swipe only across publicly visible, photo-allowed pieces
-      // in the same collection. Never reach a private piece or a hidden photo.
+      // Public gallery: swipe only across publicly visible pieces that have a
+      // photo, in the same collection. Never reach a private piece (or one in a
+      // private collection) — that gate lives in isPubliclyVisiblePiece.
       if (!piece.collectionId) return [piece];
       const siblings = pieces.filter(
         (p) =>
           p.collectionId === piece.collectionId &&
           isPubliclyVisiblePiece(p, collections) &&
-          p.publicDataSettings.showPhotos,
+          !!p.imageUri,
       );
       return siblings.some((p) => p.id === piece.id) ? siblings : [piece];
     }
@@ -210,7 +211,6 @@ export default function PieceDetailScreen() {
       publicDataSettings: {
         ...piece.publicDataSettings,
         showTitle: true,
-        showPhotos: true,
         showDescription: true,
         showClayBody: true,
         showDimensions: true,
@@ -276,7 +276,7 @@ export default function PieceDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
         >
-          {pds.showPhotos ? (
+          {piece.imageUri ? (
             <Pressable
               onPress={() => setViewerVisible(true)}
               accessibilityRole="imagebutton"

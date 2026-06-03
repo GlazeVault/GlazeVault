@@ -8,22 +8,36 @@ description: How the fullscreen swipe gallery is scoped on the public vs owner p
 The fullscreen `ImageViewer` swipe set on the piece-detail page is scoped differently for public vs owner views.
 
 - **Public view** (`?public=1`): the gallery must include ONLY siblings that are
-  `isPubliclyVisiblePiece(p, collections)` **AND** `p.publicDataSettings.showPhotos`,
+  `isPubliclyVisiblePiece(p, collections)` **AND** have an image (`!!p.imageUri`),
   restricted to the same `collectionId`. A piece with no collection = `[piece]` only.
   Viewer captions must honor each piece's own `publicDataSettings` (`showTitle`,
   `showClayBody`, `showGlazeName`) — not the owner's raw fields.
 - **Owner view**: scope by the `from` collection param if present, else the whole archive.
 
 **Why:** swiping is a back-door that can leak otherwise-hidden work. Scoping by
-`collectionId` alone is NOT enough — a public collection can contain private pieces
-or pieces with `showPhotos=false`; both must be excluded from the public swipe set,
-and per-piece caption gating prevents leaking titles/materials.
+`collectionId` alone is NOT enough — a public collection can contain private pieces;
+those are excluded by `isPubliclyVisiblePiece`. `showPhotos` is NO LONGER a display
+gate (see below) — a public piece always shows its photo — so the swipe set keys off
+`imageUri` presence, not `showPhotos`.
 
 **How to apply:** any future change to the public detail gallery (or new public
-surfaces that swipe across pieces) must filter through `isPubliclyVisiblePiece` +
-`showPhotos`, never bare `collectionId` equality. The public hero is itself a
+surfaces that swipe across pieces) must filter through `isPubliclyVisiblePiece`
+(+ `imageUri`), never bare `collectionId` equality. The public hero is itself a
 `Pressable` that opens the viewer, and `ImageViewer` is rendered inside the public
 return branch (it is a separate render path from the owner branch).
+
+## showPhotos is DEPRECATED as a display gate (public pieces always show their photo)
+A public piece with a valid `imageUri` but `publicDataSettings.showPhotos=false`
+used to render a blank placeholder on public surfaces (portfolio tile, public hero,
+cover fallback) while Archive/Collection — which never gated on `showPhotos` — showed
+it fine. **The rule now:** public surfaces render the image whenever `piece.imageUri`
+exists; `showPhotos` is ignored for display. The "Photos" toggle was removed from
+`PUBLIC_DATA_FIELDS`; `showPhotos` stays in the `PublicDataSettings` type+DEFAULT only
+for Supabase round-trip (marked `@deprecated`). **Why:** a gallery with hidden photos
+is just blank placeholders — the user reported this as a bug. **How to apply:** never
+reintroduce `showPhotos` as a render/scope/cover gate; gate public photos by
+`piece.imageUri` presence + `isPubliclyVisiblePiece`. Cover fallbacks pick the first
+piece WITH an `imageUri` (`cp.find(p => p.imageUri)`), not the first with `showPhotos`.
 
 ## Public metadata = clay · dimensions · year ONLY (curated gallery subset)
 The public meta line is built by the single shared helper `buildPublicMetaLine(piece)`

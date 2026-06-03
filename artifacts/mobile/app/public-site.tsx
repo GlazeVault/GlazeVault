@@ -81,7 +81,7 @@ export default function PublicSiteScreen() {
       const cp = getPublicCollectionPieces(c, pieces) as PublicPiece[];
       // Prefer the artist-chosen cover. Otherwise fall back to a public piece
       // that itself allows photos, so a hidden image never leaks through.
-      const fallback = cp.find((p) => p.publicDataSettings.showPhotos) ?? null;
+      const fallback = cp.find((p) => p.imageUri) ?? null;
       const coverUri = c.coverImageUri || fallback?.imageUri || null;
       const coverPieceId = c.coverImageUri ? null : (fallback?.id ?? null);
       // Never repeat the cover artwork in the grid directly beneath it.
@@ -131,7 +131,7 @@ export default function PublicSiteScreen() {
         onPress={() => router.push(`/piece/${piece.id}?public=1`)}
       >
         <View style={[styles.tileImage, imageStyle]}>
-          {piece.publicDataSettings.showPhotos ? (
+          {piece.imageUri ? (
             <Image
               source={resolveImageSource(piece.imageUri)}
               style={StyleSheet.absoluteFill}

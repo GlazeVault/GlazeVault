@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Image as RNImage,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -215,11 +216,26 @@ export function ImageCropper({
         context.resize({ width: MAX_OUTPUT_WIDTH });
       }
       const image = await context.renderAsync();
+      // On web, request the bytes inline as base64 and hand back a self-contained
+      // `data:` URI. The manipulator's web output is a `blob:` URL, and fetching a
+      // blob: inside the sandboxed preview iframe fails — so persistPieceImage
+      // would throw "Couldn't save photo". A data: URI side-steps the fetch
+      // entirely (persistPieceImage returns it untouched).
       const result = await image.saveAsync({
         compress: 0.82,
         format: SaveFormat.JPEG,
+        base64: Platform.OS === "web",
       });
-      onConfirm(result.uri);
+      if (Platform.OS === "web" && !result.base64) {
+        // Fall through to the catch: a blob: result.uri would fail downstream in
+        // the preview iframe, so surface the error instead of saving a dead URI.
+        throw new Error("ImageCropper: web crop returned no base64");
+      }
+      const outUri =
+        Platform.OS === "web" && result.base64
+          ? `data:image/jpeg;base64,${result.base64}`
+          : result.uri;
+      onConfirm(outUri);
     } catch (err) {
       console.log("ImageCropper crop failed", err);
       setProcessing(false);

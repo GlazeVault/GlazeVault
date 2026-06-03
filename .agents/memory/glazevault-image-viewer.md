@@ -11,7 +11,7 @@ means swipe across the archive/collection, not multiple photos per piece.
 
 ## Gallery scoping (privacy-critical)
 Built in app/piece/[id].tsx, not the viewer. See `glazevault-public-gallery.md` for the public-side detail:
-- public preview (`isPublicView`) → same-collection siblings filtered by `isPubliclyVisiblePiece` + `showPhotos` (no collection → `[piece]`); captions honor per-piece publicDataSettings. (Superseded the old "single piece only" behavior.)
+- public preview (`isPublicView`) → same-collection siblings filtered by `isPubliclyVisiblePiece` + `!!imageUri` (no collection → `[piece]`); captions honor per-piece publicDataSettings. `showPhotos` is deprecated as a gate (see glazevault-public-gallery.md). (Superseded the old "single piece only" behavior.)
 - opened from a collection (`from` param) → pieces filtered to that collection.
 - otherwise → whole archive.
 - always guard: if the current piece isn't in the scoped set, fall back to `[piece]`.

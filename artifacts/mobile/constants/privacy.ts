@@ -2,6 +2,11 @@ export type Visibility = "public" | "private";
 
 export interface PublicDataSettings {
   showTitle: boolean;
+  /**
+   * @deprecated No longer gates rendering. A public piece always shows its image
+   * on public surfaces; this field is kept only for Supabase payload round-trip
+   * compatibility with existing records. Do NOT reintroduce it as a display gate.
+   */
   showPhotos: boolean;
   showDescription: boolean;
   showClayBody: boolean;
@@ -34,9 +39,10 @@ export const DEFAULT_PUBLIC_DATA_SETTINGS: PublicDataSettings = {
 // fields are ever shown publicly. Technical/firing data (glaze name + recipe,
 // cone, firing environment, firing notes, price) stays in the owner's private
 // studio record and is deliberately NOT offered as a public toggle here.
+// The photo itself is NOT a toggle: a public piece always shows its image on
+// public surfaces (a gallery with hidden photos is just blank placeholders).
 export const PUBLIC_DATA_FIELDS: { key: keyof PublicDataSettings; label: string }[] = [
   { key: "showTitle", label: "Title" },
-  { key: "showPhotos", label: "Photos" },
   { key: "showDescription", label: "Studio Notes" },
   { key: "showClayBody", label: "Clay Body" },
   { key: "showDimensions", label: "Dimensions" },
