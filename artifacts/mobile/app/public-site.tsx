@@ -361,14 +361,14 @@ const styles = StyleSheet.create({
   },
   coverWrap: {
     width: "100%",
-    aspectRatio: 16 / 10,
+    aspectRatio: 2.2,
     borderRadius: 14,
     overflow: "hidden",
     marginBottom: 6,
   },
   coverPlaceholder: {
     width: "100%",
-    aspectRatio: 16 / 10,
+    aspectRatio: 2.2,
     borderRadius: 14,
     overflow: "hidden",
     marginBottom: 6,
@@ -395,15 +395,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   // Grid layout
-  gridWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 18 },
+  gridWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 16 },
   gridTile: {
-    width: "31.5%",
+    width: "32%",
     aspectRatio: 1,
     borderRadius: 8,
     overflow: "hidden",
   },
   // Editorial layout
-  editorialWrap: { gap: 14, marginTop: 14 },
+  editorialWrap: { gap: 12, marginTop: 14 },
   editorialTile: {
     width: "100%",
     aspectRatio: 4 / 3,
@@ -411,8 +411,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   // Masonry layout
-  masonryWrap: { flexDirection: "row", gap: 8, marginTop: 14 },
-  masonryCol: { flex: 1, gap: 8 },
+  masonryWrap: { flexDirection: "row", gap: 6, marginTop: 14 },
+  masonryCol: { flex: 1, gap: 6 },
   masonryTile: { width: "100%", borderRadius: 10, overflow: "hidden" },
   masonryTall: { aspectRatio: 0.78 },
   masonryShort: { aspectRatio: 1.1 },
