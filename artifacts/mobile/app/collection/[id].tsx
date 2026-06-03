@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -235,6 +236,7 @@ export default function CollectionDetailScreen() {
     collection?.featuredOnSite ?? false
   );
   const [coverImageUri, setCoverImageUri] = useState(collection?.coverImageUri ?? "");
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const pickingCover = useRef(false);
 
@@ -251,6 +253,7 @@ export default function CollectionDetailScreen() {
       if (!result.canceled && result.assets[0]?.uri) {
         const stored = await persistPieceImage(result.assets[0].uri);
         setCoverImageUri(stored);
+        setCoverPickerOpen(false);
       }
     } catch (e) {
       console.warn("Failed to pick collection cover", e);
@@ -270,9 +273,14 @@ export default function CollectionDetailScreen() {
     );
   }
 
-  // The cover image acts as a banner/intro. If a piece's image is the cover,
-  // skip it in the grid so the same image never appears twice.
-  const activeCover = (isEditing ? coverImageUri : collection.coverImageUri) || "";
+  // Display fallback order: explicit cover -> first piece in this collection.
+  const firstPieceImage = collectionPieces[0]?.imageUri ?? "";
+  const headerCover = (collection.coverImageUri || firstPieceImage) || "";
+  // The cover image acts as a banner/intro. While editing only the explicit
+  // selection is shown (so Remove visibly clears it); otherwise the resolved
+  // fallback is used. If a piece's image is the cover, skip it in the grid so
+  // the same image never appears twice.
+  const activeCover = isEditing ? coverImageUri || "" : headerCover;
   const gridPieces = activeCover
     ? collectionPieces.filter((p) => p.imageUri !== activeCover)
     : collectionPieces;
@@ -330,59 +338,68 @@ export default function CollectionDetailScreen() {
         ListHeaderComponent={
           <View style={styles.header}>
             {isEditing ? (
-              coverImageUri ? (
-                <View style={styles.coverWrap}>
-                  <Image
-                    source={resolveImageSource(coverImageUri)}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="cover"
-                    transition={220}
-                    cachePolicy="memory-disk"
-                    recyclingKey={coverImageUri}
-                  />
-                  <View style={styles.coverActions}>
-                    <Pressable
-                      style={[styles.coverBtn, { backgroundColor: "rgba(253,250,245,0.92)" }]}
-                      onPress={pickCover}
-                    >
-                      <Feather name="refresh-cw" size={13} color="#8A7B6C" />
-                      <Text style={[styles.coverBtnText, { color: "#8A7B6C" }]}>Replace</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.coverBtn, { backgroundColor: "rgba(253,250,245,0.92)" }]}
-                      onPress={() => setCoverImageUri("")}
-                    >
-                      <Feather name="trash-2" size={13} color={colors.destructive} />
-                      <Text style={[styles.coverBtnText, { color: colors.destructive }]}>Remove</Text>
-                    </Pressable>
+              <View style={styles.coverSection}>
+                <Text style={[styles.coverSectionLabel, { color: colors.mutedForeground }]}>
+                  Collection Cover
+                </Text>
+                {coverImageUri ? (
+                  <View style={styles.coverWrap}>
+                    <Image
+                      source={resolveImageSource(coverImageUri)}
+                      style={StyleSheet.absoluteFill}
+                      contentFit="cover"
+                      transition={220}
+                      cachePolicy="memory-disk"
+                      recyclingKey={coverImageUri}
+                    />
+                    <View style={styles.coverActions}>
+                      <Pressable
+                        style={[styles.coverBtn, { backgroundColor: "rgba(253,250,245,0.92)" }]}
+                        onPress={() => setCoverPickerOpen(true)}
+                      >
+                        <Feather name="refresh-cw" size={13} color="#8A7B6C" />
+                        <Text style={[styles.coverBtnText, { color: "#8A7B6C" }]}>Replace</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.coverBtn, { backgroundColor: "rgba(253,250,245,0.92)" }]}
+                        onPress={() => setCoverImageUri("")}
+                      >
+                        <Feather name="trash-2" size={13} color={colors.destructive} />
+                        <Text style={[styles.coverBtnText, { color: colors.destructive }]}>Remove</Text>
+                      </Pressable>
+                    </View>
                   </View>
-                </View>
-              ) : (
-                <Pressable
-                  style={[styles.coverPicker, { backgroundColor: colors.secondary, borderColor: "rgba(120,110,100,0.2)" }]}
-                  onPress={pickCover}
-                >
-                  <Feather name="image" size={20} color={colors.mutedForeground} style={{ opacity: 0.5 }} />
-                  <Text style={[styles.coverPickerText, { color: colors.mutedForeground }]}>
-                    Choose a cover image
-                  </Text>
-                  <Text style={[styles.coverPickerHint, { color: colors.mutedForeground }]}>
-                    Falls back to a public piece if left empty
-                  </Text>
-                </Pressable>
-              )
-            ) : collection.coverImageUri ? (
+                ) : (
+                  <Pressable
+                    style={[
+                      styles.coverChooseBtn,
+                      { backgroundColor: colors.secondary, borderColor: "rgba(120,110,100,0.22)" },
+                    ]}
+                    onPress={() => setCoverPickerOpen(true)}
+                  >
+                    <Feather name="image" size={15} color={colors.mutedForeground} />
+                    <Text style={[styles.coverChooseBtnText, { color: colors.foreground }]}>
+                      Choose Cover Image
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            ) : headerCover ? (
               <View style={styles.coverWrap}>
                 <Image
-                  source={resolveImageSource(collection.coverImageUri)}
+                  source={resolveImageSource(headerCover)}
                   style={StyleSheet.absoluteFill}
                   contentFit="cover"
                   transition={220}
                   cachePolicy="memory-disk"
-                  recyclingKey={collection.coverImageUri}
+                  recyclingKey={headerCover}
                 />
               </View>
-            ) : null}
+            ) : (
+              <View style={[styles.coverPlaceholder, { backgroundColor: colors.secondary }]}>
+                <Feather name="layers" size={26} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
+              </View>
+            )}
             <Text style={[styles.eyebrow, { color: colors.cobalt }]}>GlazeVault</Text>
             {isEditing ? (
               <TextInput
@@ -680,6 +697,87 @@ export default function CollectionDetailScreen() {
           </Pressable>
         )}
       </View>
+
+      <Modal
+        visible={coverPickerOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCoverPickerOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setCoverPickerOpen(false)}
+        />
+        <View
+          style={[
+            styles.modalSheet,
+            { backgroundColor: colors.background, paddingBottom: insets.bottom + 20 },
+          ]}
+        >
+          <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
+          <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+            Choose Cover Image
+          </Text>
+          <Pressable
+            style={[styles.uploadBtn, { borderColor: "rgba(120,110,100,0.22)", backgroundColor: colors.secondary }]}
+            onPress={pickCover}
+          >
+            <Feather name="upload" size={15} color={colors.foreground} />
+            <Text style={[styles.uploadBtnText, { color: colors.foreground }]}>
+              Upload from library
+            </Text>
+          </Pressable>
+          {collectionPieces.length > 0 ? (
+            <>
+              <Text style={[styles.modalSubLabel, { color: colors.mutedForeground }]}>
+                From this collection
+              </Text>
+              <FlatList
+                data={collectionPieces}
+                keyExtractor={(item) => item.id}
+                numColumns={3}
+                columnWrapperStyle={styles.gridRow}
+                contentContainerStyle={styles.gridContent}
+                showsVerticalScrollIndicator={false}
+                renderItem={({ item }) => {
+                  const selected = item.imageUri === coverImageUri;
+                  return (
+                    <Pressable
+                      style={[
+                        styles.gridItem,
+                        { backgroundColor: colors.secondary },
+                        selected && { borderColor: colors.cobalt, borderWidth: 2 },
+                      ]}
+                      onPress={() => {
+                        setCoverImageUri(item.imageUri);
+                        setCoverPickerOpen(false);
+                      }}
+                    >
+                      <Image
+                        source={resolveImageSource(item.imageUri)}
+                        style={StyleSheet.absoluteFill}
+                        contentFit="cover"
+                        transition={160}
+                        cachePolicy="memory-disk"
+                        recyclingKey={item.imageUri}
+                      />
+                      {selected ? (
+                        <View style={[styles.gridCheck, { backgroundColor: colors.cobalt }]}>
+                          <Feather name="check" size={13} color="#FFFFFF" />
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                }}
+              />
+            </>
+          ) : (
+            <Text style={[styles.modalEmpty, { color: colors.mutedForeground }]}>
+              Add pieces to this collection to choose a cover from them.
+            </Text>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -715,6 +813,15 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 20,
   },
+  coverPlaceholder: {
+    width: "100%",
+    aspectRatio: 16 / 10,
+    borderRadius: 14,
+    overflow: "hidden",
+    marginBottom: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   coverActions: {
     position: "absolute",
     bottom: 10,
@@ -743,6 +850,95 @@ const styles = StyleSheet.create({
   },
   coverPickerText: { fontSize: 13, fontFamily: "Poppins_400Regular", letterSpacing: 0.2 },
   coverPickerHint: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
+  coverSection: { marginBottom: 20 },
+  coverSectionLabel: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+    marginBottom: 10,
+  },
+  coverChooseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 15,
+    borderRadius: 14,
+    borderWidth: 0.75,
+  },
+  coverChooseBtnText: { fontSize: 13, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(40,34,28,0.32)",
+  },
+  modalSheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    maxHeight: "82%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+  },
+  modalHandle: {
+    alignSelf: "center",
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.2,
+    marginBottom: 16,
+  },
+  uploadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 0.75,
+    marginBottom: 20,
+  },
+  uploadBtnText: { fontSize: 13, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
+  modalSubLabel: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+    marginBottom: 12,
+  },
+  gridRow: { gap: 10 },
+  gridContent: { gap: 10, paddingBottom: 8 },
+  gridItem: {
+    flex: 1 / 3,
+    aspectRatio: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  gridCheck: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalEmpty: {
+    fontSize: 13,
+    fontFamily: "Poppins_400Regular",
+    letterSpacing: 0.2,
+    lineHeight: 20,
+    paddingVertical: 8,
+  },
   eyebrow: {
     fontSize: 11,
     fontFamily: "Poppins_500Medium",

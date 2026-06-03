@@ -207,7 +207,11 @@ export default function PublicSiteScreen() {
                     recyclingKey={coverUri}
                   />
                 </Pressable>
-              ) : null}
+              ) : (
+                <View style={[styles.coverPlaceholder, { backgroundColor: colors.secondary }]}>
+                  <Feather name="layers" size={26} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
+                </View>
+              )}
               <Text style={[styles.collectionTitle, { color: colors.foreground }]}>
                 {collection.title}
               </Text>
@@ -329,6 +333,15 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: "hidden",
     marginBottom: 16,
+  },
+  coverPlaceholder: {
+    width: "100%",
+    aspectRatio: 16 / 10,
+    borderRadius: 14,
+    overflow: "hidden",
+    marginBottom: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   collectionTitle: {
     fontSize: 24,
