@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ImageViewer, type ViewerItem } from "@/components/ImageViewer";
 import { ShareSheet } from "@/components/ShareSheet";
 import { PUBLIC_DATA_FIELDS } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
@@ -55,6 +56,7 @@ export default function PieceDetailScreen() {
   const [shareVisible, setShareVisible] = useState(false);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
   const [updatingCollection, setUpdatingCollection] = useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
 
   // On focus, re-read the latest piece from global state by id (single source of
   // truth) so the public preview always reflects the current saved visibility.
@@ -78,6 +80,24 @@ export default function PieceDetailScreen() {
   }
 
   const currentCollection = collections.find((c) => c.id === piece.collectionId) ?? null;
+
+  // Pieces the fullscreen viewer can swipe through. In the public preview we keep
+  // it to this piece alone so private work is never reachable; when opened from a
+  // collection we stay within that collection; otherwise the whole archive.
+  const galleryPieces = (() => {
+    if (isPublicView) return [piece];
+    const scoped = from ? pieces.filter((p) => p.collectionId === from) : pieces;
+    return scoped.some((p) => p.id === piece.id) ? scoped : [piece];
+  })();
+  const viewerItems: ViewerItem[] = galleryPieces.map((p) => ({
+    uri: p.imageUri,
+    title: p.title,
+    materials: [p.clay, p.glaze].filter(Boolean).join("  ·  "),
+  }));
+  const viewerIndex = Math.max(
+    0,
+    galleryPieces.findIndex((p) => p.id === piece.id),
+  );
 
   const handleFavorite = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -299,13 +319,19 @@ export default function PieceDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
       >
-        {/* Hero image */}
-        <Image
-          source={resolveImageSource(piece.imageUri)}
-          style={styles.heroImage}
-          contentFit="cover"
-          transition={200}
-        />
+        {/* Hero image — tap to open the fullscreen viewer */}
+        <Pressable
+          onPress={() => setViewerVisible(true)}
+          accessibilityRole="imagebutton"
+          accessibilityLabel={`View ${piece.title} fullscreen`}
+        >
+          <Image
+            source={resolveImageSource(piece.imageUri)}
+            style={styles.heroImage}
+            contentFit="cover"
+            transition={200}
+          />
+        </Pressable>
 
         {/* Content */}
         <View style={styles.content}>
@@ -716,6 +742,13 @@ export default function PieceDetailScreen() {
         visible={shareVisible}
         onClose={() => setShareVisible(false)}
         pieceTitle={piece.title}
+      />
+
+      <ImageViewer
+        visible={viewerVisible}
+        items={viewerItems}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerVisible(false)}
       />
     </View>
   );
