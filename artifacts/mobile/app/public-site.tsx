@@ -93,12 +93,15 @@ export default function PublicSiteScreen() {
   // Asymmetric "art book" rhythm for the default layout: alternating large /
   // small pairs with staggered offsets and an occasional full-width cinematic
   // image, separated by generous negative space.
-  const renderCatalog = (cp: PublicPiece[]) => {
+  const renderCatalog = (cp: PublicPiece[], seed = 0) => {
     const rows: React.ReactNode[] = [];
     let i = 0;
     let rowIndex = 0;
     while (i < cp.length) {
       const remaining = cp.length - i;
+      // Seed the rhythm with the collection index so alignment and offsets vary
+      // across collections instead of every lone piece hugging the same side.
+      const beat = rowIndex + seed;
       // An occasional full-bleed cinematic image breaks up the pair rhythm.
       const wideRow = rowIndex % 3 === 2 && remaining >= 2;
       if (wideRow) {
@@ -107,20 +110,20 @@ export default function PublicSiteScreen() {
         );
         i += 1;
       } else if (remaining === 1) {
-        // A lone piece sits offset with negative space beside it, rather than a
-        // full-width band — keeps an airy, asymmetric art-book feel.
-        const alignEnd = rowIndex % 2 === 1;
+        // A lone piece sits offset with negative space beside it, alternating
+        // side and drop so collections don't stack identically on the left.
+        const alignEnd = beat % 2 === 1;
         rows.push(
           <View
             key={`row-${rowIndex}`}
             style={[styles.catalogSoloRow, alignEnd ? styles.soloEnd : styles.soloStart]}
           >
-            {renderTile(cp[i], styles.catalogSolo)}
+            {renderTile(cp[i], [styles.catalogSolo, alignEnd ? styles.catalogSoloDrop : null])}
           </View>,
         );
         i += 1;
       } else {
-        const largeLeft = rowIndex % 2 === 0;
+        const largeLeft = beat % 2 === 0;
         const a = cp[i];
         const b = cp[i + 1];
         rows.push(
@@ -132,7 +135,7 @@ export default function PublicSiteScreen() {
               </>
             ) : (
               <>
-                {renderTile(a, [styles.catalogSmall, styles.catalogStagger])}
+                {renderTile(a, [styles.catalogSmall, styles.catalogStaggerDeep])}
                 {renderTile(b, styles.catalogLarge)}
               </>
             )}
@@ -145,7 +148,7 @@ export default function PublicSiteScreen() {
     return <View style={styles.catalogWrap}>{rows}</View>;
   };
 
-  const renderPieces = (collectionPieces: PublicPiece[]) => {
+  const renderPieces = (collectionPieces: PublicPiece[], seed = 0) => {
     if (layout === "editorial") {
       return (
         <View style={styles.editorialWrap}>
@@ -167,7 +170,7 @@ export default function PublicSiteScreen() {
         </View>
       );
     }
-    return renderCatalog(collectionPieces);
+    return renderCatalog(collectionPieces, seed);
   };
 
   return (
@@ -286,7 +289,7 @@ export default function PublicSiteScreen() {
                   <Feather name="layers" size={26} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
                 </View>
               )}
-              {gridPieces.length > 0 ? renderPieces(gridPieces) : null}
+              {gridPieces.length > 0 ? renderPieces(gridPieces, index) : null}
             </View>
           ))
         )}
@@ -453,11 +456,13 @@ const styles = StyleSheet.create({
   catalogLarge: { flex: 1.6, aspectRatio: 0.82, borderRadius: 12, overflow: "hidden" },
   catalogSmall: { flex: 1, aspectRatio: 0.92, borderRadius: 12, overflow: "hidden" },
   catalogStagger: { marginTop: 30 },
+  catalogStaggerDeep: { marginTop: 48 },
   catalogWide: { width: "100%", aspectRatio: 16 / 9, borderRadius: 12, overflow: "hidden" },
   catalogSoloRow: { flexDirection: "row" },
   soloStart: { justifyContent: "flex-start" },
   soloEnd: { justifyContent: "flex-end" },
   catalogSolo: { width: "68%", aspectRatio: 0.86, borderRadius: 12, overflow: "hidden" },
+  catalogSoloDrop: { marginTop: 36 },
   // Editorial layout
   editorialWrap: { gap: 12, marginTop: 14 },
   editorialTile: {
