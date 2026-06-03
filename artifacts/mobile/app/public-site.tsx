@@ -50,7 +50,9 @@ export default function PublicSiteScreen() {
       const fallback = cp.find((p) => p.publicDataSettings.showPhotos) ?? null;
       const coverUri = c.coverImageUri || fallback?.imageUri || null;
       const coverPieceId = c.coverImageUri ? null : (fallback?.id ?? null);
-      return { collection: c, pieces: cp, coverUri, coverPieceId };
+      // Never repeat the cover artwork in the grid directly beneath it.
+      const gridPieces = coverUri ? cp.filter((p) => p.imageUri !== coverUri) : cp;
+      return { collection: c, pieces: cp, coverUri, coverPieceId, gridPieces };
     })
     .filter((entry) => entry.pieces.length > 0);
 
@@ -88,6 +90,61 @@ export default function PublicSiteScreen() {
     );
   };
 
+  // Asymmetric "art book" rhythm for the default layout: alternating large /
+  // small pairs with staggered offsets and an occasional full-width cinematic
+  // image, separated by generous negative space.
+  const renderCatalog = (cp: PublicPiece[]) => {
+    const rows: React.ReactNode[] = [];
+    let i = 0;
+    let rowIndex = 0;
+    while (i < cp.length) {
+      const remaining = cp.length - i;
+      // An occasional full-bleed cinematic image breaks up the pair rhythm.
+      const wideRow = rowIndex % 3 === 2 && remaining >= 2;
+      if (wideRow) {
+        rows.push(
+          <View key={`row-${rowIndex}`}>{renderTile(cp[i], styles.catalogWide)}</View>,
+        );
+        i += 1;
+      } else if (remaining === 1) {
+        // A lone piece sits offset with negative space beside it, rather than a
+        // full-width band — keeps an airy, asymmetric art-book feel.
+        const alignEnd = rowIndex % 2 === 1;
+        rows.push(
+          <View
+            key={`row-${rowIndex}`}
+            style={[styles.catalogSoloRow, alignEnd ? styles.soloEnd : styles.soloStart]}
+          >
+            {renderTile(cp[i], styles.catalogSolo)}
+          </View>,
+        );
+        i += 1;
+      } else {
+        const largeLeft = rowIndex % 2 === 0;
+        const a = cp[i];
+        const b = cp[i + 1];
+        rows.push(
+          <View key={`row-${rowIndex}`} style={styles.catalogPairRow}>
+            {largeLeft ? (
+              <>
+                {renderTile(a, styles.catalogLarge)}
+                {renderTile(b, [styles.catalogSmall, styles.catalogStagger])}
+              </>
+            ) : (
+              <>
+                {renderTile(a, [styles.catalogSmall, styles.catalogStagger])}
+                {renderTile(b, styles.catalogLarge)}
+              </>
+            )}
+          </View>,
+        );
+        i += 2;
+      }
+      rowIndex += 1;
+    }
+    return <View style={styles.catalogWrap}>{rows}</View>;
+  };
+
   const renderPieces = (collectionPieces: PublicPiece[]) => {
     if (layout === "editorial") {
       return (
@@ -110,11 +167,7 @@ export default function PublicSiteScreen() {
         </View>
       );
     }
-    return (
-      <View style={styles.gridWrap}>
-        {collectionPieces.map((p) => renderTile(p, styles.gridTile))}
-      </View>
-    );
+    return renderCatalog(collectionPieces);
   };
 
   return (
@@ -188,7 +241,7 @@ export default function PublicSiteScreen() {
             </Text>
           </View>
         ) : (
-          featured.map(({ collection, pieces: cp, coverUri, coverPieceId }, index) => (
+          featured.map(({ collection, pieces: cp, coverUri, coverPieceId, gridPieces }, index) => (
             <View key={collection.id} style={styles.collectionSection}>
               {index > 0 ? (
                 <View style={styles.chapterBreak}>
@@ -233,7 +286,7 @@ export default function PublicSiteScreen() {
                   <Feather name="layers" size={26} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
                 </View>
               )}
-              {renderPieces(cp)}
+              {gridPieces.length > 0 ? renderPieces(gridPieces) : null}
             </View>
           ))
         )}
@@ -361,14 +414,14 @@ const styles = StyleSheet.create({
   },
   coverWrap: {
     width: "100%",
-    aspectRatio: 2.2,
+    aspectRatio: 16 / 9,
     borderRadius: 14,
     overflow: "hidden",
     marginBottom: 6,
   },
   coverPlaceholder: {
     width: "100%",
-    aspectRatio: 2.2,
+    aspectRatio: 16 / 9,
     borderRadius: 14,
     overflow: "hidden",
     marginBottom: 6,
@@ -394,14 +447,17 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: 12,
   },
-  // Grid layout
-  gridWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 16 },
-  gridTile: {
-    width: "32%",
-    aspectRatio: 1,
-    borderRadius: 8,
-    overflow: "hidden",
-  },
+  // Catalog layout (asymmetric art-book rhythm)
+  catalogWrap: { gap: 30, marginTop: 18 },
+  catalogPairRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  catalogLarge: { flex: 1.6, aspectRatio: 0.82, borderRadius: 12, overflow: "hidden" },
+  catalogSmall: { flex: 1, aspectRatio: 0.92, borderRadius: 12, overflow: "hidden" },
+  catalogStagger: { marginTop: 30 },
+  catalogWide: { width: "100%", aspectRatio: 16 / 9, borderRadius: 12, overflow: "hidden" },
+  catalogSoloRow: { flexDirection: "row" },
+  soloStart: { justifyContent: "flex-start" },
+  soloEnd: { justifyContent: "flex-end" },
+  catalogSolo: { width: "68%", aspectRatio: 0.86, borderRadius: 12, overflow: "hidden" },
   // Editorial layout
   editorialWrap: { gap: 12, marginTop: 14 },
   editorialTile: {

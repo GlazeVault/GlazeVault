@@ -15,3 +15,8 @@ description: How collection cover images are chosen, displayed, and deduped
 On web (preview iframe), ImagePicker returns a `blob:` URI. `fetch(blob:)` FAILS inside the sandboxed preview iframe, so `persistPieceImage` (which fetches the blob) silently throws and the image is never applied.
 **Fix pattern (must use for every web image picker):** call `launchImageLibraryAsync({ base64: Platform.OS === "web" })` and build a `data:` URI from `asset.base64` directly — never fetch the blob. Native still uses `persistPieceImage`.
 Cover upload also persists immediately via `updateCollection` (not deferred to Save). `uploadImage` skips http(s) URIs, so a later Save never re-uploads. `readImageBytes`/`uploadImage` both accept `data:` URIs.
+
+## Public-site cover & catalog layout
+- Public site must dedup the cover artwork from the grid (mirror collection detail): `gridPieces = coverUri ? cp.filter(p => p.imageUri !== coverUri) : cp`, render grid only when non-empty. Without this the cover repeats immediately below.
+- The `HomepageLayout` key `"grid"` was repurposed into an asymmetric "art-book catalog" (`renderCatalog`): alternating large+small staggered pairs, occasional full-bleed wide image, lone trailing piece as an offset 68%-width "solo". Stored key stays `"grid"` (no migration); only its settings label/hint changed to "Catalog".
+- Collection cover aspect ratio has see-sawed by request: settled on 16/9 cinematic banner (tried 16/10 = too dominant, 2.2 = too compressed). Piece-count metadata uses full collection count, not deduped count.

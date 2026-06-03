@@ -26,7 +26,7 @@ export const DEFAULT_PUBLIC_SITE: PublicSiteSettings = {
 };
 
 export const HOMEPAGE_LAYOUTS: { key: HomepageLayout; label: string; hint: string }[] = [
-  { key: "grid", label: "Grid", hint: "Even three-column gallery" },
+  { key: "grid", label: "Catalog", hint: "Asymmetric art-book rhythm" },
   { key: "editorial", label: "Editorial", hint: "Large stacked features" },
   { key: "masonry", label: "Masonry", hint: "Staggered two-column flow" },
 ];
