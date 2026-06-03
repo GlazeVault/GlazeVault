@@ -1,0 +1,179 @@
+Redesign the Archive → Collections → Portfolio logic to be extremely simple, human, and artist-friendly.
+
+CORE UX PRINCIPLE
+
+The app should NOT feel like:
+- managing visibility settings
+- configuring public/private permissions
+- database administration
+
+It SHOULD feel like:
+- organizing artwork
+- building a body of work
+- preparing an exhibition
+- creating a beautiful portfolio naturally
+
+--------------------------------------------------
+NEW STRUCTURE
+--------------------------------------------------
+
+ARCHIVE
+= private studio workspace
+All pieces live here first by default.
+
+COLLECTIONS
+= curated groups / series / exhibitions
+
+PORTFOLIO
+= automatically generated public site
+
+Public Collections automatically appear in the Portfolio.
+
+--------------------------------------------------
+1. ARCHIVE BEHAVIOR
+--------------------------------------------------
+
+When adding a new piece:
+
+Default flow:
+- Add Piece
+- Save to Archive automatically
+
+Archive should feel:
+- private
+- safe
+- calm
+- like a studio shelf
+
+All new pieces default to:
+PRIVATE
+
+--------------------------------------------------
+2. COLLECTION FLOW
+--------------------------------------------------
+
+After saving a piece:
+
+Show simple prompt:
+
+"Add this piece to a Collection?"
+
+Buttons:
+- Choose Collection
+- Create New Collection
+- Later
+
+Do NOT use technical language like:
+- assign relationship
+- manage visibility
+- taxonomy
+
+Use human language only.
+
+--------------------------------------------------
+3. COLLECTION PUBLIC LOGIC
+--------------------------------------------------
+
+Collections become the primary public publishing unit.
+
+If a Collection is marked:
+"Show in Portfolio"
+
+Then:
+- all included public-ready pieces appear automatically in Portfolio
+- Portfolio updates automatically
+
+Collections should feel like:
+- exhibition groups
+- series
+- curated bodies of work
+
+--------------------------------------------------
+4. REMOVE VISIBILITY CONFUSION
+--------------------------------------------------
+
+Reduce reliance on:
+- individual piece public toggles
+- complicated publicDataSettings
+- feature flags
+
+Most artists should NOT need to think about:
+- public/private architecture
+- metadata permissions
+
+--------------------------------------------------
+5. AUTOMATIC PUBLIC DEFAULTS
+--------------------------------------------------
+
+When a Collection is shown in Portfolio,
+automatically display these fields publicly:
+
+- Title
+- Photos
+- Clay Body / Material
+- Dimensions
+- Year
+
+Keep these private by default:
+- glaze recipe
+- firing logs
+- studio notes
+- technical records
+
+--------------------------------------------------
+6. TERMINOLOGY REFINEMENT
+--------------------------------------------------
+
+Replace confusing labels:
+
+Instead of:
+- Public
+- Private
+- Feature on Site
+
+Use:
+- Show in Portfolio
+- Hidden from Portfolio
+
+Collections should feel like:
+"Prepare for Exhibition"
+
+not:
+"Configure permissions"
+
+--------------------------------------------------
+7. PORTFOLIO ROLE
+--------------------------------------------------
+
+Portfolio is NOT a separate content system.
+
+Portfolio is:
+- automatically generated
+- built from Public Collections
+- artist website output
+
+Portfolio tab should focus on:
+- public preview
+- ordering
+- featured collections
+- bio
+- artist statement
+- sharing
+
+NOT artwork management.
+
+--------------------------------------------------
+8. DESIGN DIRECTION
+--------------------------------------------------
+
+Preserve:
+- calm Japandi aesthetic
+- editorial gallery mood
+- atmospheric pacing
+- soft typography
+- artwork-first presentation
+
+The experience should feel:
+simple, warm, human, intuitive.
+
+An 80-year-old ceramic artist should understand it immediately.
