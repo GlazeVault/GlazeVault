@@ -39,7 +39,7 @@ interface PotteryContextType {
       PotteryPiece,
       "id" | "createdAt" | "isFavorite" | "visibility" | "publicDataSettings"
     >
-  ) => Promise<void>;
+  ) => Promise<PotteryPiece>;
   updatePiece: (id: string, updates: Partial<PotteryPiece>) => Promise<void>;
   deletePiece: (id: string) => Promise<void>;
   removePieceFromCollection: (collectionId: string, pieceId: string) => Promise<void>;
@@ -249,6 +249,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
       };
       await persist([newPiece, ...current]);
       await pushPieceRemote(newPiece);
+      return newPiece;
     },
     [persist, pushPieceRemote]
   );
@@ -264,9 +265,6 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
             const firingEnvironment = merged.firingEnvironment || merged.firing || "";
             merged.firingEnvironment = firingEnvironment;
             merged.firing = firingEnvironment;
-          }
-          if (updates.visibility !== undefined) {
-            console.log("Saved piece visibility:", merged.id, merged.visibility);
           }
           return merged;
         })

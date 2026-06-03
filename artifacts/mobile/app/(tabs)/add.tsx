@@ -157,11 +157,32 @@ export default function AddScreen() {
       Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
       return;
     }
-    await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), year: year.trim(), imageUri: storedImageUri, collectionId });
+    const created = await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), year: year.trim(), imageUri: storedImageUri, collectionId });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const wasUncollected = !collectionId;
     setImageUri(null); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear())); setCollectionId(undefined);
     setSaving(false);
     router.replace("/");
+    // Pieces only become public through a collection that's in the portfolio.
+    // When the piece isn't in one yet, nudge the maker to add it — Later is fine.
+    if (wasUncollected) {
+      Alert.alert(
+        "Add this piece to a Collection?",
+        "Collections are how pieces appear in your portfolio. You can always do this later.",
+        [
+          {
+            text: "Choose a Collection",
+            onPress: () => router.push({ pathname: "/piece/[id]", params: { id: created.id } }),
+          },
+          {
+            text: "Create New",
+            onPress: () =>
+              router.push({ pathname: "/collection/new", params: { attachPieceId: created.id } }),
+          },
+          { text: "Later", style: "cancel" },
+        ]
+      );
+    }
   };
 
   const Field = ({ value, onChange, placeholder, multiline = false }: {

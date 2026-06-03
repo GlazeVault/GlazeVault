@@ -6,10 +6,9 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-n
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  PublicDataSettings,
   buildPublicMetaLine,
   getPublicCollectionPieces,
-  isCollectionFeatured,
+  isCollectionInPortfolio,
 } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
@@ -29,7 +28,6 @@ interface PublicPiece {
   clay: string;
   dimensions: string;
   year: string;
-  publicDataSettings: PublicDataSettings;
 }
 
 function ExpandableIntro({ text, color }: { text: string; color: string }) {
@@ -73,14 +71,15 @@ export default function PublicSiteScreen() {
   const site = profile.publicSite;
   const layout: HomepageLayout = site.homepageLayout;
 
-  // Privacy: only public collections explicitly featured on the site, each
-  // reduced to its public pieces. Featuring lives on the collection itself.
+  // Privacy: only collections shown in the portfolio, each reduced to its public
+  // pieces (any piece in the collection that has a photo). Portfolio membership
+  // lives on the collection itself via a single switch.
   const featured = collections
-    .filter(isCollectionFeatured)
+    .filter(isCollectionInPortfolio)
     .map((c) => {
       const cp = getPublicCollectionPieces(c, pieces) as PublicPiece[];
-      // Prefer the artist-chosen cover. Otherwise fall back to a public piece
-      // that itself allows photos, so a hidden image never leaks through.
+      // Prefer the artist-chosen cover. Otherwise fall back to a piece that has
+      // a photo.
       const fallback = cp.find((p) => p.imageUri) ?? null;
       const coverUri = c.coverImageUri || fallback?.imageUri || null;
       const coverPieceId = c.coverImageUri ? null : (fallback?.id ?? null);
@@ -100,11 +99,11 @@ export default function PublicSiteScreen() {
   const initial = profile.name.trim().charAt(0).toUpperCase();
 
   // A quiet, editorial caption beneath each piece: serif title + a single
-  // whispered metadata line built from the piece's own publicDataSettings via the
-  // shared buildPublicMetaLine helper, so cards, collections and the detail page
-  // always render the exact same string. Empty/disabled fields drop out.
+  // whispered metadata line built via the shared buildPublicMetaLine helper, so
+  // cards, collections and the detail page always render the exact same string.
+  // Empty fields drop out.
   const renderCaption = (piece: PublicPiece) => {
-    const title = piece.publicDataSettings.showTitle ? piece.title.trim() : "";
+    const title = piece.title.trim();
     const meta = buildPublicMetaLine(piece);
     if (!title && !meta) return null;
     return (
@@ -244,7 +243,7 @@ export default function PublicSiteScreen() {
         ]}
       >
         {/* Masthead */}
-        <Text style={[styles.eyebrow, { color: colors.emerald }]}>Public Site</Text>
+        <Text style={[styles.eyebrow, { color: colors.emerald }]}>Portfolio</Text>
         <View style={styles.masthead}>
           {profile.avatarUri ? (
             <Image source={resolveImageSource(profile.avatarUri)} style={styles.avatar} contentFit="cover" />
@@ -299,9 +298,9 @@ export default function PublicSiteScreen() {
             <View style={[styles.emptyCircle, { backgroundColor: colors.secondary }]}>
               <Feather name="layers" size={20} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Nothing featured yet</Text>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Nothing in your portfolio yet</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              Feature a public collection with public pieces to fill your site.
+              Turn on “Show in Portfolio” for a collection with photographed pieces to fill your site.
             </Text>
           </View>
         ) : (

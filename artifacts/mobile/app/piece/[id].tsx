@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useState } from "react";
 import {
   Alert,
   Modal,
@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ImageViewer, type ViewerItem } from "@/components/ImageViewer";
 import { ShareSheet } from "@/components/ShareSheet";
-import { PUBLIC_DATA_FIELDS, buildPublicMetaLine, isPubliclyVisiblePiece } from "@/constants/privacy";
+import { buildPublicMetaLine, isPubliclyVisiblePiece } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
@@ -58,17 +58,6 @@ export default function PieceDetailScreen() {
   const [updatingCollection, setUpdatingCollection] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
 
-  // On focus, re-read the latest piece from global state by id (single source of
-  // truth) so the public preview always reflects the current saved visibility.
-  useFocusEffect(
-    useCallback(() => {
-      const latestPiece = pieces.find((p) => p.id === id);
-      if (latestPiece && isPublicView) {
-        console.log("Preview loaded piece visibility:", latestPiece.id, latestPiece.visibility);
-      }
-    }, [pieces, id, isPublicView])
-  );
-
   if (!piece) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
@@ -103,13 +92,11 @@ export default function PieceDetailScreen() {
   })();
   const viewerItems: ViewerItem[] = galleryPieces.map((p) => {
     if (isPublicView) {
-      // Captions honor each piece's own public display toggles via the shared
-      // buildPublicMetaLine helper, so the fullscreen viewer reads identically to
-      // the detail page and the portfolio cards.
-      const s = p.publicDataSettings;
+      // Captions use the shared buildPublicMetaLine helper, so the fullscreen
+      // viewer reads identically to the detail page and the portfolio cards.
       return {
         uri: p.imageUri,
-        title: s.showTitle ? p.title : undefined,
+        title: p.title,
         materials: buildPublicMetaLine(p),
       };
     }
@@ -193,43 +180,12 @@ export default function PieceDetailScreen() {
     year: "numeric",
   });
 
-  const pds = piece.publicDataSettings;
-
-  const togglePublicField = async (key: (typeof PUBLIC_DATA_FIELDS)[number]["key"]) => {
-    await Haptics.selectionAsync();
-    await updatePiece(piece.id, {
-      publicDataSettings: { ...piece.publicDataSettings, [key]: !piece.publicDataSettings[key] },
-    });
-  };
-
-  // Quick action: reveal the public-facing details in one tap. Only the
-  // gallery-friendly fields exist publicly — technical/firing data is never
-  // shared, so it is intentionally absent here.
-  const showAllPublicDetails = async () => {
-    await Haptics.selectionAsync();
-    await updatePiece(piece.id, {
-      publicDataSettings: {
-        ...piece.publicDataSettings,
-        showTitle: true,
-        showDescription: true,
-        showClayBody: true,
-        showDimensions: true,
-        showYear: true,
-      },
-    });
-  };
-
-  // Public preview: how this piece appears to others. Only fields enabled in
-  // publicDataSettings are shown. This owner-facing preview keys off the piece's
-  // own visibility only — collection-level privacy is enforced separately at the
-  // public-site listing layer (getPublicCollectionPieces / isCollectionFeatured),
-  // so it never surfaces a private-collection piece to non-owners.
+  // Public preview: how this piece appears to others. A piece is public iff its
+  // collection is in the portfolio AND it has a photo — there are no per-piece
+  // publishing controls. isPubliclyVisiblePiece is the single source of truth.
   if (isPublicView) {
     const latestPiece = pieces.find((p) => p.id === id);
-    console.log("PUBLIC PREVIEW pieceId:", id);
-    console.log("PUBLIC PREVIEW latestPiece:", latestPiece);
-    console.log("PUBLIC PREVIEW visibility:", latestPiece?.visibility);
-    if (!latestPiece || latestPiece.visibility !== "public") {
+    if (!latestPiece || !isPubliclyVisiblePiece(latestPiece, collections)) {
       return (
         <View style={[styles.center, { backgroundColor: colors.background }]}>
           <View style={[styles.privateCircle, { backgroundColor: colors.secondary }]}>
@@ -237,7 +193,7 @@ export default function PieceDetailScreen() {
           </View>
           <Text style={[styles.privateTitle, { color: colors.foreground }]}>This piece is private</Text>
           <Text style={[styles.privateText, { color: colors.mutedForeground }]}>
-            It isn’t visible on your public profile.
+            Add its collection to your portfolio to publish it.
           </Text>
           <Pressable
             style={({ pressed }) => [styles.privateBack, { opacity: pressed ? 0.6 : 1 }]}
@@ -249,9 +205,8 @@ export default function PieceDetailScreen() {
       );
     }
 
-    // One quiet, editorial metadata line driven entirely by this piece's public
-    // display toggles (shared with the portfolio cards + fullscreen viewer via
-    // buildPublicMetaLine), so any enabled field that has a value shows, and the
+    // One quiet, editorial metadata line (clay · dimensions · year) shared with
+    // the portfolio cards + fullscreen viewer via buildPublicMetaLine, so the
     // same string renders identically on every public surface.
     const publicMeta = buildPublicMetaLine(piece);
 
@@ -280,7 +235,7 @@ export default function PieceDetailScreen() {
             <Pressable
               onPress={() => setViewerVisible(true)}
               accessibilityRole="imagebutton"
-              accessibilityLabel={`View ${pds.showTitle && piece.title ? piece.title : "piece"} fullscreen`}
+              accessibilityLabel={`View ${piece.title ? piece.title : "piece"} fullscreen`}
             >
               <Image
                 source={resolveImageSource(piece.imageUri)}
@@ -307,7 +262,7 @@ export default function PieceDetailScreen() {
 
           <View style={styles.content}>
             <Text style={[styles.eyebrow, { color: colors.emerald }]}>Public View</Text>
-            {pds.showTitle && piece.title ? (
+            {piece.title ? (
               <Text style={[styles.title, { color: colors.foreground }]}>{piece.title}</Text>
             ) : null}
 
@@ -316,20 +271,13 @@ export default function PieceDetailScreen() {
                 {publicMeta}
               </Text>
             ) : null}
-
-            {pds.showDescription && piece.notes ? (
-              <View style={styles.notesSection}>
-                <Text style={[styles.notesLabel, { color: colors.mutedForeground }]}>Studio Notes</Text>
-                <Text style={[styles.notesText, { color: colors.foreground }]}>{piece.notes}</Text>
-              </View>
-            ) : null}
           </View>
         </ScrollView>
 
         <ShareSheet
           visible={shareVisible}
           onClose={() => setShareVisible(false)}
-          pieceTitle={pds.showTitle ? piece.title : "Untitled piece"}
+          pieceTitle={piece.title || "Untitled piece"}
         />
 
         <ImageViewer
@@ -412,145 +360,62 @@ export default function PieceDetailScreen() {
             </Text>
           </View>
 
-          {/* Visibility toggle */}
+          {/* Publish status — derived from the piece's collection, not a per-piece
+              toggle. A piece is public iff its collection is in the portfolio and
+              it has a photo. Publishing is managed on the collection. */}
           {(() => {
-            const isPublic = piece.visibility === "public";
+            const isPublished = isPubliclyVisiblePiece(piece, collections);
             return (
-              <Pressable
+              <View
                 style={[
                   styles.visibilityRow,
                   {
-                    backgroundColor: isPublic ? "rgba(107,139,122,0.1)" : colors.secondary,
-                    borderColor: isPublic ? "rgba(107,139,122,0.3)" : "rgba(120,110,100,0.16)",
+                    backgroundColor: isPublished ? "rgba(107,139,122,0.1)" : colors.secondary,
+                    borderColor: isPublished ? "rgba(107,139,122,0.3)" : "rgba(120,110,100,0.16)",
                   },
                 ]}
-                onPress={async () => {
-                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  await updatePiece(piece.id, {
-                    visibility: isPublic ? "private" : "public",
-                  });
-                }}
-                accessibilityRole="switch"
-                accessibilityState={{ checked: isPublic }}
-                accessibilityLabel="Piece visibility"
+                accessibilityRole="text"
+                accessibilityLabel={isPublished ? "In your portfolio" : "Not in your portfolio"}
               >
                 <Feather
-                  name={isPublic ? "globe" : "lock"}
+                  name={isPublished ? "globe" : "lock"}
                   size={14}
-                  color={isPublic ? colors.emerald : colors.mutedForeground}
+                  color={isPublished ? colors.emerald : colors.mutedForeground}
                 />
                 <View style={styles.visibilityLabels}>
                   <Text
                     style={[
                       styles.visibilityTitle,
-                      { color: isPublic ? colors.emerald : colors.foreground },
+                      { color: isPublished ? colors.emerald : colors.foreground },
                     ]}
                   >
-                    {isPublic ? "Public" : "Private"}
+                    {isPublished ? "In Portfolio" : "Not in Portfolio"}
                   </Text>
                   <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
-                    {isPublic ? "Shown on your public profile" : "Only visible to you"}
+                    {isPublished
+                      ? "Shown on your public site"
+                      : currentCollection
+                        ? !piece.imageUri
+                          ? "Add a photo to show it publicly"
+                          : "Turn on “Show in Portfolio” for its collection"
+                        : "Add it to a collection that’s in your portfolio"}
                   </Text>
                 </View>
-                <View
-                  style={[
-                    styles.visToggle,
-                    {
-                      backgroundColor: isPublic ? colors.emerald : "rgba(120,110,100,0.18)",
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.visToggleThumb,
-                      {
-                        backgroundColor: "#FFFFFF",
-                        transform: [{ translateX: isPublic ? 18 : 2 }],
-                      },
-                    ]}
-                  />
-                </View>
-              </Pressable>
+              </View>
             );
           })()}
 
-          {/* Field-level public display settings (only when piece is public) */}
-          {piece.visibility === "public" && (
-            <View style={styles.publicData}>
-              <Text style={[styles.publicDataLabel, { color: colors.mutedForeground }]}>
-                Public Display Settings
+          {isPubliclyVisiblePiece(piece, collections) ? (
+            <Pressable
+              style={({ pressed }) => [styles.previewBtn, { opacity: pressed ? 0.6 : 1 }]}
+              onPress={() => router.push(`/piece/${piece.id}?public=1`)}
+            >
+              <Feather name="eye" size={13} color={colors.cobalt} />
+              <Text style={[styles.previewBtnText, { color: colors.cobalt }]}>
+                Preview public view
               </Text>
-              <Text style={[styles.publicDataHint, { color: colors.mutedForeground }]}>
-                Your piece is public. Choose which details visitors can see.
-              </Text>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.showAllBtn,
-                  {
-                    backgroundColor: "rgba(107,139,122,0.1)",
-                    borderColor: "rgba(107,139,122,0.3)",
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                ]}
-                onPress={showAllPublicDetails}
-                accessibilityRole="button"
-                accessibilityLabel="Show all public details"
-              >
-                <Feather name="eye" size={13} color={colors.emerald} />
-                <Text style={[styles.showAllBtnText, { color: colors.emerald }]}>
-                  Show all public details
-                </Text>
-              </Pressable>
-              {PUBLIC_DATA_FIELDS.map((field, i) => {
-                const on = pds[field.key];
-                return (
-                  <Pressable
-                    key={field.key}
-                    style={[
-                      styles.fieldToggleRow,
-                      i > 0 && { borderTopWidth: 0.75, borderTopColor: "rgba(120,110,100,0.1)" },
-                    ]}
-                    onPress={() => togglePublicField(field.key)}
-                    accessibilityRole="switch"
-                    accessibilityState={{ checked: on }}
-                    accessibilityLabel={field.label}
-                  >
-                    <Text style={[styles.fieldToggleLabel, { color: colors.foreground }]}>
-                      {field.label}
-                    </Text>
-                    <View
-                      style={[
-                        styles.toggleSm,
-                        {
-                          backgroundColor: on ? colors.emerald : colors.secondary,
-                          borderColor: on ? colors.emerald : "rgba(120,110,100,0.2)",
-                        },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.toggleSmThumb,
-                          {
-                            backgroundColor: on ? "#FFFFFF" : colors.mutedForeground,
-                            transform: [{ translateX: on ? 15 : 2 }],
-                          },
-                        ]}
-                      />
-                    </View>
-                  </Pressable>
-                );
-              })}
-              <Pressable
-                style={({ pressed }) => [styles.previewBtn, { opacity: pressed ? 0.6 : 1 }]}
-                onPress={() => router.push(`/piece/${piece.id}?public=1`)}
-              >
-                <Feather name="eye" size={13} color={colors.cobalt} />
-                <Text style={[styles.previewBtnText, { color: colors.cobalt }]}>
-                  Preview public view
-                </Text>
-              </Pressable>
-            </View>
-          )}
+            </Pressable>
+          ) : null}
 
           {/* Collection row */}
           <Pressable
@@ -938,13 +803,6 @@ const styles = StyleSheet.create({
   visibilityLabels: { flex: 1, gap: 2 },
   visibilityTitle: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
   visibilitySub: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
-  visToggle: {
-    width: 42,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-  },
-  visToggleThumb: { width: 18, height: 18, borderRadius: 9 },
   collectionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -997,45 +855,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     letterSpacing: 0.2,
   },
-  // Field-level public display settings
-  publicData: { marginBottom: 20 },
-  publicDataLabel: {
-    fontSize: 9,
-    fontFamily: "Poppins_500Medium",
-    letterSpacing: 1.8,
-    textTransform: "uppercase",
-    marginBottom: 4,
-  },
-  publicDataHint: {
-    fontSize: 12,
-    fontFamily: "Poppins_300Light",
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  showAllBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    paddingVertical: 11,
-    borderRadius: 12,
-    borderWidth: 0.75,
-    marginBottom: 6,
-  },
-  showAllBtnText: {
-    fontSize: 13,
-    fontFamily: "Poppins_500Medium",
-    letterSpacing: 0.3,
-  },
-  fieldToggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-  },
-  fieldToggleLabel: { fontSize: 14, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
-  toggleSm: { width: 38, height: 22, borderRadius: 11, justifyContent: "center", borderWidth: 1 },
-  toggleSmThumb: { width: 16, height: 16, borderRadius: 8 },
   previewBtn: {
     flexDirection: "row",
     alignItems: "center",

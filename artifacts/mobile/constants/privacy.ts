@@ -20,12 +20,18 @@ export interface PublicDataSettings {
   showPrice: boolean;
 }
 
+/**
+ * @deprecated Per-field public toggles were removed in the Portfolio redesign.
+ * The public field set is now fixed (Title, Photo, Clay, Dimensions, Year). This
+ * object is retained ONLY so existing Supabase `public_data_settings` rows keep a
+ * stable shape on round-trip; nothing in the UI reads these flags anymore.
+ */
 export const DEFAULT_PUBLIC_DATA_SETTINGS: PublicDataSettings = {
   showTitle: true,
   showPhotos: true,
   showDescription: true,
-  showClayBody: false,
-  showGlazeName: true,
+  showClayBody: true,
+  showGlazeName: false,
   showGlazeRecipe: false,
   showCone: false,
   showFiringEnvironment: false,
@@ -35,92 +41,66 @@ export const DEFAULT_PUBLIC_DATA_SETTINGS: PublicDataSettings = {
   showPrice: false,
 };
 
-// The public surfaces are intentionally gallery-like: only artwork-identity
-// fields are ever shown publicly. Technical/firing data (glaze name + recipe,
-// cone, firing environment, firing notes, price) stays in the owner's private
-// studio record and is deliberately NOT offered as a public toggle here.
-// The photo itself is NOT a toggle: a public piece always shows its image on
-// public surfaces (a gallery with hidden photos is just blank placeholders).
-export const PUBLIC_DATA_FIELDS: { key: keyof PublicDataSettings; label: string }[] = [
-  { key: "showTitle", label: "Title" },
-  { key: "showDescription", label: "Studio Notes" },
-  { key: "showClayBody", label: "Clay Body" },
-  { key: "showDimensions", label: "Dimensions" },
-  { key: "showYear", label: "Year" },
-];
-
 export interface PublicMetaPiece {
   clay: string;
   dimensions: string;
   year: string;
-  publicDataSettings: PublicDataSettings;
 }
 
 /**
  * Builds the single quiet metadata line shown on EVERY public surface
  * (portfolio cards, public collection display, piece detail, fullscreen viewer).
  *
- * The public portfolio is deliberately gallery-like, so this line is limited to
- * the three artwork-identity fields — clay body · dimensions · year — each still
- * gated by its own `publicDataSettings` toggle. Technical/firing data (glaze,
- * cone, firing environment, recipe, firing notes) is intentionally never shown
- * publicly; it lives only on the owner's private studio record. Empty/disabled
- * fields are dropped (no gaps), and because every surface calls this one function
- * the same string renders identically across the app, e.g.
- * "Stoneware · 12 × 12 × 14 in · 2025".
+ * The public portfolio is a fixed, gallery-like format: every piece shows the
+ * same three artwork-identity fields — clay body · dimensions · year. There are
+ * no per-field toggles; technical/firing data (glaze, cone, firing environment,
+ * recipe, firing notes) is never shown publicly and lives only on the owner's
+ * private studio record. Empty fields are dropped (no gaps), and because every
+ * surface calls this one function the same string renders identically across the
+ * app, e.g. "Stoneware · 12 × 12 × 14 in · 2025".
  */
 export function buildPublicMetaLine(piece: PublicMetaPiece): string {
-  const s = piece.publicDataSettings;
-  return [
-    s.showClayBody ? piece.clay : "",
-    s.showDimensions ? piece.dimensions : "",
-    s.showYear ? piece.year : "",
-  ]
+  return [piece.clay, piece.dimensions, piece.year]
     .map((v) => (v ?? "").trim())
     .filter(Boolean)
     .join("  ·  ");
 }
 
-export function isPiecePublic(piece: { visibility: Visibility }): boolean {
-  return piece.visibility === "public";
-}
-
-export function isCollectionPublic(collection: { visibility: Visibility }): boolean {
-  return collection.visibility === "public";
-}
-
 /**
- * Whether a collection should surface on the public site. Featuring requires the
- * collection to be public — a private collection can never be featured, so the
- * public flag always wins over a stale `featuredOnSite` value.
+ * Whether a collection is published to the artist's portfolio. This is the single
+ * source of truth for the redesigned one-switch publishing model. `featuredOnSite`
+ * is the stored flag (kept in lockstep with `visibility` for Supabase round-trip:
+ * in-portfolio collections are saved as public, hidden ones as private).
  */
-export function isCollectionFeatured(collection: {
-  visibility: Visibility;
+export function isCollectionInPortfolio(collection: {
   featuredOnSite: boolean;
 }): boolean {
-  return isCollectionPublic(collection) && collection.featuredOnSite;
-}
-
-export function getPublicCollectionPieces<
-  P extends { collectionId?: string; visibility: Visibility }
->(collection: { id: string }, pieces: P[]): P[] {
-  return pieces.filter((p) => p.collectionId === collection.id && isPiecePublic(p));
+  return !!collection.featuredOnSite;
 }
 
 /**
- * Whether a piece should surface on a public, non-owner surface (e.g. a public
- * portfolio). A public piece is hidden if it lives inside a private collection —
- * collection visibility can suppress a public piece, but can never reveal a
- * private one. Pieces without a collection (or whose collection was deleted)
- * surface as long as the piece itself is public.
+ * The public pieces of a collection: every piece in the collection that has a
+ * photo. There is no per-piece publishing control — a piece is public iff its
+ * collection is in the portfolio (checked by the caller) and it has an image.
+ */
+export function getPublicCollectionPieces<
+  P extends { collectionId?: string; imageUri?: string }
+>(collection: { id: string }, pieces: P[]): P[] {
+  return pieces.filter((p) => p.collectionId === collection.id && !!p.imageUri);
+}
+
+/**
+ * Whether a piece surfaces on a public, non-owner surface. A piece is public iff
+ * it belongs to a collection that is in the portfolio AND it has a photo. Pieces
+ * without a collection (or whose collection was deleted / is hidden) are never
+ * public — putting a collection in the portfolio is the only way to publish.
  */
 export function isPubliclyVisiblePiece(
-  piece: { visibility: Visibility; collectionId?: string },
-  collections: { id: string; visibility: Visibility }[]
+  piece: { collectionId?: string; imageUri?: string },
+  collections: { id: string; featuredOnSite: boolean }[]
 ): boolean {
-  if (!isPiecePublic(piece)) return false;
-  if (!piece.collectionId) return true;
+  if (!piece.imageUri) return false;
+  if (!piece.collectionId) return false;
   const parent = collections.find((c) => c.id === piece.collectionId);
-  if (parent && !isCollectionPublic(parent)) return false;
-  return true;
+  return !!parent && isCollectionInPortfolio(parent);
 }

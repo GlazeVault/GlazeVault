@@ -5,7 +5,9 @@ import { router } from "expo-router";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { isPubliclyVisiblePiece } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
+import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -18,7 +20,10 @@ interface PotteryCardProps {
 export function PotteryCard({ piece, fromCollectionId, showVisibility = true }: PotteryCardProps) {
   const colors = useColors();
   const { toggleFavorite } = usePottery();
-  const isPrivate = piece.visibility === "private";
+  const { collections } = useCollections();
+  // Public iff the piece's collection is in the portfolio and it has a photo —
+  // there is no per-piece visibility flag anymore.
+  const isPrivate = !isPubliclyVisiblePiece(piece, collections);
 
   const handleFavorite = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

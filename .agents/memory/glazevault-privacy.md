@@ -1,39 +1,42 @@
 ---
 name: GlazeVault privacy / visibility model
-description: How piece + collection visibility, public-data field toggles, and public-surface gating work in the mobile app
+description: How piece + collection visibility and public-surface gating work after the Portfolio Publishing Redesign
 ---
 
-# Privacy model
+# Privacy model (collection-driven)
 
-Pieces and collections each carry `visibility: "public" | "private"`. Pieces also carry a `publicDataSettings` object (11 field toggles). Helpers live in `constants/privacy.ts`: `isPiecePublic`, `isCollectionPublic`, `getPublicCollectionPieces`, `isPubliclyVisiblePiece`.
+Publishing is driven entirely by the **collection**, not the piece. There are NO per-piece publishing controls anymore (the piece visibility toggle and the per-field "Public Display Settings" were removed).
 
-## Source-of-truth rule
-Piece privacy is the source of truth. Collection visibility can **suppress** a public piece but can **never** reveal a private one. A private piece is never public regardless of `publicDataSettings`.
+## Single rule
+A piece is public IFF its parent collection is in the portfolio AND the piece has an `imageUri`. The one source of truth is `isPubliclyVisiblePiece(piece, collections)` in `constants/privacy.ts`.
 
-**How to apply:** any new public/non-owner *listing* surface must filter through `isPubliclyVisiblePiece(piece, collections)` (or the public-site chain below) — never just `isPiecePublic`. That helper hides a public piece if its parent collection is private; pieces with no collection (or a deleted one) surface as long as the piece is public.
+- `isCollectionInPortfolio(c) = !!c.featuredOnSite` — the ONE collection switch ("Show in Portfolio").
+- `getPublicCollectionPieces` = pieces matching `collectionId` AND having `imageUri`.
+- Pieces with no collection (or a deleted one) are NEVER public.
 
-**Exception — owner-facing piece preview keys off piece visibility ONLY.** The `/piece/[id]?public=1` preview (reached from the owner's own Piece Detail "Preview public view") gates on `latestPiece.visibility === "public"`, NOT `isPubliclyVisiblePiece`. **Why:** users repeatedly reported a public piece in a *private collection* wrongly showing "This piece is private" — confusing because Piece Detail said Public. The preview answers "is THIS piece public?", not "would it appear on my site?". **Safe because** the only entry points are (1) the owner's own preview button and (2) public-site piece links, which only ever come from `isCollectionFeatured` (public) collections — so a private-collection piece is never linked from a non-owner surface. Collection-level gating still lives at the public-site listing layer (`getPublicCollectionPieces` over `isCollectionFeatured`). If real remote/public deep links to `/piece/[id]` are ever added, re-introduce collection-level checks here to prevent direct-link bypass.
+**How to apply:** every public/non-owner surface (listing OR detail) must gate through `isPubliclyVisiblePiece` (or `getPublicCollectionPieces`). The owner-facing `/piece/[id]?public=1` preview ALSO uses `isPubliclyVisiblePiece` now (no special-case on piece visibility anymore).
+
+## Fixed public fields
+Public output is a FIXED set: **Title, Photo, Clay, Dimensions, Year**. No user toggles.
+- `buildPublicMetaLine(piece)` always renders `clay · dimensions · year`.
+- **Public piece detail must render ONLY title + photo + buildPublicMetaLine.** Do NOT render `notes` (Studio Notes), glaze, cone, firing, etc. on any `?public=1` surface. **Why:** the architect flagged that the public view was leaking `piece.notes` — a privacy violation, since public-site tiles route into `/piece/[id]?public=1`. **How to apply:** when adding anything to the public branch, confirm the field is in the fixed set; everything else is owner-only.
+
+## Legacy fields kept for round-trip ONLY
+- `piece.visibility` is still STORED but no longer gates anything. Don't read it for visibility decisions; use `isPubliclyVisiblePiece`.
+- `Collection.visibility` is kept in lockstep with `featuredOnSite` (visibility `public` iff in portfolio) purely for Supabase round-trip compatibility — write both together, read neither for gating.
+- `PublicDataSettings` type + `DEFAULT_PUBLIC_DATA_SETTINGS` are kept ONLY so the Supabase row shape round-trips. `addPiece` still seeds `visibility:"private"` + defaults. `PUBLIC_DATA_FIELDS` and the `isPiecePublic`/`isCollectionPublic`/`isCollectionFeatured` helpers were REMOVED — do not reintroduce.
 
 ## collectionId vs pieceIds (intentional)
-The spec described `pieceIds[]` on collections, but the app uses `collectionId`-per-piece (one collection per piece). We kept `collectionId` — it already references by ID with no duplication, and avoids a risky migration. `getPublicCollectionPieces` computes membership via `collectionId`, not a `pieceIds` array. Do not add `pieceIds[]` unless multi-collection membership is actually needed.
+One collection per piece via `collectionId` (no `pieceIds[]` array). Membership is computed from `collectionId`. Don't add `pieceIds[]` unless multi-collection membership is genuinely needed.
 
-**Why:** lower risk, no dual source of truth, identical user-facing behavior.
-
-## Defaults & backward compat
-- New pieces AND new collections default to `private`.
-- `normalizePiece` migrates legacy `isPublic` → `visibility` (only when `visibility` absent) and backfills `publicDataSettings` from `DEFAULT_PUBLIC_DATA_SETTINGS`.
-- CollectionsContext load defaults missing `visibility` to `private`.
-- `PUBLIC_DATA_FIELDS` (ordered key+label list) drives the field-toggle UI in Edit Piece AND the Public Display Settings section in Piece Detail; field controls only render when the piece is public.
-
-## Public renderer & field gating
-- Canonical public renderer is the piece detail route in public mode (`/piece/[id]?public=1`). `public` is a reserved word — read it via the params object (`params.public === "1"`), don't destructure. Public mode is read-only: hide favorite/edit/delete/visibility/collection/field-settings; show a private notice when `!isPubliclyVisiblePiece`.
-- Data model has FEWER content fields than the 11 toggles: `showGlazeRecipe`/`showFiringNotes`/`showPrice` intentionally map to no field. Do NOT add new data fields to satisfy them.
-- **Gate every outbound channel, not just on-screen rows.** A hidden field can still leak through side channels — e.g. ShareSheet was leaking `piece.title` when `showTitle=false`. **Why:** the architect flagged this as a privacy violation. **How to apply:** in public mode, pass share/export metadata through the same `publicDataSettings` gate (fall back to a generic label like "Untitled piece" when a field is off).
+## Post-save "Add to a Collection?" prompt
+On Add Piece save, if no collection was chosen, prompt: Choose a Collection / Create New / Later.
+- `addPiece` returns the created `PotteryPiece` (so the new id is available).
+- "Choose a Collection" → navigate to `/piece/[id]` (assign via its collection row).
+- "Create New" → `/collection/new?attachPieceId=<id>`; that screen links the piece via `updatePiece(attachPieceId, { collectionId })` AFTER `addCollection` (which returns the new `Collection`).
 
 ## Public Site (generated gallery)
-- The Public Site lives as a section INSIDE the Profile screen (no new bottom tab) plus a `/public-site` preview route. Config is `profile.publicSite` in ProfileContext: `enabled`, `homepageLayout` ("grid"|"editorial"|"masonry"), `contactEmail`, `etsy`, `shopify`. Name/bio/statement/website/instagram are REUSED from the profile, never duplicated.
-- **Featuring lives on the Collection, not the profile.** Each `Collection` has `featuredOnSite: boolean`; the toggle is in Collection detail AND the create/edit modal, shown only when the collection is public, and forced to `false` whenever visibility flips to private (both in UI state and on save). The old profile-side `publicSite.featuredCollectionIds` chip selector was REMOVED. `normalizeProfile` whitelists `publicSite` keys so the legacy `featuredCollectionIds` is dropped and never re-persisted. **Why:** single source of truth for "is this collection on my site". **How to apply:** use `isCollectionFeatured(c)` (= public AND featuredOnSite) — never reintroduce a profile-side ID list.
-- **Filter chain, applied at render (defense in depth):** `collections.filter(isCollectionFeatured)` → `getPublicCollectionPieces` → tiles render the image whenever `piece.imageUri` exists and gate the title by `showTitle`. `showPhotos` is NO LONGER a display gate (deprecated — see glazevault-public-gallery.md). A featured collection later made private drops off automatically because `isCollectionFeatured` re-checks public status every render.
-- **Collection cover precedence:** artist-chosen `Collection.coverImageUri` (optional; picked via expo-image-picker, persisted with `persistPieceImage`) → else first public piece WITH an `imageUri` (`cp.find(p => p.imageUri)`) → else placeholder. Used identically in profile featured cards and `/public-site`. **Intentional:** the artist-selected cover is independent of piece-level privacy — it is a deliberate gallery choice the owner makes, so it is NOT gated by `publicDataSettings`. The *fallback* path only ever inspects pieces already filtered through `getPublicCollectionPieces` (public + public collection), so it can never leak a private image. In `/public-site`, tapping the cover only navigates to a piece when the cover came from the fallback (a real public piece); an artist-uploaded cover is non-navigable.
-- Profile's "Featured Collections" list (replaced the old per-piece "Public Works" grid) shows cover + title + public-piece count for `isCollectionFeatured` collections; tapping a card opens that collection's detail.
-- **ProfileContext writes must be race-safe.** Immediate-save toggle/selector handlers + the edit-form `handleSave` can fire near-simultaneously; the old closure-based `updateProfile` clobbered nested `publicSite`. **Why:** architect flagged real data loss. **How to apply:** `updateProfile` merges against a `profileRef` (mirror of latest state, updated synchronously before the await), and nested writes go through `updatePublicSite(partial)` which merges from `profileRef.current.publicSite` — callers must NOT hand-spread `{...profile.publicSite,...}` from render-closure state.
+- Lives inside Profile + a `/public-site` preview route. Featuring is the collection's `featuredOnSite` (the "Show in Portfolio" switch) — surfaced via `isCollectionInPortfolio`.
+- Filter chain at render (defense in depth): `collections.filter(isCollectionInPortfolio)` → `getPublicCollectionPieces` → tiles render image when `imageUri` exists, title always shown.
+- Collection cover precedence: artist-chosen `coverImageUri` → first public piece with `imageUri` → placeholder. Artist cover is a deliberate gallery choice, not gated by piece privacy; fallback only inspects already-public pieces.
+- ProfileContext writes must stay race-safe via `profileRef` + `updatePublicSite(partial)` (see prior note — unchanged by this redesign).

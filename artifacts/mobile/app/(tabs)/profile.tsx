@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
 import { ImportedText, pickAndExtractText, UnsupportedFileError } from "@/constants/importText";
-import { getPublicCollectionPieces, isCollectionFeatured } from "@/constants/privacy";
+import { getPublicCollectionPieces, isCollectionInPortfolio } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import {
@@ -64,7 +64,7 @@ export default function ProfileScreen() {
   // from rapid taps on the avatar.
   const pickingAvatar = useRef(false);
 
-  const featuredCollections = collections.filter(isCollectionFeatured);
+  const featuredCollections = collections.filter(isCollectionInPortfolio);
   const site = profile.publicSite;
 
   const startEditing = () => {
@@ -436,7 +436,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-              Featured Collections
+              Portfolio Collections
             </Text>
             {featuredCollections.length > 0 && (
               <View style={[styles.countBadge, { backgroundColor: "rgba(107,127,163,0.1)" }]}>
@@ -450,10 +450,10 @@ export default function ProfileScreen() {
             <View style={[styles.publicEmpty, { borderColor: "rgba(120,110,100,0.12)" }]}>
               <Feather name="star" size={16} color={colors.mutedForeground} style={{ opacity: 0.35, marginBottom: 8 }} />
               <Text style={[styles.publicEmptyText, { color: colors.mutedForeground }]}>
-                No featured collections yet
+                No collections in your portfolio yet
               </Text>
               <Text style={[styles.publicEmptyHint, { color: colors.mutedForeground }]}>
-                Open a public collection and turn on “Feature on Public Site”
+                Open a collection and turn on “Show in Portfolio”
               </Text>
             </View>
           ) : (
@@ -644,10 +644,10 @@ export default function ProfileScreen() {
                 <Feather name="star" size={13} color={colors.cobalt} />
                 <Text style={[styles.siteHintText, { color: colors.mutedForeground }]}>
                   {featuredCollections.length === 0
-                    ? "Open a public collection and turn on “Feature on Public Site” to add it here."
+                    ? "Open a collection and turn on “Show in Portfolio” to add it here."
                     : `${featuredCollections.length} ${
                         featuredCollections.length === 1 ? "collection is" : "collections are"
-                      } featured. Manage featuring from each collection.`}
+                      } in your portfolio. Manage this from each collection.`}
                 </Text>
               </View>
 
@@ -759,8 +759,8 @@ export default function ProfileScreen() {
 
               <Text style={[styles.siteHint, { color: colors.mutedForeground }]}>
                 Your name, bio, statement, website, and Instagram from above also appear on your
-                site. Only public collections, their public pieces, and the fields you allow are
-                shown.
+                site. Only collections you’ve added to your portfolio — and their photographed
+                pieces — are shown.
               </Text>
 
               {/* Preview */}

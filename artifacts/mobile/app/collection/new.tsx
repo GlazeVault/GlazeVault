@@ -17,23 +17,27 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
-import { Visibility } from "@/constants/privacy";
+import { isCollectionInPortfolio, Visibility } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
+import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
 export default function NewCollectionScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { addCollection, getCollection, updateCollection } = useCollections();
-  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const { updatePiece } = usePottery();
+  const { editId, attachPieceId } = useLocalSearchParams<{
+    editId?: string;
+    attachPieceId?: string;
+  }>();
   const existing = editId ? getCollection(editId) : undefined;
 
   const [title, setTitle] = useState(existing?.title ?? "");
   const [intro, setIntro] = useState(existing?.intro ?? "");
-  const [visibility, setVisibility] = useState<Visibility>(existing?.visibility ?? "private");
-  const [featuredOnSite, setFeaturedOnSite] = useState<boolean>(
-    existing?.featuredOnSite ?? false
+  const [inPortfolio, setInPortfolio] = useState<boolean>(
+    existing ? isCollectionInPortfolio(existing) : false
   );
   const [coverImageUri, setCoverImageUri] = useState(existing?.coverImageUri ?? "");
   const [saving, setSaving] = useState(false);
@@ -44,8 +48,7 @@ export default function NewCollectionScreen() {
     if (existing) {
       setTitle(existing.title);
       setIntro(existing.intro);
-      setVisibility(existing.visibility);
-      setFeaturedOnSite(existing.featuredOnSite);
+      setInPortfolio(isCollectionInPortfolio(existing));
       setCoverImageUri(existing.coverImageUri ?? "");
     }
   }, [existing?.id]);
@@ -80,23 +83,31 @@ export default function NewCollectionScreen() {
       return;
     }
     setSaving(true);
-    const featured = visibility === "public" ? featuredOnSite : false;
+    // One switch: portfolio membership. `visibility` is kept in lockstep with
+    // `featuredOnSite` purely for Supabase round-trip compatibility.
+    const portfolioFields = {
+      visibility: (inPortfolio ? "public" : "private") as Visibility,
+      featuredOnSite: inPortfolio,
+    };
     if (existing && editId) {
       await updateCollection(editId, {
         title: title.trim(),
         intro: intro.trim(),
-        visibility,
-        featuredOnSite: featured,
+        ...portfolioFields,
         coverImageUri: coverImageUri || undefined,
       });
     } else {
-      await addCollection({
+      const created = await addCollection({
         title: title.trim(),
         intro: intro.trim(),
-        visibility,
-        featuredOnSite: featured,
+        ...portfolioFields,
         coverImageUri: coverImageUri || undefined,
       });
+      // When opened from the post-save prompt, link the new piece to this
+      // freshly created collection so it lands in the portfolio in one step.
+      if (attachPieceId) {
+        await updatePiece(attachPieceId, { collectionId: created.id });
+      }
     }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setSaving(false);
@@ -205,125 +216,59 @@ export default function NewCollectionScreen() {
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>Visibility</Text>
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>Portfolio</Text>
           <Pressable
             style={[
               styles.visibilityRow,
               {
-                backgroundColor:
-                  visibility === "public" ? "rgba(107,139,122,0.1)" : colors.secondary,
-                borderColor:
-                  visibility === "public"
-                    ? "rgba(107,139,122,0.3)"
-                    : "rgba(120,110,100,0.16)",
+                backgroundColor: inPortfolio ? "rgba(107,139,122,0.1)" : colors.secondary,
+                borderColor: inPortfolio
+                  ? "rgba(107,139,122,0.3)"
+                  : "rgba(120,110,100,0.16)",
               },
             ]}
-            onPress={() =>
-              setVisibility((v) => {
-                const next = v === "public" ? "private" : "public";
-                if (next === "private") setFeaturedOnSite(false);
-                return next;
-              })
-            }
+            onPress={() => setInPortfolio((v) => !v)}
             accessibilityRole="switch"
-            accessibilityState={{ checked: visibility === "public" }}
-            accessibilityLabel="Collection visibility"
+            accessibilityState={{ checked: inPortfolio }}
+            accessibilityLabel="Show in portfolio"
           >
             <Feather
-              name={visibility === "public" ? "globe" : "lock"}
+              name={inPortfolio ? "globe" : "lock"}
               size={14}
-              color={visibility === "public" ? colors.emerald : colors.mutedForeground}
+              color={inPortfolio ? colors.emerald : colors.mutedForeground}
             />
             <View style={styles.visibilityLabels}>
               <Text
                 style={[
                   styles.visibilityTitle,
-                  { color: visibility === "public" ? colors.emerald : colors.foreground },
+                  { color: inPortfolio ? colors.emerald : colors.foreground },
                 ]}
               >
-                {visibility === "public" ? "Public" : "Private"}
+                {inPortfolio ? "Show in Portfolio" : "Hidden from Portfolio"}
               </Text>
               <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
-                {visibility === "public"
-                  ? "Public pieces in here are visible to others"
-                  : "Hidden from everyone but you"}
+                {inPortfolio
+                  ? "Photographed pieces here appear on your public site"
+                  : "Kept private — only you can see it"}
               </Text>
             </View>
             <View
               style={[
                 styles.visToggle,
                 {
-                  backgroundColor:
-                    visibility === "public" ? colors.emerald : "rgba(120,110,100,0.18)",
+                  backgroundColor: inPortfolio ? colors.emerald : "rgba(120,110,100,0.18)",
                 },
               ]}
             >
               <View
                 style={[
                   styles.visToggleThumb,
-                  { transform: [{ translateX: visibility === "public" ? 18 : 2 }] },
+                  { transform: [{ translateX: inPortfolio ? 18 : 2 }] },
                 ]}
               />
             </View>
           </Pressable>
         </View>
-
-        {visibility === "public" ? (
-          <View style={styles.fieldGroup}>
-            <Text style={[styles.label, { color: colors.mutedForeground }]}>Public Site</Text>
-            <Pressable
-              style={[
-                styles.visibilityRow,
-                {
-                  backgroundColor: featuredOnSite ? "rgba(107,127,163,0.1)" : colors.secondary,
-                  borderColor: featuredOnSite
-                    ? "rgba(107,127,163,0.3)"
-                    : "rgba(120,110,100,0.16)",
-                },
-              ]}
-              onPress={() => setFeaturedOnSite((f) => !f)}
-              accessibilityRole="switch"
-              accessibilityState={{ checked: featuredOnSite }}
-              accessibilityLabel="Feature on public site"
-            >
-              <Feather
-                name="star"
-                size={14}
-                color={featuredOnSite ? colors.cobalt : colors.mutedForeground}
-              />
-              <View style={styles.visibilityLabels}>
-                <Text
-                  style={[
-                    styles.visibilityTitle,
-                    { color: featuredOnSite ? colors.cobalt : colors.foreground },
-                  ]}
-                >
-                  Feature on Public Site
-                </Text>
-                <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
-                  {featuredOnSite
-                    ? "Highlighted on your public site"
-                    : "Not shown on your public site"}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.visToggle,
-                  {
-                    backgroundColor: featuredOnSite ? colors.cobalt : "rgba(120,110,100,0.18)",
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.visToggleThumb,
-                    { transform: [{ translateX: featuredOnSite ? 18 : 2 }] },
-                  ]}
-                />
-              </View>
-            </Pressable>
-          </View>
-        ) : null}
 
         <View style={[styles.hint, { backgroundColor: colors.secondary, borderColor: "rgba(120,110,100,0.12)" }]}>
           <Feather name="info" size={13} color={colors.mutedForeground} style={{ marginTop: 1 }} />

@@ -24,12 +24,7 @@ import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
 import { resolveImageSource } from "@/constants/seedImages";
-import {
-  DEFAULT_PUBLIC_DATA_SETTINGS,
-  PUBLIC_DATA_FIELDS,
-  PublicDataSettings,
-  Visibility,
-} from "@/constants/privacy";
+import { DEFAULT_PUBLIC_DATA_SETTINGS, PublicDataSettings } from "@/constants/privacy";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -92,11 +87,11 @@ export default function EditPieceScreen() {
   );
   const [dimensions, setDimensions] = useState(piece?.dimensions ?? "");
   const [year, setYear] = useState(piece?.year ?? "");
-  const [visibility, setVisibility] = useState<Visibility>(piece?.visibility ?? "private");
-  const [publicData, setPublicData] = useState<PublicDataSettings>(
+  // Kept only for the Supabase round-trip — publishing is now collection-driven,
+  // so there are no per-piece publishing controls in this form.
+  const [publicData] = useState<PublicDataSettings>(
     piece?.publicDataSettings ?? { ...DEFAULT_PUBLIC_DATA_SETTINGS }
   );
-  const isPublic = visibility === "public";
   const [collectionId, setCollectionId] = useState<string | undefined>(piece?.collectionId);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
   const [cropSource, setCropSource] = useState<
@@ -151,7 +146,6 @@ export default function EditPieceScreen() {
       dimensions: dimensions.trim(),
       year: year.trim(),
       imageUri: storedImageUri,
-      visibility,
       publicDataSettings: publicData,
       collectionId,
     });
@@ -307,103 +301,6 @@ export default function EditPieceScreen() {
             </Text>
             <Feather name="chevron-right" size={13} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
           </Pressable>
-
-          {/* Visibility toggle */}
-          <View style={styles.toggleSection}>
-            <View style={[styles.toggleDivider, { backgroundColor: "rgba(120,110,100,0.1)" }]} />
-            <Pressable
-              style={styles.toggleRow}
-              onPress={() => setVisibility((v) => (v === "public" ? "private" : "public"))}
-              accessibilityRole="switch"
-              accessibilityState={{ checked: isPublic }}
-              accessibilityLabel="Piece visibility"
-            >
-              <View style={styles.toggleLabels}>
-                <Text style={[styles.toggleTitle, { color: colors.foreground }]}>
-                  {isPublic ? "Public" : "Private"}
-                </Text>
-                <Text style={[styles.toggleSub, { color: colors.mutedForeground }]}>
-                  {isPublic
-                    ? "Visible on your public profile and in public collections"
-                    : "Only visible to you, everywhere"}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.toggle,
-                  {
-                    backgroundColor: isPublic
-                      ? colors.emerald
-                      : colors.secondary,
-                    borderColor: isPublic ? colors.emerald : "rgba(120,110,100,0.2)",
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.toggleThumb,
-                    {
-                      backgroundColor: isPublic ? "#FFFFFF" : colors.mutedForeground,
-                      transform: [{ translateX: isPublic ? 18 : 2 }],
-                    },
-                  ]}
-                />
-              </View>
-            </Pressable>
-
-            {/* Field-level public data controls */}
-            {isPublic && (
-              <View style={styles.publicData}>
-                <Text style={[styles.publicDataLabel, { color: colors.mutedForeground }]}>
-                  Public Details
-                </Text>
-                <Text style={[styles.publicDataHint, { color: colors.mutedForeground }]}>
-                  Choose what shows on the public view of this piece.
-                </Text>
-                {PUBLIC_DATA_FIELDS.map((field, i) => {
-                  const on = publicData[field.key];
-                  return (
-                    <Pressable
-                      key={field.key}
-                      style={[
-                        styles.fieldToggleRow,
-                        i > 0 && { borderTopWidth: 0.75, borderTopColor: "rgba(120,110,100,0.1)" },
-                      ]}
-                      onPress={() =>
-                        setPublicData((prev) => ({ ...prev, [field.key]: !prev[field.key] }))
-                      }
-                      accessibilityRole="switch"
-                      accessibilityState={{ checked: on }}
-                      accessibilityLabel={field.label}
-                    >
-                      <Text style={[styles.fieldToggleLabel, { color: colors.foreground }]}>
-                        {field.label}
-                      </Text>
-                      <View
-                        style={[
-                          styles.toggleSm,
-                          {
-                            backgroundColor: on ? colors.emerald : colors.secondary,
-                            borderColor: on ? colors.emerald : "rgba(120,110,100,0.2)",
-                          },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.toggleSmThumb,
-                            {
-                              backgroundColor: on ? "#FFFFFF" : colors.mutedForeground,
-                              transform: [{ translateX: on ? 15 : 2 }],
-                            },
-                          ]}
-                        />
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-          </View>
         </View>
       </KeyboardAwareScrollView>
 
@@ -648,62 +545,4 @@ const styles = StyleSheet.create({
   emptyCollections: { alignItems: "center", paddingVertical: 28, gap: 10 },
   sheetCancel: { alignItems: "center", paddingVertical: 16, marginTop: 4 },
   sheetCancelText: { fontSize: 13, fontFamily: "Poppins_400Regular", letterSpacing: 0.3 },
-  toggleSection: { marginTop: 24 },
-  toggleDivider: { height: 1, marginBottom: 20 },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 4,
-  },
-  toggleLabels: { flex: 1, gap: 3, paddingRight: 16 },
-  toggleTitle: { fontSize: 14, fontFamily: "Poppins_400Regular" },
-  toggleSub: { fontSize: 12, fontFamily: "Poppins_300Light" },
-  toggle: {
-    width: 42,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: "center",
-  },
-  toggleThumb: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    opacity: 0.85,
-  },
-  publicData: { marginTop: 24 },
-  publicDataLabel: {
-    fontSize: 9,
-    fontFamily: "Poppins_500Medium",
-    letterSpacing: 1.8,
-    textTransform: "uppercase",
-    marginBottom: 6,
-  },
-  publicDataHint: {
-    fontSize: 12,
-    fontFamily: "Poppins_300Light",
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  fieldToggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-  },
-  fieldToggleLabel: { fontSize: 14, fontFamily: "Poppins_300Light" },
-  toggleSm: {
-    width: 36,
-    height: 21,
-    borderRadius: 11,
-    borderWidth: 1,
-    justifyContent: "center",
-  },
-  toggleSmThumb: {
-    width: 15,
-    height: 15,
-    borderRadius: 8,
-    opacity: 0.85,
-  },
 });
