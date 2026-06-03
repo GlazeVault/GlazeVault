@@ -24,7 +24,6 @@ import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
 import { resolveImageSource } from "@/constants/seedImages";
-import { DEFAULT_PUBLIC_DATA_SETTINGS, PublicDataSettings } from "@/constants/privacy";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -87,11 +86,6 @@ export default function EditPieceScreen() {
   );
   const [dimensions, setDimensions] = useState(piece?.dimensions ?? "");
   const [year, setYear] = useState(piece?.year ?? "");
-  // Kept only for the Supabase round-trip — publishing is now collection-driven,
-  // so there are no per-piece publishing controls in this form.
-  const [publicData] = useState<PublicDataSettings>(
-    piece?.publicDataSettings ?? { ...DEFAULT_PUBLIC_DATA_SETTINGS }
-  );
   const [collectionId, setCollectionId] = useState<string | undefined>(piece?.collectionId);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
   const [cropSource, setCropSource] = useState<
@@ -146,7 +140,6 @@ export default function EditPieceScreen() {
       dimensions: dimensions.trim(),
       year: year.trim(),
       imageUri: storedImageUri,
-      publicDataSettings: publicData,
       collectionId,
     });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

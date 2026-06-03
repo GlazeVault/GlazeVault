@@ -23,6 +23,11 @@ create table if not exists public.pieces (
   image_url            text not null default '',
   created_at           timestamptz not null default now(),
   is_favorite          boolean not null default false,
+  -- DEPRECATED: `visibility` and `public_data_settings` are legacy per-piece
+  -- publishing fields. Publishing is now collection-driven, so the app no longer
+  -- reads or writes these columns. They are kept (not dropped) so existing rows
+  -- round-trip safely; the NOT NULL DEFAULT / nullable shapes let upserts that
+  -- omit them succeed. Safe to drop in a future migration once no old clients remain.
   visibility           text not null default 'private',
   public_data_settings jsonb,
   collection_id        text
@@ -38,6 +43,9 @@ create table if not exists public.collections (
   title             text not null default '',
   intro             text not null default '',
   created_at        timestamptz not null default now(),
+  -- DEPRECATED: legacy publishing field, no longer read/written by the app.
+  -- Portfolio membership (`featured_on_site`) is the only publishing control.
+  -- Kept for safe round-trip of existing rows; droppable in a future migration.
   visibility        text not null default 'private',
   featured_on_site  boolean not null default false,
   cover_image_url   text

@@ -18,11 +18,6 @@ import {
 import type { Collection } from "@/context/CollectionsContext";
 import type { ArtistProfile } from "@/context/ProfileContext";
 import type { PotteryPiece } from "@/context/PotteryContext";
-import {
-  DEFAULT_PUBLIC_DATA_SETTINGS,
-  type PublicDataSettings,
-  type Visibility,
-} from "@/constants/privacy";
 
 /** Thrown when a remote call is attempted with no Supabase config. */
 export class SupabaseNotConfiguredError extends Error {
@@ -128,11 +123,14 @@ type PieceRow = {
   image_url: string;
   created_at: string;
   is_favorite: boolean;
-  visibility: string;
-  public_data_settings: PublicDataSettings | null;
   collection_id: string | null;
 };
 
+// NOTE: the `pieces` table still has legacy `visibility` and
+// `public_data_settings` columns (NOT NULL DEFAULT 'private' / nullable). They
+// are intentionally no longer read or written here — publishing is
+// collection-driven. Upserts omit them, so existing rows keep their values and
+// new rows fall back to the column defaults. See supabase/schema.sql.
 function pieceToRow(p: PotteryPiece): PieceRow {
   return {
     id: p.id,
@@ -148,8 +146,6 @@ function pieceToRow(p: PotteryPiece): PieceRow {
     image_url: p.imageUri,
     created_at: p.createdAt,
     is_favorite: p.isFavorite,
-    visibility: p.visibility,
-    public_data_settings: p.publicDataSettings,
     collection_id: p.collectionId ?? null,
   };
 }
@@ -169,11 +165,6 @@ function rowToPiece(r: PieceRow): PotteryPiece {
     imageUri: r.image_url ?? "",
     createdAt: r.created_at ?? new Date().toISOString(),
     isFavorite: r.is_favorite ?? false,
-    visibility: (r.visibility as Visibility) ?? "private",
-    publicDataSettings: {
-      ...DEFAULT_PUBLIC_DATA_SETTINGS,
-      ...(r.public_data_settings ?? {}),
-    },
     collectionId: r.collection_id ?? undefined,
   };
 }
@@ -215,18 +206,19 @@ type CollectionRow = {
   title: string;
   intro: string;
   created_at: string;
-  visibility: string;
   featured_on_site: boolean;
   cover_image_url: string | null;
 };
 
+// As with pieces, the `collections` table keeps a legacy `visibility` column
+// (NOT NULL DEFAULT 'private') that is no longer read or written. Portfolio
+// membership (`featured_on_site`) is the only publishing control.
 function collectionToRow(c: Collection): CollectionRow {
   return {
     id: c.id,
     title: c.title,
     intro: c.intro,
     created_at: c.createdAt,
-    visibility: c.visibility,
     featured_on_site: c.featuredOnSite,
     cover_image_url: c.coverImageUri ?? null,
   };
@@ -238,7 +230,6 @@ function rowToCollection(r: CollectionRow): Collection {
     title: r.title ?? "",
     intro: r.intro ?? "",
     createdAt: r.created_at ?? new Date().toISOString(),
-    visibility: (r.visibility as Visibility) ?? "private",
     featuredOnSite: r.featured_on_site ?? false,
     coverImageUri: r.cover_image_url ?? undefined,
   };

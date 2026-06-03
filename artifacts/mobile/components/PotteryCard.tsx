@@ -30,9 +30,9 @@ export function PotteryCard({ piece, fromCollectionId, showVisibility = true }: 
     await toggleFavorite(piece.id);
   };
 
-  // Owner archive metadata is drawn from the piece's own data (never gated by
-  // publicDataSettings — those only affect public surfaces). Order: clay body ·
-  // glaze name · cone · firing environment; only fields with values render.
+  // Owner archive metadata is drawn from the piece's own data and is shown only
+  // on private owner surfaces. Order: clay body · glaze name · cone · firing
+  // environment; only fields with values render.
   const meta = [
     piece.clay,
     piece.glaze,

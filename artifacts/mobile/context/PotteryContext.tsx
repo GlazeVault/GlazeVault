@@ -1,11 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
-import {
-  DEFAULT_PUBLIC_DATA_SETTINGS,
-  PublicDataSettings,
-  Visibility,
-} from "@/constants/privacy";
 import { isSupabaseConfigured } from "@/services/supabase";
 import {
   deletePiece as deletePieceRemote,
@@ -27,18 +22,13 @@ export interface PotteryPiece {
   imageUri: string;
   createdAt: string;
   isFavorite: boolean;
-  visibility: Visibility;
-  publicDataSettings: PublicDataSettings;
   collectionId?: string;
 }
 
 interface PotteryContextType {
   pieces: PotteryPiece[];
   addPiece: (
-    piece: Omit<
-      PotteryPiece,
-      "id" | "createdAt" | "isFavorite" | "visibility" | "publicDataSettings"
-    >
+    piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite">
   ) => Promise<PotteryPiece>;
   updatePiece: (id: string, updates: Partial<PotteryPiece>) => Promise<void>;
   deletePiece: (id: string) => Promise<void>;
@@ -75,9 +65,15 @@ function isDemoSeedPiece(p: Pick<PotteryPiece, "id" | "imageUri">): boolean {
 }
 
 function normalizePiece(
-  p: Partial<PotteryPiece> & { isPublic?: boolean } & Pick<PotteryPiece, "id">
+  p: Partial<PotteryPiece> & {
+    // Legacy publishing fields from older cached/remote rows. Publishing is now
+    // collection-driven, so these are stripped off and never stored on the model.
+    isPublic?: boolean;
+    visibility?: unknown;
+    publicDataSettings?: unknown;
+  } & Pick<PotteryPiece, "id">
 ): PotteryPiece {
-  const { isPublic, ...rest } = p;
+  const { isPublic, visibility, publicDataSettings, ...rest } = p;
   const base = {
     notes: "",
     clay: "",
@@ -90,20 +86,11 @@ function normalizePiece(
     imageUri: "",
     createdAt: new Date().toISOString(),
     isFavorite: false,
-    visibility: "private" as Visibility,
     ...rest,
   } as PotteryPiece;
   if (!base.firingEnvironment && base.firing) {
     base.firingEnvironment = base.firing;
   }
-  // Backward compat: migrate legacy `isPublic` flag → `visibility`.
-  if (rest.visibility == null && isPublic != null) {
-    base.visibility = isPublic ? "public" : "private";
-  }
-  base.publicDataSettings = {
-    ...DEFAULT_PUBLIC_DATA_SETTINGS,
-    ...(rest.publicDataSettings ?? {}),
-  };
   return base;
 }
 
@@ -230,10 +217,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
 
   const addPiece = useCallback(
     async (
-      piece: Omit<
-        PotteryPiece,
-        "id" | "createdAt" | "isFavorite" | "visibility" | "publicDataSettings"
-      >
+      piece: Omit<PotteryPiece, "id" | "createdAt" | "isFavorite">
     ) => {
       const current = piecesRef.current;
       const firingEnvironment = piece.firingEnvironment || piece.firing || "";
@@ -244,8 +228,6 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
         id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
         createdAt: new Date().toISOString(),
         isFavorite: false,
-        visibility: "private",
-        publicDataSettings: { ...DEFAULT_PUBLIC_DATA_SETTINGS },
       };
       await persist([newPiece, ...current]);
       await pushPieceRemote(newPiece);

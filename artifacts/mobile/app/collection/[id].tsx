@@ -24,7 +24,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
-import { Visibility, isCollectionInPortfolio } from "@/constants/privacy";
+import { isCollectionInPortfolio } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
@@ -339,12 +339,10 @@ export default function CollectionDetailScreen() {
       return;
     }
     setSaving(true);
-    // One switch: portfolio membership. `visibility` is kept in lockstep with
-    // `featuredOnSite` purely for Supabase round-trip compatibility.
+    // One switch: portfolio membership is the only publishing control.
     await updateCollection(id, {
       title: title.trim(),
       intro: intro.trim(),
-      visibility: (inPortfolio ? "public" : "private") as Visibility,
       featuredOnSite: inPortfolio,
       coverImageUri: coverImageUri || undefined,
     });

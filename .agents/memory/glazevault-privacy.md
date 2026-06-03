@@ -21,10 +21,12 @@ Public output is a FIXED set: **Title, Photo, Clay, Dimensions, Year**. No user 
 - `buildPublicMetaLine(piece)` always renders `clay · dimensions · year`.
 - **Public piece detail must render ONLY title + photo + buildPublicMetaLine.** Do NOT render `notes` (Studio Notes), glaze, cone, firing, etc. on any `?public=1` surface. **Why:** the architect flagged that the public view was leaking `piece.notes` — a privacy violation, since public-site tiles route into `/piece/[id]?public=1`. **How to apply:** when adding anything to the public branch, confirm the field is in the fixed set; everything else is owner-only.
 
-## Legacy fields kept for round-trip ONLY
-- `piece.visibility` is still STORED but no longer gates anything. Don't read it for visibility decisions; use `isPubliclyVisiblePiece`.
-- `Collection.visibility` is kept in lockstep with `featuredOnSite` (visibility `public` iff in portfolio) purely for Supabase round-trip compatibility — write both together, read neither for gating.
-- `PublicDataSettings` type + `DEFAULT_PUBLIC_DATA_SETTINGS` are kept ONLY so the Supabase row shape round-trips. `addPiece` still seeds `visibility:"private"` + defaults. `PUBLIC_DATA_FIELDS` and the `isPiecePublic`/`isCollectionPublic`/`isCollectionFeatured` helpers were REMOVED — do not reintroduce.
+## Legacy fields REMOVED from the app model (DB columns retained)
+The legacy publishing fields were dropped from the TypeScript model — do NOT reintroduce them:
+- `piece.visibility`, `piece.publicDataSettings`, and `Collection.visibility` are gone from `PotteryPiece`/`Collection`, `addPiece`/`addCollection` seeding, the edit/collection screens, and the Supabase `pieceToRow`/`collectionToRow`/`rowTo*` mappers.
+- `PublicDataSettings` type + `DEFAULT_PUBLIC_DATA_SETTINGS` were DELETED from `constants/privacy.ts`. `PUBLIC_DATA_FIELDS` / `isPiecePublic` / `isCollectionPublic` / `isCollectionFeatured` were removed in the redesign — none of these exist; use `isPubliclyVisiblePiece` / `isCollectionInPortfolio`.
+- The Supabase columns `pieces.visibility`, `pieces.public_data_settings`, `collections.visibility` are STILL in `supabase/schema.sql` (not dropped). **Why kept:** safe round-trip of existing rows. Upserts omit them; `visibility` is `NOT NULL DEFAULT 'private'` so new rows fall back to the default, `public_data_settings` is nullable. **How to apply:** never add these back to the row types/mappers; if you ever drop the columns, do it as a deliberate Supabase migration.
+- `normalizePiece` (PotteryContext) destructures and discards legacy `isPublic`/`visibility`/`publicDataSettings` so they never leak from old cached/remote rows into the model.
 
 ## collectionId vs pieceIds (intentional)
 One collection per piece via `collectionId` (no `pieceIds[]` array). Membership is computed from `collectionId`. Don't add `pieceIds[]` unless multi-collection membership is genuinely needed.

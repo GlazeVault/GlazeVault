@@ -1,46 +1,3 @@
-export type Visibility = "public" | "private";
-
-export interface PublicDataSettings {
-  showTitle: boolean;
-  /**
-   * @deprecated No longer gates rendering. A public piece always shows its image
-   * on public surfaces; this field is kept only for Supabase payload round-trip
-   * compatibility with existing records. Do NOT reintroduce it as a display gate.
-   */
-  showPhotos: boolean;
-  showDescription: boolean;
-  showClayBody: boolean;
-  showGlazeName: boolean;
-  showGlazeRecipe: boolean;
-  showCone: boolean;
-  showFiringEnvironment: boolean;
-  showFiringNotes: boolean;
-  showDimensions: boolean;
-  showYear: boolean;
-  showPrice: boolean;
-}
-
-/**
- * @deprecated Per-field public toggles were removed in the Portfolio redesign.
- * The public field set is now fixed (Title, Photo, Clay, Dimensions, Year). This
- * object is retained ONLY so existing Supabase `public_data_settings` rows keep a
- * stable shape on round-trip; nothing in the UI reads these flags anymore.
- */
-export const DEFAULT_PUBLIC_DATA_SETTINGS: PublicDataSettings = {
-  showTitle: true,
-  showPhotos: true,
-  showDescription: true,
-  showClayBody: true,
-  showGlazeName: false,
-  showGlazeRecipe: false,
-  showCone: false,
-  showFiringEnvironment: false,
-  showFiringNotes: false,
-  showDimensions: true,
-  showYear: true,
-  showPrice: false,
-};
-
 export interface PublicMetaPiece {
   clay: string;
   dimensions: string;
@@ -69,8 +26,7 @@ export function buildPublicMetaLine(piece: PublicMetaPiece): string {
 /**
  * Whether a collection is published to the artist's portfolio. This is the single
  * source of truth for the redesigned one-switch publishing model. `featuredOnSite`
- * is the stored flag (kept in lockstep with `visibility` for Supabase round-trip:
- * in-portfolio collections are saved as public, hidden ones as private).
+ * is the stored flag — the only publishing control there is.
  */
 export function isCollectionInPortfolio(collection: {
   featuredOnSite: boolean;

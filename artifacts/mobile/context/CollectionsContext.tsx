@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
-import { Visibility } from "@/constants/privacy";
 import { isSupabaseConfigured } from "@/services/supabase";
 import {
   deleteCollection as deleteCollectionRemote,
@@ -14,7 +13,6 @@ export interface Collection {
   title: string;
   intro: string;
   createdAt: string;
-  visibility: Visibility;
   featuredOnSite: boolean;
   // Optional artist-chosen cover image (web: base64 data URI, native: relative
   // pieces/ path). When absent, surfaces fall back to a public piece image.
@@ -24,8 +22,7 @@ export interface Collection {
 interface CollectionsContextType {
   collections: Collection[];
   addCollection: (
-    c: Omit<Collection, "id" | "createdAt" | "visibility" | "featuredOnSite"> & {
-      visibility?: Visibility;
+    c: Omit<Collection, "id" | "createdAt" | "featuredOnSite"> & {
       featuredOnSite?: boolean;
     }
   ) => Promise<Collection>;
@@ -98,11 +95,10 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
         const data = await AsyncStorage.getItem(STORAGE_KEY);
         if (data) {
           const parsed = JSON.parse(data) as Partial<Collection>[];
-          // Backward compat: collections saved before privacy default to private,
-          // and collections saved before site-featuring default to not featured.
+          // Backward compat: collections saved before site-featuring default to
+          // not featured.
           cached = parsed.map((c) => ({
             ...(c as Collection),
-            visibility: c.visibility ?? "private",
             featuredOnSite: c.featuredOnSite ?? false,
           }));
           collectionsRef.current = cached;
@@ -153,14 +149,12 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
 
   const addCollection = useCallback(
     async (
-      c: Omit<Collection, "id" | "createdAt" | "visibility" | "featuredOnSite"> & {
-        visibility?: Visibility;
+      c: Omit<Collection, "id" | "createdAt" | "featuredOnSite"> & {
         featuredOnSite?: boolean;
       }
     ): Promise<Collection> => {
       const newCol: Collection = {
         ...c,
-        visibility: c.visibility ?? "private",
         featuredOnSite: c.featuredOnSite ?? false,
         id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
         createdAt: new Date().toISOString(),
