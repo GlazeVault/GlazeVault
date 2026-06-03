@@ -124,6 +124,7 @@ type PieceRow = {
   cone: string;
   firing_environment: string;
   dimensions: string;
+  year: string;
   image_url: string;
   created_at: string;
   is_favorite: boolean;
@@ -143,6 +144,7 @@ function pieceToRow(p: PotteryPiece): PieceRow {
     cone: p.cone,
     firing_environment: p.firingEnvironment,
     dimensions: p.dimensions,
+    year: p.year,
     image_url: p.imageUri,
     created_at: p.createdAt,
     is_favorite: p.isFavorite,
@@ -163,6 +165,7 @@ function rowToPiece(r: PieceRow): PotteryPiece {
     cone: r.cone ?? "",
     firingEnvironment: r.firing_environment ?? r.firing ?? "",
     dimensions: r.dimensions ?? "",
+    year: r.year ?? "",
     imageUri: r.image_url ?? "",
     createdAt: r.created_at ?? new Date().toISOString(),
     isFavorite: r.is_favorite ?? false,

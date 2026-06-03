@@ -103,18 +103,17 @@ export default function PieceDetailScreen() {
   const viewerItems: ViewerItem[] = galleryPieces.map((p) => {
     if (isPublicView) {
       // Captions honor each piece's own public display settings, but stay
-      // curated: material plus a single secondary detail (dimensions, else cone).
+      // curated: clay · dimensions · year. The full technical record stays
+      // private (firing, glaze, cone live only on the owner's studio view).
       const s = p.publicDataSettings;
-      const secondary =
-        s.showDimensions && p.dimensions
-          ? p.dimensions
-          : s.showCone && p.cone
-            ? p.cone
-            : "";
       return {
         uri: p.imageUri,
         title: s.showTitle ? p.title : undefined,
-        materials: [s.showClayBody ? p.clay : "", secondary]
+        materials: [
+          s.showClayBody ? p.clay : "",
+          s.showDimensions ? p.dimensions : "",
+          s.showYear ? p.year : "",
+        ]
           .filter(Boolean)
           .join("  ·  "),
       };
@@ -223,6 +222,7 @@ export default function PieceDetailScreen() {
         showCone: true,
         showFiringEnvironment: true,
         showDimensions: true,
+        showYear: true,
       },
     });
   };
@@ -257,17 +257,16 @@ export default function PieceDetailScreen() {
       );
     }
 
-    // Curated public metadata: keep it quiet and editorial — material plus a
-    // single secondary detail (dimensions preferred, otherwise cone). The full
-    // technical fields remain on the owner's private studio record below.
-    const publicMaterial = pds.showClayBody ? piece.clay : "";
-    const publicSecondary =
-      pds.showDimensions && piece.dimensions
-        ? piece.dimensions
-        : pds.showCone && piece.cone
-          ? piece.cone
-          : "";
-    const publicMeta = [publicMaterial, publicSecondary].filter(Boolean).join("  ·  ");
+    // Curated public metadata: keep it quiet and editorial — clay · dimensions ·
+    // year only (e.g. "Stoneware · 12 × 12 × 14 in · 2026"). The full technical
+    // fields (firing, glaze, cone) remain on the owner's private studio record.
+    const publicMeta = [
+      pds.showClayBody ? piece.clay : "",
+      pds.showDimensions ? piece.dimensions : "",
+      pds.showYear ? piece.year : "",
+    ]
+      .filter(Boolean)
+      .join("  ·  ");
 
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -613,6 +612,13 @@ export default function PieceDetailScreen() {
               <InfoRow
                 label="Dimensions"
                 value={piece.dimensions}
+                accent={colors.mutedForeground}
+              />
+            ) : null}
+            {piece.year ? (
+              <InfoRow
+                label="Year"
+                value={piece.year}
                 accent={colors.mutedForeground}
               />
             ) : null}

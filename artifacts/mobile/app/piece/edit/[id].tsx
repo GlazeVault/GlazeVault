@@ -91,6 +91,7 @@ export default function EditPieceScreen() {
     piece?.firingEnvironment || piece?.firing || ""
   );
   const [dimensions, setDimensions] = useState(piece?.dimensions ?? "");
+  const [year, setYear] = useState(piece?.year ?? "");
   const [visibility, setVisibility] = useState<Visibility>(piece?.visibility ?? "private");
   const [publicData, setPublicData] = useState<PublicDataSettings>(
     piece?.publicDataSettings ?? { ...DEFAULT_PUBLIC_DATA_SETTINGS }
@@ -148,6 +149,7 @@ export default function EditPieceScreen() {
       cone: cone.trim(),
       firingEnvironment,
       dimensions: dimensions.trim(),
+      year: year.trim(),
       imageUri: storedImageUri,
       visibility,
       publicDataSettings: publicData,
@@ -243,8 +245,11 @@ export default function EditPieceScreen() {
           <Label text="Title" />
           <Field value={title} onChange={setTitle} placeholder="e.g. Wabi Yunomi" />
 
-          <Label text="Notes" />
-          <Field value={notes} onChange={setNotes} placeholder="Glaze recipe, firing notes, story…" multiline />
+          <Label text="Year" />
+          <Field value={year} onChange={setYear} placeholder="e.g. 2026" />
+
+          <Label text="Dimensions" />
+          <Field value={dimensions} onChange={setDimensions} placeholder="e.g. 12 × 12 × 14 in (W × D × H)" />
 
           <Label text="Clay Body" />
           <ChipSelector options={CLAY_OPTIONS} value={clay} onChange={setClay} />
@@ -264,8 +269,8 @@ export default function EditPieceScreen() {
             onChange={setFiringEnvironment}
           />
 
-          <Label text="Dimensions" />
-          <Field value={dimensions} onChange={setDimensions} placeholder="e.g. 9 cm H × 11 cm W" />
+          <Label text="Notes" />
+          <Field value={notes} onChange={setNotes} placeholder="Glaze recipe, firing notes, story…" multiline />
 
           {/* Collection */}
           <Label text="Collection" />

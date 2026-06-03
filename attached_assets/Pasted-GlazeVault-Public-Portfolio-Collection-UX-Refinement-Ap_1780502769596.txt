@@ -1,0 +1,209 @@
+GlazeVault Public Portfolio + Collection UX Refinement
+
+Apply all of the following refinements together while preserving the current aesthetic direction.
+
+CORE DIRECTION
+The app should feel like:
+- an artist archive
+- an exhibition catalog
+- a curated monograph
+NOT:
+- a database
+- an inventory system
+- a standard portfolio grid
+
+Preserve:
+- Japandi calmness
+- editorial pacing
+- atmospheric photography
+- soft beige palette
+- serif typography
+- breathing room
+- artwork-first presentation
+
+--------------------------------------------------
+1. COLLECTION STRUCTURE & RHYTHM
+--------------------------------------------------
+
+Collections should feel like separate curated exhibition chapters.
+
+Improve:
+- spacing between collections
+- pacing
+- hierarchy
+- visual transitions
+
+Keep:
+- collection numbering
+- title
+- optional description
+- featured/public logic
+
+Add stronger:
+- negative space
+- editorial rhythm
+- visual pause between collections
+
+Avoid:
+- rigid stacked layouts
+- repetitive grids
+- “feed” feeling
+
+--------------------------------------------------
+2. COLLECTION COVER IMAGE
+--------------------------------------------------
+
+Collection cover images should feel cinematic and immersive.
+
+Requirements:
+- large editorial hero image
+- atmospheric
+- exhibition-opening feeling
+- not like a card component
+
+Important:
+Do NOT repeat the same artwork immediately below the cover.
+
+--------------------------------------------------
+3. PIECE GRID COMPOSITION
+--------------------------------------------------
+
+The artwork grid should feel curated and asymmetrical.
+
+Allow:
+- staggered layouts
+- alternating left/right rhythm
+- occasional larger pieces
+- quieter asymmetry
+
+Avoid:
+- rigid symmetry
+- Pinterest chaos
+- aggressive masonry
+
+The layout should feel:
+- intentional
+- calm
+- art-directed
+
+--------------------------------------------------
+4. PUBLIC PORTFOLIO METADATA
+--------------------------------------------------
+
+Reduce visible public metadata.
+
+ONLY show:
+- Title
+- Clay body/material
+- Dimensions
+- Year
+
+Example:
+
+Moon Jar
+Stoneware · 12 × 12 × 14 in · 2026
+
+Avoid:
+- long technical strings
+- firing environment
+- glaze recipe
+- database-style metadata
+
+Full technical information should remain available inside:
+- Piece detail pages
+- Archive/private views
+
+--------------------------------------------------
+5. DESCRIPTION REFINEMENT
+--------------------------------------------------
+
+Collection descriptions currently feel too long and dense.
+
+Public-facing descriptions should:
+- feel poetic
+- feel editorial
+- be concise
+- support atmosphere
+
+Target:
+2–4 lines maximum before “Read more”.
+
+Desired feeling:
+- exhibition wall text
+- artist monograph
+- quiet curatorial writing
+
+--------------------------------------------------
+6. BADGE SOFTENING
+--------------------------------------------------
+
+Public / Featured badges should feel quieter and less UI-heavy.
+
+Refine:
+- opacity
+- contrast
+- border weight
+- pill styling
+
+They should support the artwork,
+not compete with it.
+
+--------------------------------------------------
+7. IMAGE UPLOAD + CROP UX
+--------------------------------------------------
+
+Current issue:
+Selected image previews do not match final artwork rendering.
+
+Add:
+- live crop preview
+- exact artwork ratio preview
+- pan/zoom/reposition controls
+
+Requirements:
+- saved crop must match preview exactly
+- same corner radius and proportions as final cards
+- calm minimal crop UI
+- no aggressive Instagram-style editor
+
+--------------------------------------------------
+8. NEW PIECE FIELDS
+--------------------------------------------------
+
+Add new fields inside:
+ADD → Record a Piece
+
+Add:
+- Year
+- Dimensions
+
+Recommended order:
+
+Title
+Year
+Dimensions
+Clay Body
+Glaze
+Cone
+Notes
+
+Dimensions format:
+W × D × H
+
+Example:
+12 × 12 × 14 in
+
+Year:
+- default to current year automatically
+- editable manually
+
+--------------------------------------------------
+9. OVERALL EXPERIENCE
+--------------------------------------------------
+
+The entire app should increasingly feel like:
+- a ceramic artist’s archive
+- a quiet gallery space
+- an editorial art publication
+
+The UI should disappear behind the artwork.

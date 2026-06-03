@@ -23,6 +23,7 @@ export interface PotteryPiece {
   cone: string;
   firingEnvironment: string;
   dimensions: string;
+  year: string;
   imageUri: string;
   createdAt: string;
   isFavorite: boolean;
@@ -85,6 +86,7 @@ function normalizePiece(
     cone: "",
     firingEnvironment: "",
     dimensions: "",
+    year: "",
     imageUri: "",
     createdAt: new Date().toISOString(),
     isFavorite: false,

@@ -28,6 +28,36 @@ interface PublicPiece {
   publicDataSettings: PublicDataSettings;
 }
 
+function ExpandableIntro({ text, color }: { text: string; color: string }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [clampable, setClampable] = React.useState(false);
+
+  return (
+    <View style={styles.introWrap}>
+      <Text
+        style={[styles.collectionIntro, { color }]}
+        numberOfLines={expanded ? undefined : 3}
+        onTextLayout={(e) => {
+          if (!clampable && e.nativeEvent.lines.length > 3) setClampable(true);
+        }}
+      >
+        {text}
+      </Text>
+      {clampable ? (
+        <Pressable
+          onPress={() => setExpanded((v) => !v)}
+          hitSlop={8}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.readMore, { color }]}>
+            {expanded ? "Read less" : "Read more"}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 export default function PublicSiteScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -262,9 +292,10 @@ export default function PublicSiteScreen() {
                   {`${cp.length} ${cp.length === 1 ? "piece" : "pieces"}`}
                 </Text>
                 {collection.intro.trim() ? (
-                  <Text style={[styles.collectionIntro, { color: colors.mutedForeground }]}>
-                    {collection.intro.trim()}
-                  </Text>
+                  <ExpandableIntro
+                    text={collection.intro.trim()}
+                    color={colors.mutedForeground}
+                  />
                 ) : null}
               </View>
               {coverUri ? (
@@ -444,11 +475,19 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginTop: 10,
   },
+  introWrap: { marginTop: 12 },
   collectionIntro: {
     fontSize: 13.5,
     fontFamily: "Poppins_300Light",
     lineHeight: 22,
-    marginTop: 12,
+  },
+  readMore: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginTop: 8,
+    opacity: 0.8,
   },
   // Catalog layout (asymmetric art-book rhythm)
   catalogWrap: { gap: 30, marginTop: 18 },

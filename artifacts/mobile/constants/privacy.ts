@@ -11,6 +11,7 @@ export interface PublicDataSettings {
   showFiringEnvironment: boolean;
   showFiringNotes: boolean;
   showDimensions: boolean;
+  showYear: boolean;
   showPrice: boolean;
 }
 
@@ -25,6 +26,7 @@ export const DEFAULT_PUBLIC_DATA_SETTINGS: PublicDataSettings = {
   showFiringEnvironment: false,
   showFiringNotes: false,
   showDimensions: true,
+  showYear: true,
   showPrice: false,
 };
 
@@ -39,6 +41,7 @@ export const PUBLIC_DATA_FIELDS: { key: keyof PublicDataSettings; label: string 
   { key: "showFiringEnvironment", label: "Firing Environment" },
   { key: "showFiringNotes", label: "Firing Notes" },
   { key: "showDimensions", label: "Dimensions" },
+  { key: "showYear", label: "Year" },
   { key: "showPrice", label: "Price" },
 ];
 

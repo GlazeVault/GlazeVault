@@ -86,6 +86,7 @@ export default function AddScreen() {
   const [cone, setCone] = useState("");
   const [firingEnvironment, setFiringEnvironment] = useState("");
   const [dimensions, setDimensions] = useState("");
+  const [year, setYear] = useState(String(new Date().getFullYear()));
   const [collectionId, setCollectionId] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
@@ -156,9 +157,9 @@ export default function AddScreen() {
       Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
       return;
     }
-    await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), imageUri: storedImageUri, collectionId });
+    await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), year: year.trim(), imageUri: storedImageUri, collectionId });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setImageUri(null); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setCollectionId(undefined);
+    setImageUri(null); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear())); setCollectionId(undefined);
     setSaving(false);
     router.replace("/");
   };
@@ -245,8 +246,11 @@ export default function AddScreen() {
         <Label text="Title" />
         <Field value={title} onChange={setTitle} placeholder="e.g. Wabi Yunomi" />
 
-        <Label text="Notes" />
-        <Field value={notes} onChange={setNotes} placeholder="Glaze recipe, firing notes, story…" multiline />
+        <Label text="Year" />
+        <Field value={year} onChange={setYear} placeholder="e.g. 2026" />
+
+        <Label text="Dimensions" />
+        <Field value={dimensions} onChange={setDimensions} placeholder="e.g. 12 × 12 × 14 in (W × D × H)" />
 
         <Label text="Clay Body" />
         <ChipSelector options={CLAY_OPTIONS} value={clay} onChange={setClay} />
@@ -266,8 +270,8 @@ export default function AddScreen() {
           onChange={setFiringEnvironment}
         />
 
-        <Label text="Dimensions" />
-        <Field value={dimensions} onChange={setDimensions} placeholder="e.g. 9 cm H × 11 cm W" />
+        <Label text="Notes" />
+        <Field value={notes} onChange={setNotes} placeholder="Glaze recipe, firing notes, story…" multiline />
 
         {collections.length > 0 && (
           <>

@@ -19,6 +19,7 @@ create table if not exists public.pieces (
   cone                 text not null default '',
   firing_environment   text not null default '',
   dimensions           text not null default '',
+  year                 text not null default '',
   image_url            text not null default '',
   created_at           timestamptz not null default now(),
   is_favorite          boolean not null default false,
@@ -26,6 +27,10 @@ create table if not exists public.pieces (
   public_data_settings jsonb,
   collection_id        text
 );
+
+-- Idempotent migrations for existing databases (create table above only runs on
+-- fresh setups, so new columns must also be added here).
+alter table public.pieces add column if not exists year text not null default '';
 
 -- ── collections ─────────────────────────────────────────────────────────────
 create table if not exists public.collections (
