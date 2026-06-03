@@ -34,13 +34,17 @@ async function webImageToDataUri(uri: string): Promise<string> {
  *   container path between builds/installs, which would otherwise orphan every
  *   saved photo. Use `resolveImageSource` to turn it back into a usable URI.
  *
- * Idempotent: seed refs, data URIs, and already-persisted relative paths are
- * returned untouched.
+ * Idempotent: seed refs, data URIs, already-uploaded remote (`http(s)://`) URLs,
+ * and already-persisted relative paths are returned untouched. This matters for
+ * metadata-only edits: once a piece has synced to Supabase its `imageUri` is a
+ * remote Storage URL, and trying to re-store that (copying it as a local file on
+ * native, or re-fetching it on web) would throw and abort the whole save.
  */
 export async function persistPieceImage(uri: string): Promise<string> {
   if (!uri) return uri;
   if (uri.startsWith("@seed")) return uri;
   if (uri.startsWith("data:")) return uri;
+  if (uri.startsWith("http://") || uri.startsWith("https://")) return uri;
 
   if (Platform.OS === "web") {
     return await webImageToDataUri(uri);
