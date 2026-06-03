@@ -201,6 +201,25 @@ export default function PieceDetailScreen() {
     });
   };
 
+  // Quick action: reveal the common public details in one tap. Recipe + firing
+  // notes stay OFF (they're the sensitive fields kept private by default).
+  const showAllPublicDetails = async () => {
+    await Haptics.selectionAsync();
+    await updatePiece(piece.id, {
+      publicDataSettings: {
+        ...piece.publicDataSettings,
+        showTitle: true,
+        showPhotos: true,
+        showDescription: true,
+        showClayBody: true,
+        showGlazeName: true,
+        showCone: true,
+        showFiringEnvironment: true,
+        showDimensions: true,
+      },
+    });
+  };
+
   // Public preview: how this piece appears to others. Only fields enabled in
   // publicDataSettings are shown. This owner-facing preview keys off the piece's
   // own visibility only — collection-level privacy is enforced separately at the
@@ -471,8 +490,26 @@ export default function PieceDetailScreen() {
                 Public Display Settings
               </Text>
               <Text style={[styles.publicDataHint, { color: colors.mutedForeground }]}>
-                Choose what shows on the public view of this piece.
+                Your piece is public. Choose which details visitors can see.
               </Text>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.showAllBtn,
+                  {
+                    backgroundColor: "rgba(107,139,122,0.1)",
+                    borderColor: "rgba(107,139,122,0.3)",
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+                onPress={showAllPublicDetails}
+                accessibilityRole="button"
+                accessibilityLabel="Show all public details"
+              >
+                <Feather name="eye" size={13} color={colors.emerald} />
+                <Text style={[styles.showAllBtnText, { color: colors.emerald }]}>
+                  Show all public details
+                </Text>
+              </Pressable>
               {PUBLIC_DATA_FIELDS.map((field, i) => {
                 const on = pds[field.key];
                 return (
@@ -966,7 +1003,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Poppins_300Light",
     lineHeight: 18,
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  showAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 0.75,
+    marginBottom: 6,
+  },
+  showAllBtnText: {
+    fontSize: 13,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.3,
   },
   fieldToggleRow: {
     flexDirection: "row",

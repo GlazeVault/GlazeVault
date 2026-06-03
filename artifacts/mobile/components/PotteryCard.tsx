@@ -15,7 +15,7 @@ interface PotteryCardProps {
   showVisibility?: boolean;
 }
 
-export function PotteryCard({ piece, fromCollectionId, showVisibility }: PotteryCardProps) {
+export function PotteryCard({ piece, fromCollectionId, showVisibility = true }: PotteryCardProps) {
   const colors = useColors();
   const { toggleFavorite } = usePottery();
   const isPrivate = piece.visibility === "private";
@@ -25,7 +25,15 @@ export function PotteryCard({ piece, fromCollectionId, showVisibility }: Pottery
     await toggleFavorite(piece.id);
   };
 
-  const meta = [piece.clay, piece.cone, piece.firingEnvironment || piece.firing]
+  // Owner archive metadata is drawn from the piece's own data (never gated by
+  // publicDataSettings — those only affect public surfaces). Order: clay body ·
+  // glaze name · cone · firing environment; only fields with values render.
+  const meta = [
+    piece.clay,
+    piece.glaze,
+    piece.cone,
+    piece.firingEnvironment || piece.firing,
+  ]
     .filter(Boolean)
     .join("  ·  ");
 
