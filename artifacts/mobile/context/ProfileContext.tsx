@@ -1,6 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
+import { isSupabaseConfigured } from "@/services/supabase";
+import {
+  loadProfile as loadProfileRemote,
+  saveProfile as saveProfileRemote,
+} from "@/services/dataService";
+
 export type HomepageLayout = "grid" | "editorial" | "masonry";
 
 export interface PublicSiteSettings {
@@ -79,24 +85,16 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   // an older snapshot can never overwrite a newer one.
   const writeChain = useRef<Promise<void>>(Promise.resolve());
 
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((data) => {
-        if (data) {
-          const next = normalizeProfile(JSON.parse(data));
-          profileRef.current = next;
-          setProfile(next);
-          console.log("Loaded profile", next.name || "(unnamed)");
-          if (next.avatarUri) console.log("Loaded profile avatar", next.avatarUri.slice(0, 40));
-        } else {
-          console.log("Loaded profile", "(none)");
-        }
-      })
-      .catch((e) => console.warn("Failed to load profile", e));
+  // Whether the profile holds any user-entered data worth migrating to Supabase
+  // on first connect (avoids pushing an empty default row).
+  const hasContent = useCallback((p: ArtistProfile): boolean => {
+    return Boolean(
+      p.name || p.bio || p.statement || p.website || p.instagram || p.avatarUri
+    );
   }, []);
 
-  const updateProfile = useCallback(async (updates: Partial<ArtistProfile>) => {
-    const updated = { ...profileRef.current, ...updates };
+  // Writes to the AsyncStorage cache only.
+  const persistCache = useCallback(async (updated: ArtistProfile) => {
     profileRef.current = updated;
     setProfile(updated);
     const write = writeChain.current
@@ -106,6 +104,67 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     await write;
     console.log("Saved profile", updated.name || "(unnamed)");
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      // 1. Local cache first.
+      let cached: ArtistProfile = DEFAULT_PROFILE;
+      try {
+        const data = await AsyncStorage.getItem(STORAGE_KEY);
+        if (data) {
+          cached = normalizeProfile(JSON.parse(data));
+          profileRef.current = cached;
+          setProfile(cached);
+          console.log("Loaded profile", cached.name || "(unnamed)");
+          if (cached.avatarUri) console.log("Loaded profile avatar", cached.avatarUri.slice(0, 40));
+        } else {
+          console.log("Loaded profile", "(none)");
+        }
+      } catch (e) {
+        console.warn("Failed to load profile", e);
+      }
+
+      // 2. Supabase is the source of truth when configured + reachable.
+      if (isSupabaseConfigured) {
+        try {
+          const remote = await loadProfileRemote();
+          if (remote) {
+            const next = normalizeProfile({ ...cached, ...remote });
+            profileRef.current = next;
+            setProfile(next);
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+            console.log("[supabase] loaded profile", next.name || "(unnamed)");
+          } else if (hasContent(cached)) {
+            console.log("[supabase] migrating local profile");
+            await saveProfileRemote(cached).catch((e) =>
+              console.warn("[supabase] migrate profile failed", e)
+            );
+          }
+        } catch (e) {
+          console.warn("[supabase] loadProfile failed, using local cache", e);
+        }
+      }
+    })();
+  }, [hasContent]);
+
+  const updateProfile = useCallback(
+    async (updates: Partial<ArtistProfile>) => {
+      const updated = { ...profileRef.current, ...updates };
+      await persistCache(updated);
+      if (isSupabaseConfigured) {
+        try {
+          const saved = await saveProfileRemote(updated);
+          // Fold any uploaded avatar URL back into the cache.
+          if (saved.avatarUri !== updated.avatarUri) {
+            await persistCache({ ...profileRef.current, avatarUri: saved.avatarUri });
+          }
+        } catch (e) {
+          console.warn("[supabase] saveProfile failed (kept in local cache)", e);
+        }
+      }
+    },
+    [persistCache]
+  );
 
   const updatePublicSite = useCallback(
     async (updates: Partial<PublicSiteSettings>) => {

@@ -6,6 +6,12 @@ import {
   PublicDataSettings,
   Visibility,
 } from "@/constants/privacy";
+import { isSupabaseConfigured } from "@/services/supabase";
+import {
+  deletePiece as deletePieceRemote,
+  loadPieces as loadPiecesRemote,
+  savePiece as savePieceRemote,
+} from "@/services/dataService";
 
 export interface PotteryPiece {
   id: string;
@@ -120,30 +126,8 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   // an older snapshot can never overwrite a newer one.
   const writeChain = useRef<Promise<void>>(Promise.resolve());
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await AsyncStorage.getItem(STORAGE_KEY);
-        if (data) {
-          const parsed = JSON.parse(data) as Array<Partial<PotteryPiece> & Pick<PotteryPiece, "id">>;
-          const normalized = parsed.map(normalizePiece);
-          piecesRef.current = normalized;
-          setPieces(normalized);
-          console.log("Loaded pieces", normalized.length);
-        } else {
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_PIECES));
-          piecesRef.current = SEED_PIECES;
-          setPieces(SEED_PIECES);
-          console.log("Loaded pieces", SEED_PIECES.length, "(seeded)");
-        }
-      } catch (e) {
-        console.warn("Failed to load pieces", e);
-        piecesRef.current = SEED_PIECES;
-        setPieces(SEED_PIECES);
-      }
-    })();
-  }, []);
-
+  // Writes to the AsyncStorage cache only. Supabase is the source of truth when
+  // configured; the cache exists for instant first paint and offline use.
   const persist = useCallback(async (updated: PotteryPiece[]) => {
     piecesRef.current = updated;
     setPieces(updated);
@@ -154,6 +138,112 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
     await write;
     console.log("Saved pieces", updated.length);
   }, []);
+
+  // Pushes a single piece to Supabase. On success the returned record carries
+  // any freshly-uploaded image URL, which we fold back into the cache so the
+  // same local image is never re-uploaded on later edits. Failures are kept in
+  // the cache (offline buffer) and logged.
+  const pushPieceRemote = useCallback(
+    async (piece: PotteryPiece) => {
+      if (!isSupabaseConfigured) return;
+      try {
+        const saved = await savePieceRemote(piece);
+        if (saved.imageUri !== piece.imageUri) {
+          await persist(
+            piecesRef.current.map((p) =>
+              p.id === saved.id ? { ...p, imageUri: saved.imageUri } : p
+            )
+          );
+        }
+      } catch (e) {
+        console.warn("[supabase] savePiece failed (kept in local cache)", e);
+      }
+    },
+    [persist]
+  );
+
+  const removePieceRemote = useCallback(async (id: string) => {
+    if (!isSupabaseConfigured) return;
+    try {
+      await deletePieceRemote(id);
+    } catch (e) {
+      console.warn("[supabase] deletePiece failed", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      // 1. Local cache first — instant paint + offline fallback.
+      let cached: PotteryPiece[] = [];
+      try {
+        const data = await AsyncStorage.getItem(STORAGE_KEY);
+        if (data) {
+          const parsed = JSON.parse(data) as Array<Partial<PotteryPiece> & Pick<PotteryPiece, "id">>;
+          cached = parsed.map(normalizePiece);
+          piecesRef.current = cached;
+          setPieces(cached);
+          console.log("Loaded pieces", cached.length);
+        } else if (!isSupabaseConfigured) {
+          // Only seed when there is no backend to be the source of truth.
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_PIECES));
+          cached = SEED_PIECES;
+          piecesRef.current = SEED_PIECES;
+          setPieces(SEED_PIECES);
+          console.log("Loaded pieces", SEED_PIECES.length, "(seeded)");
+        } else {
+          console.log("Loaded pieces", 0);
+        }
+      } catch (e) {
+        console.warn("Failed to load pieces", e);
+        if (!isSupabaseConfigured) {
+          cached = SEED_PIECES;
+          piecesRef.current = SEED_PIECES;
+          setPieces(SEED_PIECES);
+        }
+      }
+
+      // 2. Supabase is the source of truth when configured + reachable.
+      //    Conflicts resolve remote-wins, but records that exist only in the
+      //    cache (created offline, never pushed) are preserved and synced up so
+      //    a freshly-added piece can't vanish on the next launch. NOTE: offline
+      //    *edits* to an existing piece and offline *deletes* still follow
+      //    remote-wins — full offline conflict/delete sync is a future step.
+      if (isSupabaseConfigured) {
+        try {
+          const remote = await loadPiecesRemote();
+          if (remote.length > 0) {
+            const remoteIds = new Set(remote.map((p) => p.id));
+            const localOnly = cached.filter((p) => !remoteIds.has(p.id));
+            const merged = [...localOnly, ...remote].sort((a, b) =>
+              b.createdAt.localeCompare(a.createdAt)
+            );
+            await persist(merged);
+            console.log(
+              "[supabase] loaded pieces",
+              remote.length,
+              localOnly.length ? `(+${localOnly.length} local unsynced)` : ""
+            );
+            await Promise.all(localOnly.map((p) => pushPieceRemote(p)));
+          } else if (cached.length > 0) {
+            // First connect with an empty cloud DB: migrate local data up and
+            // fold the returned image URLs back into the cache.
+            console.log("[supabase] migrating", cached.length, "local pieces");
+            const migrated = await Promise.all(
+              cached.map((p) =>
+                savePieceRemote(p).catch((e) => {
+                  console.warn("[supabase] migrate piece failed", e);
+                  return p;
+                })
+              )
+            );
+            await persist(migrated);
+          }
+        } catch (e) {
+          console.warn("[supabase] loadPieces failed, using local cache", e);
+        }
+      }
+    })();
+  }, [persist, pushPieceRemote]);
 
   const addPiece = useCallback(
     async (
@@ -175,16 +265,18 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
         publicDataSettings: { ...DEFAULT_PUBLIC_DATA_SETTINGS },
       };
       await persist([newPiece, ...current]);
+      await pushPieceRemote(newPiece);
     },
-    [persist]
+    [persist, pushPieceRemote]
   );
 
   const updatePiece = useCallback(
     async (id: string, updates: Partial<PotteryPiece>) => {
+      let merged: PotteryPiece | undefined;
       await persist(
         piecesRef.current.map((p) => {
           if (p.id !== id) return p;
-          const merged = { ...p, ...updates };
+          merged = { ...p, ...updates };
           if (updates.firingEnvironment !== undefined || updates.firing !== undefined) {
             const firingEnvironment = merged.firingEnvironment || merged.firing || "";
             merged.firingEnvironment = firingEnvironment;
@@ -196,35 +288,51 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
           return merged;
         })
       );
+      if (merged) await pushPieceRemote(merged);
     },
-    [persist]
+    [persist, pushPieceRemote]
   );
 
   const deletePiece = useCallback(
     async (id: string) => {
       await persist(piecesRef.current.filter((p) => p.id !== id));
+      await removePieceRemote(id);
     },
-    [persist]
+    [persist, removePieceRemote]
   );
 
   const removePieceFromCollection = useCallback(
     async (collectionId: string, pieceId: string) => {
+      let changed: PotteryPiece | undefined;
       await persist(
-        piecesRef.current.map((p) =>
-          p.id === pieceId && p.collectionId === collectionId
-            ? { ...p, collectionId: undefined }
-            : p
-        )
+        piecesRef.current.map((p) => {
+          if (p.id === pieceId && p.collectionId === collectionId) {
+            changed = { ...p, collectionId: undefined };
+            return changed;
+          }
+          return p;
+        })
       );
+      if (changed) await pushPieceRemote(changed);
     },
-    [persist]
+    [persist, pushPieceRemote]
   );
 
   const toggleFavorite = useCallback(
     async (id: string) => {
-      await persist(piecesRef.current.map((p) => (p.id === id ? { ...p, isFavorite: !p.isFavorite } : p)));
+      let changed: PotteryPiece | undefined;
+      await persist(
+        piecesRef.current.map((p) => {
+          if (p.id === id) {
+            changed = { ...p, isFavorite: !p.isFavorite };
+            return changed;
+          }
+          return p;
+        })
+      );
+      if (changed) await pushPieceRemote(changed);
     },
-    [persist]
+    [persist, pushPieceRemote]
   );
 
   const getPiece = useCallback((id: string) => piecesRef.current.find((p) => p.id === id), []);

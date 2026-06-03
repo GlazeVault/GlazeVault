@@ -58,9 +58,11 @@
   "dependencies": {
     "@expo-google-fonts/playfair-display": "^0.4.2",
     "@expo-google-fonts/poppins": "^0.4.1",
+    "@supabase/supabase-js": "^2.106.2",
     "expo-clipboard": "~8.0.8",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.23",
-    "expo-sharing": "^56.0.15"
+    "expo-sharing": "^56.0.15",
+    "react-native-url-polyfill": "^3.0.0"
   }
 }

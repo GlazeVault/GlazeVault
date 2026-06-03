@@ -2,6 +2,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { Visibility } from "@/constants/privacy";
+import { isSupabaseConfigured } from "@/services/supabase";
+import {
+  deleteCollection as deleteCollectionRemote,
+  loadCollections as loadCollectionsRemote,
+  saveCollection as saveCollectionRemote,
+} from "@/services/dataService";
 
 export interface Collection {
   id: string;
@@ -41,28 +47,8 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
   // an older snapshot can never overwrite a newer one.
   const writeChain = useRef<Promise<void>>(Promise.resolve());
 
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((data) => {
-        if (!data) {
-          console.log("Loaded collections", 0);
-          return;
-        }
-        const parsed = JSON.parse(data) as Partial<Collection>[];
-        // Backward compat: collections saved before privacy default to private,
-        // and collections saved before site-featuring default to not featured.
-        const normalized = parsed.map((c) => ({
-          ...(c as Collection),
-          visibility: c.visibility ?? "private",
-          featuredOnSite: c.featuredOnSite ?? false,
-        }));
-        collectionsRef.current = normalized;
-        setCollections(normalized);
-        console.log("Loaded collections", normalized.length);
-      })
-      .catch((e) => console.warn("Failed to load collections", e));
-  }, []);
-
+  // Writes to the AsyncStorage cache only. Supabase is the source of truth when
+  // configured; the cache exists for instant first paint and offline use.
   const persist = useCallback(async (updated: Collection[]) => {
     collectionsRef.current = updated;
     setCollections(updated);
@@ -73,6 +59,97 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
     await write;
     console.log("Saved collections", updated.length);
   }, []);
+
+  // Pushes a single collection to Supabase, folding any uploaded cover-image URL
+  // back into the cache. Failures stay in the cache and are logged.
+  const pushCollectionRemote = useCallback(
+    async (col: Collection) => {
+      if (!isSupabaseConfigured) return;
+      try {
+        const saved = await saveCollectionRemote(col);
+        if (saved.coverImageUri !== col.coverImageUri) {
+          await persist(
+            collectionsRef.current.map((c) =>
+              c.id === saved.id ? { ...c, coverImageUri: saved.coverImageUri } : c
+            )
+          );
+        }
+      } catch (e) {
+        console.warn("[supabase] saveCollection failed (kept in local cache)", e);
+      }
+    },
+    [persist]
+  );
+
+  const removeCollectionRemote = useCallback(async (id: string) => {
+    if (!isSupabaseConfigured) return;
+    try {
+      await deleteCollectionRemote(id);
+    } catch (e) {
+      console.warn("[supabase] deleteCollection failed", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      // 1. Local cache first.
+      let cached: Collection[] = [];
+      try {
+        const data = await AsyncStorage.getItem(STORAGE_KEY);
+        if (data) {
+          const parsed = JSON.parse(data) as Partial<Collection>[];
+          // Backward compat: collections saved before privacy default to private,
+          // and collections saved before site-featuring default to not featured.
+          cached = parsed.map((c) => ({
+            ...(c as Collection),
+            visibility: c.visibility ?? "private",
+            featuredOnSite: c.featuredOnSite ?? false,
+          }));
+          collectionsRef.current = cached;
+          setCollections(cached);
+          console.log("Loaded collections", cached.length);
+        } else {
+          console.log("Loaded collections", 0);
+        }
+      } catch (e) {
+        console.warn("Failed to load collections", e);
+      }
+
+      // 2. Supabase is the source of truth when configured + reachable.
+      //    Remote-wins on conflicts, but cache-only collections (created offline,
+      //    never pushed) are preserved and synced up. Offline edits/deletes to an
+      //    existing collection still follow remote-wins (future: full sync).
+      if (isSupabaseConfigured) {
+        try {
+          const remote = await loadCollectionsRemote();
+          if (remote.length > 0) {
+            const remoteIds = new Set(remote.map((c) => c.id));
+            const localOnly = cached.filter((c) => !remoteIds.has(c.id));
+            await persist([...remote, ...localOnly]);
+            console.log(
+              "[supabase] loaded collections",
+              remote.length,
+              localOnly.length ? `(+${localOnly.length} local unsynced)` : ""
+            );
+            await Promise.all(localOnly.map((c) => pushCollectionRemote(c)));
+          } else if (cached.length > 0) {
+            console.log("[supabase] migrating", cached.length, "local collections");
+            const migrated = await Promise.all(
+              cached.map((c) =>
+                saveCollectionRemote(c).catch((e) => {
+                  console.warn("[supabase] migrate collection failed", e);
+                  return c;
+                })
+              )
+            );
+            await persist(migrated);
+          }
+        } catch (e) {
+          console.warn("[supabase] loadCollections failed, using local cache", e);
+        }
+      }
+    })();
+  }, [persist, pushCollectionRemote]);
 
   const addCollection = useCallback(
     async (
@@ -89,25 +166,33 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
         createdAt: new Date().toISOString(),
       };
       await persist([...collectionsRef.current, newCol]);
+      await pushCollectionRemote(newCol);
       return newCol;
     },
-    [persist]
+    [persist, pushCollectionRemote]
   );
 
   const updateCollection = useCallback(
     async (id: string, updates: Partial<Collection>) => {
+      let changed: Collection | undefined;
       await persist(
-        collectionsRef.current.map((c) => (c.id === id ? { ...c, ...updates } : c))
+        collectionsRef.current.map((c) => {
+          if (c.id !== id) return c;
+          changed = { ...c, ...updates };
+          return changed;
+        })
       );
+      if (changed) await pushCollectionRemote(changed);
     },
-    [persist]
+    [persist, pushCollectionRemote]
   );
 
   const deleteCollection = useCallback(
     async (id: string) => {
       await persist(collectionsRef.current.filter((c) => c.id !== id));
+      await removeCollectionRemote(id);
     },
-    [persist]
+    [persist, removeCollectionRemote]
   );
 
   const getCollection = useCallback(
