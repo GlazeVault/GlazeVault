@@ -70,6 +70,14 @@ begin
   end loop;
 end $$;
 
+-- RLS controls WHICH rows are visible; table-level GRANTs control whether the
+-- anon/authenticated roles may touch the table at all. Both are required for the
+-- PostgREST API (used by @supabase/supabase-js) to read/write these tables.
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete
+  on public.pieces, public.collections, public.profiles
+  to anon, authenticated;
+
 -- ── Storage bucket for images ────────────────────────────────────────────────
 -- Create a PUBLIC bucket named `images`:
 --   Dashboard → Storage → New bucket → name `images` → toggle "Public" on.
