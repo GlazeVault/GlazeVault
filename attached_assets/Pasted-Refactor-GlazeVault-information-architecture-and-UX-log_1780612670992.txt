@@ -1,0 +1,114 @@
+Refactor GlazeVault information architecture and UX logic to remove the current confusion between Archive, Public, Collections, and Portfolio.
+
+CORE PHILOSOPHY
+
+Archive = the permanent master vault.
+Every recorded piece is automatically saved into Archive.
+
+Collections = curated groupings of PUBLIC pieces.
+
+Portfolio/Public Site = a presentation layer built from FEATURED collections.
+
+FEATURED should belong to COLLECTIONS, not individual pieces.
+
+FINAL DATA / VISIBILITY LOGIC
+
+Piece:
+- always exists in Archive once created
+- can be Public or Private
+- can belong to zero or more Collections
+- does NOT have a “featured” state
+
+Collection:
+- contains only Public pieces
+- can be Public or Private
+- can be Featured in Portfolio
+
+Portfolio:
+- displays Featured Collections only
+
+RULES
+
+1. Saving a piece:
+Current:
+“Save to Archive”
+
+Keep this wording for now.
+
+2. Remove “Archive Piece” action entirely.
+Reason:
+the piece is already archived by definition.
+
+Replace with:
+“Retire Piece”
+Meaning:
+hide from active views/public/collections while preserving the record.
+
+3. Piece Detail screen should contain ONLY:
+- Public / Private toggle
+- Add to Collection
+- Edit Piece
+- Share
+- Retire Piece
+- Delete Piece
+
+REMOVE:
+“Feature in Portfolio” from Piece Detail.
+
+4. Add “Feature in Portfolio” ONLY inside Collection Edit / Collection Settings.
+
+5. Collection logic:
+- Private pieces CANNOT appear inside public collections.
+- If user adds a private piece to a collection:
+    automatically switch the piece to Public
+    OR show confirmation:
+    “Collections are public-facing. Make this piece public?”
+
+6. After saving a piece:
+DO NOT force the user to go back to Archive manually.
+
+Instead show:
+- Make Public
+- Add to Collection
+
+immediately after save.
+
+7. Portfolio rendering:
+Portfolio page should render ONLY Featured Collections in this order:
+
+Collection title
+Hero image
+Short expandable description
+Collection works grid
+
+8. Archive browsing:
+Archive is NOT the portfolio.
+Archive remains the artist’s internal vault/library.
+
+9. Retired pieces:
+Retired pieces:
+- stay in archive
+- disappear from public views
+- disappear from collections and portfolio
+- remain editable privately
+
+10. Clean up labels:
+Use consistent terminology everywhere:
+
+Archive = vault/database
+Collection = grouping
+Portfolio = curated public presentation
+Public = visibility state
+Featured = portfolio inclusion
+
+Avoid mixing these concepts in the same toggle area.
+
+11. UX goal:
+The experience should feel intuitive even for elderly ceramic artists with zero technical knowledge.
+
+The mental model should be:
+
+“Everything is safely stored.”
+“Some works become public.”
+“Some public works go into collections.”
+“Some collections appear in my portfolio.”
