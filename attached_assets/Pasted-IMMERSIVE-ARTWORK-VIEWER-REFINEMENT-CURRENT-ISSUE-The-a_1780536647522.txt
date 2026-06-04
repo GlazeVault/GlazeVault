@@ -1,0 +1,148 @@
+IMMERSIVE ARTWORK VIEWER REFINEMENT
+
+CURRENT ISSUE
+
+The app currently has two disconnected viewing modes:
+
+1. Piece Detail
+- image
+- title
+- metadata
+- Public / Featured controls
+- collection info
+
+2. Fullscreen Photo Viewer
+- image only
+- metadata/context disappears
+
+This creates a broken experience.
+
+When a user taps a photo and then swipes to the next piece,
+the artwork information disappears, making it feel like a separate photo gallery instead of a continuous artwork viewing experience.
+
+NEW DIRECTION
+
+Fullscreen should feel like an extension of Piece Detail,
+not a disconnected photo viewer.
+
+The goal is:
+
+Detail page
+→ immersive artwork viewer
+→ swipe through works
+→ keep context
+
+FULLSCREEN VIEWER REQUIREMENTS
+
+In fullscreen mode, keep minimal artwork metadata visible.
+
+BOTTOM OVERLAY
+
+Show a subtle bottom overlay with:
+
+- title
+- material / clay body
+- glaze or cone if available
+- year
+- collection name if available
+
+Example:
+
+Untitled
+Stoneware · Cone 10 · 2024
+Passage Collection
+
+TOP OVERLAY
+
+Keep:
+
+- close button
+- current position count
+- share button if available
+
+Example:
+
+X        6 / 11        Share
+
+INTERACTION RULES
+
+Horizontal swipe:
+- move to next / previous piece
+
+Vertical swipe down:
+- dismiss viewer
+- return to the exact same archive or collection scroll position
+
+Single tap:
+- hide/show UI overlays
+
+Default:
+- metadata visible
+
+Tap once:
+- full immersion, hide overlays
+
+Tap again:
+- show overlays again
+
+IMPORTANT CONTEXT RULE
+
+When swiping to the next piece in fullscreen,
+the metadata must update with the artwork.
+
+Do not show image-only navigation without context.
+
+The viewer should preserve the current browsing context:
+
+Examples:
+Archive → Piece 5 → fullscreen → swipe → Piece 6
+
+Passage Collection → Piece A → fullscreen → swipe → Piece B
+
+Do not jump between unrelated collections.
+
+DESIGN GOAL
+
+This should feel like:
+
+- flipping through an art book
+- browsing a museum archive
+- viewing a digital exhibition catalog
+
+not like a generic phone photo gallery.
+
+VISUAL DIRECTION
+
+Use:
+- dark immersive background
+- subtle translucent metadata overlay
+- quiet typography
+- smooth fade transitions
+- calm swipe movement
+
+Avoid:
+- heavy UI
+- noisy buttons
+- disappearing context
+- social-media style interaction
+
+FUTURE OPTION
+
+Later, add a deep detail drawer.
+
+From fullscreen viewer, user can swipe up or tap “Details” to see:
+
+- dimensions
+- glaze notes
+- firing info
+- clay body
+- process notes
+- private studio notes
+
+But private studio notes must remain private and never appear in public/shared viewer.
+
+CORE PRINCIPLE
+
+Fullscreen viewer is not just a photo viewer.
+
+It is an immersive artwork viewing system.
