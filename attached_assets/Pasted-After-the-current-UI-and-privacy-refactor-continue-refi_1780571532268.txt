@@ -1,0 +1,108 @@
+After the current UI and privacy refactor, continue refining the core GlazeVault experience with these decisions and priorities:
+
+CORE EXPERIENCE
+- GlazeVault should feel like a calm digital ceramic archive and exhibition space, not a social media app.
+- Preserve the editorial / art-book atmosphere across all screens.
+- Prioritize emotional clarity, visual breathing room, and intuitive navigation.
+
+PORTFOLIO STRUCTURE
+- Remove the separate “Selected Works” section entirely.
+- Portfolio should flow directly into curated Collections.
+
+Final structure:
+Artist intro
+→ Collection title
+→ Hero image
+→ Collection description
+→ Works grid
+
+PROFILE HEADER
+- Increase profile image size by approximately 15–25%.
+- Preserve minimal elegant spacing and calm composition.
+
+IMAGE DISPLAY SYSTEM
+- Preserve original artwork aspect ratios whenever possible.
+- Never aggressively crop pottery silhouettes.
+- Protect visibility of:
+  - rim/opening
+  - shoulder
+  - foot/base
+  - overall form
+
+LANDSCAPE IMAGE HANDLING
+- Landscape images should never appear tiny inside narrow portrait cards.
+- Allow landscape works to:
+  - span wider cards
+  - appear full-width when appropriate
+  - become collection hero images
+- Prioritize artwork visibility over rigid masonry symmetry.
+
+ARCHIVE LAYOUT
+- Archive can remain more experimental and masonry-like.
+- Goal:
+  asymmetrical editorial rhythm
+  similar to flipping through an art book.
+- Mixed image sizes are acceptable if they preserve artwork integrity.
+
+COLLECTION / PORTFOLIO LAYOUT
+- Collections and public portfolio should feel more stable and curated.
+- Cleaner rhythm and spacing than Archive.
+- Avoid visual chaos.
+
+IMMERSIVE VIEWER
+- Archive browsing should support swipe-based navigation like flipping pages in a book.
+- Entering fullscreen/detail mode should:
+  - preserve metadata visibility
+  - maintain swipe navigation
+  - avoid losing title/material/year overlays between images
+- Exiting fullscreen should return users to the same archive position.
+
+VIEWER UX RULE
+Currently metadata disappears after entering fullscreen from detail mode.
+Fix this by using a single unified artwork viewer state instead of switching between separate viewer modes.
+
+BADGES / STATUS INDICATORS
+- Simplify badges to icon-first language:
+  🌐 Public
+  🔒 Private
+  ☆ Featured
+- Prefer icon-only or very minimal labels.
+- Maintain consistency across Archive, Collection, and Portfolio views.
+
+PUBLIC / PORTFOLIO LOGIC
+Keep these states separate:
+- Public = visible in public archive/collections
+- Featured in Portfolio = curated inclusion in public portfolio
+
+A work may be:
+- public but not featured
+- featured and public
+- private and never public
+
+COLLECTION LOGIC
+Collections can independently be:
+- public
+- private
+- featured in portfolio
+
+WORKFLOW PRINCIPLE
+Archive → Collection → Portfolio
+should feel natural and frictionless.
+
+SHARING (Future Phase)
+Future sharing/export system should support:
+- Instagram
+- Pinterest
+- Facebook
+- Etsy
+- Shopify
+
+Sharing should feel elegant and native to the artistic workflow, not like aggressive social posting.
+
+LONG-TERM DESIGN GOAL
+The app should ultimately feel like:
+- a ceramic archive
+- a studio notebook
+- a personal museum
+- an exhibition catalog
+combined into one calm environment.

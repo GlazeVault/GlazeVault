@@ -23,8 +23,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { PieceStatusBadge } from "@/components/StatusBadge";
 import { persistPieceImage } from "@/constants/imageStorage";
-import { isCollectionPublic, isPubliclyVisiblePiece } from "@/constants/privacy";
+import { isCollectionPublic } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
@@ -83,14 +84,12 @@ function GalleryTile({
   span,
   ratio,
   fromCollectionId,
-  published,
   colors,
 }: {
   piece: PotteryPiece;
   span: "full" | "half";
   ratio: number;
   fromCollectionId: string;
-  published: boolean;
   colors: TileColors;
 }) {
   const { toggleFavorite } = usePottery();
@@ -134,13 +133,7 @@ function GalleryTile({
           cachePolicy="memory-disk"
           recyclingKey={piece.id}
         />
-        <View style={styles.tileBadge}>
-          <Feather
-            name={published ? "globe" : "lock"}
-            size={10}
-            color={published ? colors.emerald : "#8A7B6C"}
-          />
-        </View>
+        <PieceStatusBadge piece={piece} />
         <Pressable style={styles.tileFav} onPress={handleFavorite} hitSlop={10}>
           <Feather
             name="heart"
@@ -556,7 +549,6 @@ export default function CollectionDetailScreen() {
                     span="half"
                     ratio={orientations[item.left.imageUri] ?? 0.8}
                     fromCollectionId={id}
-                    published={isPubliclyVisiblePiece(item.left)}
                     colors={colors}
                   />
                 </View>
@@ -567,7 +559,6 @@ export default function CollectionDetailScreen() {
                       span="half"
                       ratio={orientations[item.right.imageUri] ?? 0.8}
                       fromCollectionId={id}
-                      published={isPubliclyVisiblePiece(item.right)}
                       colors={colors}
                     />
                   ) : null}
@@ -580,7 +571,6 @@ export default function CollectionDetailScreen() {
                 span="full"
                 ratio={orientations[item.item.imageUri] ?? 1.4}
                 fromCollectionId={id}
-                published={isPubliclyVisiblePiece(item.item)}
                 colors={colors}
               />
             )}
@@ -969,17 +959,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "rgba(120,110,100,0.06)",
-  },
-  tileBadge: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(253,250,245,0.86)",
   },
   tileFav: {
     position: "absolute",

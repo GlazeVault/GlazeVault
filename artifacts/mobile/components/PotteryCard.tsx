@@ -5,7 +5,7 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { isPortfolioPiece, isPubliclyVisiblePiece } from "@/constants/privacy";
+import { PieceStatusBadge } from "@/components/StatusBadge";
 import { resolveImageSource } from "@/constants/seedImages";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -38,10 +38,6 @@ export function PotteryCard({
 }: PotteryCardProps) {
   const colors = useColors();
   const { toggleFavorite } = usePottery();
-  // Per-piece curation/visibility. Status badge priority is calm and singular:
-  // archived → featured → public → private.
-  const isFeatured = isPortfolioPiece(piece);
-  const isPublic = isPubliclyVisiblePiece(piece);
 
   // Preserve each pot's natural silhouette. Start at the editorial 4:5 ratio as a
   // graceful placeholder while the image measures, then relax to the image's true
@@ -133,28 +129,7 @@ export function PotteryCard({
         />
       </Pressable>
 
-      {showVisibility &&
-        (piece.archived ? (
-          <View style={styles.statusBadge}>
-            <Feather name="archive" size={11} color="#8A7B6C" />
-            <Text style={[styles.statusBadgeText, { color: "#8A7B6C" }]}>Archived</Text>
-          </View>
-        ) : isFeatured ? (
-          <View style={styles.statusBadge}>
-            <Feather name="star" size={11} color={colors.emerald} />
-            <Text style={[styles.statusBadgeText, { color: colors.emerald }]}>Featured</Text>
-          </View>
-        ) : isPublic ? (
-          <View style={styles.statusBadge}>
-            <Feather name="globe" size={11} color={colors.cobalt} />
-            <Text style={[styles.statusBadgeText, { color: colors.cobalt }]}>Public</Text>
-          </View>
-        ) : (
-          <View style={styles.statusBadge}>
-            <Feather name="lock" size={11} color="#8A7B6C" />
-            <Text style={[styles.statusBadgeText, { color: "#8A7B6C" }]}>Private</Text>
-          </View>
-        ))}
+      {showVisibility ? <PieceStatusBadge piece={piece} /> : null}
 
       <View style={styles.info}>
         <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
@@ -192,25 +167,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(253,250,245,0.82)",
     alignItems: "center",
     justifyContent: "center",
-  },
-  statusBadge: {
-    position: "absolute",
-    top: 14,
-    left: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: "rgba(253,250,245,0.6)",
-    borderWidth: 0.5,
-    borderColor: "rgba(120,110,100,0.12)",
-  },
-  statusBadgeText: {
-    fontSize: 10,
-    fontFamily: "Poppins_400Regular",
-    letterSpacing: 0.5,
   },
   info: {
     paddingTop: 14,
