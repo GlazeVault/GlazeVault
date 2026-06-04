@@ -15,12 +15,11 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 
+import { computeDropTarget, STRIDE } from "@/constants/photoDropTarget";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useColors } from "@/hooks/useColors";
 
 const ITEM_W = 72;
-const GAP = 12;
-const STRIDE = ITEM_W + GAP;
 const ITEM_H = (ITEM_W * 5) / 4;
 const TOP_PAD = 8;
 
@@ -113,10 +112,12 @@ export function DraggablePhotoStrip({
     if (next === scrollOffset.value) return;
     scrollOffset.value = next;
     scrollTo(scrollRef, next, 0, false);
-    const displacement =
-      activeIndex.value * STRIDE + dragX.value + (next - scrollStart.value);
-    const target = Math.round(displacement / STRIDE);
-    hoverIndex.value = Math.min(Math.max(target, 0), count - 1);
+    hoverIndex.value = computeDropTarget({
+      startIndex: activeIndex.value,
+      translationX: dragX.value,
+      scrollDelta: next - scrollStart.value,
+      count,
+    });
   });
 
   return (
@@ -231,10 +232,12 @@ function Thumb({
       dragX.value = e.translationX;
       // Displacement of the dragged item in content space: original slot +
       // finger travel + scroll that happened since the drag started.
-      const displacement =
-        index * STRIDE + dragX.value + (scrollOffset.value - scrollStart.value);
-      const target = Math.round(displacement / STRIDE);
-      hoverIndex.value = Math.min(Math.max(target, 0), count - 1);
+      hoverIndex.value = computeDropTarget({
+        startIndex: index,
+        translationX: dragX.value,
+        scrollDelta: scrollOffset.value - scrollStart.value,
+        count,
+      });
 
       // Edge auto-scroll: ramp speed up the closer the finger is to an edge.
       const local = e.absoluteX - stripPageX.value;
