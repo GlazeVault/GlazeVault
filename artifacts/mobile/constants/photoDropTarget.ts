@@ -20,6 +20,11 @@ const GAP = 12;
 /** Pixel pitch of one thumbnail slot (thumbnail width + inter-item gap). */
 export const STRIDE = ITEM_W + GAP;
 
+// How close (px) the finger must get to a strip edge before auto-scroll kicks
+// in, and the peak scroll speed (px/frame ~= px per 16ms) at the very edge.
+export const EDGE_ZONE = 56;
+export const MAX_AUTO_SCROLL = 9;
+
 export interface DropTargetArgs {
   /** Slot the dragged photo started in (its original index). */
   startIndex: number;
@@ -51,4 +56,47 @@ export function computeDropTarget({
   const displacement = startIndex * stride + translationX + scrollDelta;
   const target = Math.round(displacement / stride);
   return Math.min(Math.max(target, 0), count - 1);
+}
+
+export interface EdgeAutoScrollArgs {
+  /** Finger position relative to the strip's left edge, in px (absoluteX - stripPageX). */
+  local: number;
+  /** Visible width of the strip, in px. The right edge zone is measured from here. */
+  viewportW: number;
+  /** Width (px) of each edge zone where auto-scroll engages. Defaults to EDGE_ZONE. */
+  edgeZone?: number;
+  /** Peak scroll speed (px/frame) reached at the very edge. Defaults to MAX_AUTO_SCROLL. */
+  maxAutoScroll?: number;
+}
+
+/**
+ * Resolve the signed auto-scroll speed (px/frame) for a finger held near a
+ * strip edge while dragging. Mirrors the edge-ramp math in
+ * DraggablePhotoStrip's `onUpdate` handler exactly:
+ *
+ *   - In the dead zone (between the two edge zones): 0 — no scroll.
+ *   - Inside the left edge zone: negative (scroll content left/back), ramping
+ *     linearly from 0 at the inner boundary to -maxAutoScroll at the edge.
+ *   - Inside the right edge zone: positive (scroll content right/forward),
+ *     ramping linearly to +maxAutoScroll at the edge.
+ *
+ * The ramp is clamped to [-maxAutoScroll, maxAutoScroll], so dragging past an
+ * edge (local < 0 or local > viewportW) holds peak speed rather than overshoot.
+ */
+export function computeEdgeAutoScroll({
+  local,
+  viewportW,
+  edgeZone = EDGE_ZONE,
+  maxAutoScroll = MAX_AUTO_SCROLL,
+}: EdgeAutoScrollArgs): number {
+  "worklet";
+  if (local < edgeZone) {
+    const ramp = Math.min((edgeZone - local) / edgeZone, 1);
+    return -maxAutoScroll * ramp;
+  }
+  if (local > viewportW - edgeZone) {
+    const ramp = Math.min((local - (viewportW - edgeZone)) / edgeZone, 1);
+    return maxAutoScroll * ramp;
+  }
+  return 0;
 }

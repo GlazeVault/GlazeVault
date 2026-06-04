@@ -15,18 +15,17 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 
-import { computeDropTarget, STRIDE } from "@/constants/photoDropTarget";
+import {
+  computeDropTarget,
+  computeEdgeAutoScroll,
+  STRIDE,
+} from "@/constants/photoDropTarget";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useColors } from "@/hooks/useColors";
 
 const ITEM_W = 72;
 const ITEM_H = (ITEM_W * 5) / 4;
 const TOP_PAD = 8;
-
-// How close (px) the finger must get to a strip edge before auto-scroll kicks
-// in, and the peak scroll speed (px/frame ~= px per 16ms) at the very edge.
-const EDGE_ZONE = 56;
-const MAX_AUTO_SCROLL = 9;
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -240,19 +239,10 @@ function Thumb({
       });
 
       // Edge auto-scroll: ramp speed up the closer the finger is to an edge.
-      const local = e.absoluteX - stripPageX.value;
-      if (local < EDGE_ZONE) {
-        const ramp = Math.min((EDGE_ZONE - local) / EDGE_ZONE, 1);
-        autoScroll.value = -MAX_AUTO_SCROLL * ramp;
-      } else if (local > viewportW.value - EDGE_ZONE) {
-        const ramp = Math.min(
-          (local - (viewportW.value - EDGE_ZONE)) / EDGE_ZONE,
-          1,
-        );
-        autoScroll.value = MAX_AUTO_SCROLL * ramp;
-      } else {
-        autoScroll.value = 0;
-      }
+      autoScroll.value = computeEdgeAutoScroll({
+        local: e.absoluteX - stripPageX.value,
+        viewportW: viewportW.value,
+      });
     })
     .onEnd(() => {
       const from = index;
