@@ -41,7 +41,7 @@ const OWNER_ONLY_SENTINELS = {
   price: "ZZPRICEPRIVATE",
 } as const;
 
-function makePiece(id: string): PotteryPiece {
+function makePiece(id: string, overrides: Partial<PotteryPiece> = {}): PotteryPiece {
   return {
     id,
     title: PUBLIC_SENTINELS.title,
@@ -61,10 +61,14 @@ function makePiece(id: string): PotteryPiece {
     featuredInPortfolio: true,
     isPublic: true,
     archived: false,
+    ...overrides,
   };
 }
 
-const mockPieces: PotteryPiece[] = [makePiece("p1"), makePiece("p2")];
+// Mutable so individual tests can vary the piece set (e.g. mark a piece private
+// or archived to exercise the public-view GATE, not just field-level leaks).
+// Reset in beforeEach. Factory-referenced outer vars must be `mock`-prefixed.
+let mockPieces: PotteryPiece[] = [makePiece("p1"), makePiece("p2")];
 
 const mockCollection: Collection = {
   id: "c1",
@@ -250,6 +254,7 @@ describe("public surfaces expose only the fixed allowed fields", () => {
     mockViewerProps.length = 0;
     mockShareProps.length = 0;
     mockCollections = [mockCollection];
+    mockPieces = [makePiece("p1"), makePiece("p2")];
   });
 
   it("public piece view (/piece/[id]?public=1) shows only title + clay·dimensions·year", () => {
@@ -426,5 +431,81 @@ describe("toPublicPiece is the structural allowlist boundary", () => {
         );
       }
     }
+  });
+});
+
+describe("the public gate refuses non-visible pieces entirely", () => {
+  // The sentinel tests above prove that WHEN a public surface renders it shows
+  // only the allowed fields. These tests prove the GATE itself: a piece that is
+  // not publicly visible (private, archived, or photoless) must be refused on
+  // the public surfaces outright — it shows the "This piece is private" lock
+  // screen, never the artwork. A regression in isPubliclyVisiblePiece that
+  // quietly published such a piece would be caught here.
+  beforeEach(() => {
+    mockRouterParams = {};
+    mockViewerProps.length = 0;
+    mockShareProps.length = 0;
+    mockCollections = [mockCollection];
+    mockPieces = [makePiece("p1"), makePiece("p2")];
+  });
+
+  // Each case is a single reason a piece is NOT publicly visible; all three must
+  // hit the same lock screen on the public piece view.
+  const blockedCases: Array<{ reason: string; overrides: Partial<PotteryPiece> }> = [
+    { reason: "marked private (isPublic: false)", overrides: { isPublic: false } },
+    { reason: "archived", overrides: { archived: true } },
+    { reason: "photoless (no imageUri)", overrides: { imageUri: "", images: [] } },
+  ];
+
+  it.each(blockedCases)(
+    "public piece view (/piece/[id]?public=1) shows the lock screen when a piece is $reason",
+    ({ overrides }) => {
+      mockPieces = [makePiece("p1", overrides)];
+      mockRouterParams = { id: "p1", public: "1" };
+      const PieceDetailScreen = require("@/app/piece/[id]").default;
+      const { toJSON } = render(<PieceDetailScreen />);
+      const text = renderedText(toJSON() as JsonNode);
+
+      // The lock screen rendered...
+      expect(text).toContain("This piece is private");
+      // ...and NONE of the artwork did: not the public "Public View" eyebrow,
+      // not the title, and not the quiet clay·dimensions·year meta line.
+      expect(text).not.toMatch(/Public View/i);
+      expect(text).not.toContain(PUBLIC_SENTINELS.title);
+      expect(text).not.toContain(PUBLIC_SENTINELS.clay);
+      expect(text).not.toContain(PUBLIC_SENTINELS.dimensions);
+
+      // The fullscreen viewer must not even be wired up with this piece — a
+      // blocked piece is unreachable, not merely hidden behind a tap.
+      mockViewerProps.forEach((p) =>
+        expect(JSON.stringify(p.items ?? null)).not.toContain("pieces/p1.jpg"),
+      );
+    },
+  );
+
+  it("public fullscreen viewer swipe set excludes private/archived collection siblings", () => {
+    // p1 is publicly visible. p2 (private) and p3 (archived) share collection
+    // c1 with it. The public viewer's swipe set must include ONLY p1 — a
+    // non-owner can never reach a sibling that isn't publicly visible, even
+    // though it lives in the same collection.
+    mockPieces = [
+      makePiece("p1"),
+      makePiece("p2", { isPublic: false }),
+      makePiece("p3", { archived: true }),
+    ];
+    mockRouterParams = { id: "p1", public: "1" };
+    const PieceDetailScreen = require("@/app/piece/[id]").default;
+    render(<PieceDetailScreen />);
+
+    expect(mockViewerProps.length).toBeGreaterThan(0);
+    const items = mockViewerProps[mockViewerProps.length - 1].items as Array<{ uri?: string }>;
+    const uris = items.map((i) => i.uri);
+
+    // Only the publicly visible piece is reachable...
+    expect(uris).toEqual(["pieces/p1.jpg"]);
+    // ...and the blocked siblings appear nowhere in the viewer payload.
+    const serialized = JSON.stringify(items);
+    expect(serialized).not.toContain("pieces/p2.jpg");
+    expect(serialized).not.toContain("pieces/p3.jpg");
   });
 });
