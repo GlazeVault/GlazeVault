@@ -261,6 +261,39 @@ describe("public surfaces expose only the fixed allowed fields", () => {
     const text = renderedText(toJSON() as JsonNode);
     expect(text).not.toMatch(/Selected Works/i);
   });
+
+  it("the REAL fullscreen viewer paints captions with only title + clay·dimensions·year", () => {
+    // The other tests stub @/components/ImageViewer to capture its props, which
+    // proves the public branch HANDS it only allowlisted data. But the viewer is
+    // itself a public surface: it could be changed to paint an owner-only field
+    // into a caption. So here we drive the REAL viewer end-to-end.
+    //
+    // 1) Render the public piece view to capture the exact `viewerItems` the
+    //    public branch of /piece/[id] builds from a sentinel-loaded piece — no
+    //    hand-rolled items, so a regression in that mapping is exercised too.
+    mockRouterParams = { id: "p1", public: "1" };
+    const PieceDetailScreen = require("@/app/piece/[id]").default;
+    render(<PieceDetailScreen />);
+    expect(mockViewerProps.length).toBeGreaterThan(0);
+    const items = mockViewerProps[mockViewerProps.length - 1].items as unknown[];
+    expect(Array.isArray(items) && items.length).toBeTruthy();
+
+    // 2) Render the actual ImageViewer (bypassing the module mock) with those
+    //    items and assert its rendered caption tree shows ONLY the allowed
+    //    fields. `visible` so the Modal + caption actually mount.
+    const { ImageViewer: RealImageViewer } = jest.requireActual(
+      "@/components/ImageViewer",
+    ) as typeof import("@/components/ImageViewer");
+    const { toJSON } = render(
+      <RealImageViewer
+        visible
+        items={items as import("@/components/ImageViewer").ViewerItem[]}
+        initialIndex={0}
+        onClose={() => {}}
+      />,
+    );
+    assertOnlyPublicFields(renderedText(toJSON() as JsonNode));
+  });
 });
 
 describe("toPublicPiece is the structural allowlist boundary", () => {
