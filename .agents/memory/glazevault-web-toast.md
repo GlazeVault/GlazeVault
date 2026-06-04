@@ -22,4 +22,4 @@ failures; permission/info notices keep the default.
 
 **How to apply:** new notices pass an appropriate `variant`. The ToastHost is
 harmless on native (no toasts are ever enqueued there). `chooseAction` in notice.ts
-still uses the window.confirm fallback (separate concern — multi-option menu task).
+now uses an in-app action-sheet modal on web — see glazevault-web-action-sheet.md.

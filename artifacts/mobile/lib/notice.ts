@@ -1,5 +1,6 @@
 import { Alert, Platform } from "react-native";
 
+import { presentActionSheet } from "@/lib/actionSheet";
 import { showToast, type ToastVariant } from "@/lib/toast";
 
 export type NoticeOptions = {
@@ -51,35 +52,19 @@ export type ActionOption = {
  * Cross-platform multi-option action sheet.
  *
  * On native this is a standard `Alert.alert` with multiple buttons. On web —
- * where `Alert.alert` is a no-op — it falls back to a sequence of `window.confirm`
- * prompts (one per non-cancel option, in order) so the user can still reach every
- * action. The first option the user accepts is invoked; declining all of them is
- * treated as the cancel action.
+ * where `Alert.alert` is a no-op — it renders a single in-app modal listing
+ * every option at once (see `@/components/ActionSheetHost`), instead of the old
+ * chained `window.confirm` prompts. The chosen option's `onPress` is invoked;
+ * dismissing the sheet (backdrop tap / close) runs the cancel option if present.
  */
 export function chooseAction(title: string, message: string | undefined, options: ActionOption[]): Promise<void> {
   if (Platform.OS === "web") {
-    if (typeof window === "undefined" || typeof window.confirm !== "function") {
-      return Promise.resolve();
-    }
-    const cancel = options.find((o) => o.style === "cancel");
-    const actions = options.filter((o) => o.style !== "cancel");
-    for (let i = 0; i < actions.length; i++) {
-      const option = actions[i];
-      const isLast = i === actions.length - 1;
-      // The last actionable option is auto-confirmed when no cancel exists, so
-      // the user is never trapped without a way to pick the final action.
-      const body = message ? `${option.text}?\n\n${message}` : `${option.text}?`;
-      if (window.confirm(body)) {
-        option.onPress?.();
-        return Promise.resolve();
-      }
-      if (isLast && !cancel) {
-        // Nothing left to offer; honor the last decline as a no-op.
-        break;
-      }
-    }
-    cancel?.onPress?.();
-    return Promise.resolve();
+    return presentActionSheet(title, message, options).then((chosen) => {
+      const cancel = options.find((o) => o.style === "cancel");
+      // A dismissal (undefined) resolves to the cancel action so callers that
+      // rely on cancel side effects still run.
+      (chosen ?? cancel)?.onPress?.();
+    });
   }
 
   return new Promise((resolve) => {

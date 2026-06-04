@@ -19,6 +19,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { ActionSheetHost } from "@/components/ActionSheetHost";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ToastHost } from "@/components/ToastHost";
 import { CollectionsProvider } from "@/context/CollectionsContext";
@@ -83,6 +84,7 @@ export default function RootLayout() {
                       />
                     </Stack>
                     <ToastHost />
+                    <ActionSheetHost />
                   </KeyboardProvider>
                 </GestureHandlerRootView>
               </ProfileProvider>
