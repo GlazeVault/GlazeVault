@@ -1,8 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Platform,
@@ -22,7 +23,7 @@ import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
 import { useCollections } from "@/context/CollectionsContext";
-import { usePottery } from "@/context/PotteryContext";
+import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
 function ChipSelector({
@@ -66,42 +67,56 @@ function ChipSelector({
 
 export default function EditPieceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPiece, updatePiece } = usePottery();
+  const { pieces } = usePottery();
+  const colors = useColors();
+  // Read the piece from the reactive pieces list so a cold load / reload of this
+  // route re-renders once the archive finishes hydrating. The form lives in a
+  // child that mounts only when the piece exists, so its useState initializers
+  // always receive real values (avoids a blank screen on the load race).
+  const piece = pieces.find((p) => p.id === id);
+
+  if (!piece) {
+    return (
+      <View style={[styles.loading, { backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.cobalt} />
+      </View>
+    );
+  }
+
+  return <EditPieceForm piece={piece} />;
+}
+
+function EditPieceForm({ piece }: { piece: PotteryPiece }) {
+  const { updatePiece } = usePottery();
   const { collections } = useCollections();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const piece = getPiece(id);
+  const id = piece.id;
 
   const initialImages =
-    piece?.images && piece.images.length > 0
+    piece.images && piece.images.length > 0
       ? piece.images
-      : piece?.imageUri
+      : piece.imageUri
         ? [piece.imageUri]
         : [];
   const [images, setImages] = useState<string[]>(initialImages);
   const [coverIndex, setCoverIndex] = useState(() => {
-    const idx = piece?.imageUri ? initialImages.indexOf(piece.imageUri) : 0;
+    const idx = piece.imageUri ? initialImages.indexOf(piece.imageUri) : 0;
     return idx >= 0 ? idx : 0;
   });
-  const [title, setTitle] = useState(piece?.title ?? "");
-  const [notes, setNotes] = useState(piece?.notes ?? "");
-  const [clay, setClay] = useState(piece?.clay ?? "");
-  const [glaze, setGlaze] = useState(piece?.glaze ?? "");
-  const [cone, setCone] = useState(piece?.cone ?? "");
+  const [title, setTitle] = useState(piece.title ?? "");
+  const [notes, setNotes] = useState(piece.notes ?? "");
+  const [clay, setClay] = useState(piece.clay ?? "");
+  const [glaze, setGlaze] = useState(piece.glaze ?? "");
+  const [cone, setCone] = useState(piece.cone ?? "");
   const [firingEnvironment, setFiringEnvironment] = useState(
-    piece?.firingEnvironment || piece?.firing || ""
+    piece.firingEnvironment || piece.firing || ""
   );
-  const [dimensions, setDimensions] = useState(piece?.dimensions ?? "");
-  const [year, setYear] = useState(piece?.year ?? "");
-  const [collectionIds, setCollectionIds] = useState<string[]>(piece?.collectionIds ?? []);
+  const [dimensions, setDimensions] = useState(piece.dimensions ?? "");
+  const [year, setYear] = useState(piece.year ?? "");
+  const [collectionIds, setCollectionIds] = useState<string[]>(piece.collectionIds ?? []);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!piece) router.back();
-  }, [piece]);
-
-  if (!piece) return null;
 
   const handleSave = async () => {
     if (images.length === 0) {
@@ -400,6 +415,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 0.75,
   },
+  loading: { flex: 1, alignItems: "center", justifyContent: "center" },
   headerBtn: { paddingHorizontal: 4, paddingVertical: 4, minWidth: 48 },
   headerTitle: { fontSize: 16, fontFamily: "PlayfairDisplay_400Regular", letterSpacing: 0.3 },
   saveText: { fontSize: 14, fontFamily: "Poppins_500Medium", textAlign: "right" },
