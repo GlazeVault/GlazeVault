@@ -508,4 +508,80 @@ describe("the public gate refuses non-visible pieces entirely", () => {
     expect(serialized).not.toContain("pieces/p2.jpg");
     expect(serialized).not.toContain("pieces/p3.jpg");
   });
+
+  it("public-site portfolio renders ONLY the public piece's tile, never private/archived/photoless siblings", () => {
+    // The field-level tests above prove that WHEN a tile renders it shows only
+    // the allowed fields. This proves the GATE on the portfolio surface itself:
+    // a private / archived / photoless sibling sharing the same public
+    // collection must never appear as a tile at all. Each blocked piece carries
+    // a unique title sentinel and a unique image path so its appearance anywhere
+    // in the rendered tree — caption OR image source — would be caught. The
+    // explicit collection cover is distinct from every piece, so every publicly
+    // visible piece flows into the grid as a tile (none is consumed as cover).
+    mockCollections = [mockCollection];
+    mockPieces = [
+      makePiece("p1", { title: "ZZVISIBLETILE" }),
+      makePiece("p2", { title: "ZZPRIVATETILE", isPublic: false }),
+      makePiece("p3", { title: "ZZARCHIVEDTILE", archived: true }),
+      makePiece("p4", { title: "ZZPHOTOLESSTILE", imageUri: "", images: [] }),
+    ];
+    const PublicSiteScreen = require("@/app/public-site").default;
+    const { toJSON } = render(<PublicSiteScreen />);
+    // Serialize the WHOLE tree (props included) so image sources are inspected
+    // too — a tile's photo lives in a prop, not in the text children.
+    const tree = JSON.stringify(toJSON() ?? null);
+
+    // The one publicly visible piece IS on the page — its title and its photo...
+    expect(tree).toContain("ZZVISIBLETILE");
+    expect(tree).toContain("pieces/p1.jpg");
+    // ...and the collection's public piece count reflects only that one piece,
+    // never the three blocked siblings.
+    expect(tree).toContain("1 piece");
+
+    // None of the blocked siblings surfaced as a tile: not their title caption...
+    for (const blocked of ["ZZPRIVATETILE", "ZZARCHIVEDTILE", "ZZPHOTOLESSTILE"]) {
+      expect(tree).not.toContain(blocked);
+    }
+    // ...and not their photo (the photoless piece has no path of its own).
+    for (const img of ["pieces/p2.jpg", "pieces/p3.jpg", "pieces/p4.jpg"]) {
+      expect(tree).not.toContain(img);
+    }
+  });
+
+  it("public collection grid (getPublicCollectionPieces) excludes blocked siblings end-to-end", () => {
+    // Drives the cover-DERIVED-from-a-piece path: with no explicit artist cover,
+    // the first publicly visible piece becomes the cover and the remaining public
+    // pieces fill the grid. This proves the gate end-to-end through BOTH derived
+    // surfaces — a blocked sibling must neither be promoted to the derived cover
+    // nor appear in the grid. p1 (visible) becomes the cover, p2 (visible) renders
+    // as a grid tile, and p3/p4/p5 (private/archived/photoless) are refused.
+    mockCollections = [{ ...mockCollection, coverImageUri: undefined }];
+    mockPieces = [
+      makePiece("p1", { title: "ZZCOVERVISIBLE" }),
+      makePiece("p2", { title: "ZZGRIDVISIBLE" }),
+      makePiece("p3", { title: "ZZPRIVATETILE", isPublic: false }),
+      makePiece("p4", { title: "ZZARCHIVEDTILE", archived: true }),
+      makePiece("p5", { title: "ZZPHOTOLESSTILE", imageUri: "", images: [] }),
+    ];
+    const PublicSiteScreen = require("@/app/public-site").default;
+    const { toJSON } = render(<PublicSiteScreen />);
+    const tree = JSON.stringify(toJSON() ?? null);
+
+    // The two publicly visible pieces rendered: p1 as the derived cover photo,
+    // p2 as a captioned grid tile.
+    expect(tree).toContain("pieces/p1.jpg");
+    expect(tree).toContain("pieces/p2.jpg");
+    expect(tree).toContain("ZZGRIDVISIBLE");
+    // The public piece count counts only the two visible pieces.
+    expect(tree).toContain("2 pieces");
+
+    // No blocked sibling surfaced as the cover, a tile, or a caption...
+    for (const blocked of ["ZZPRIVATETILE", "ZZARCHIVEDTILE", "ZZPHOTOLESSTILE"]) {
+      expect(tree).not.toContain(blocked);
+    }
+    // ...nor did any blocked sibling's photo reach the grid or the cover slot.
+    for (const img of ["pieces/p3.jpg", "pieces/p4.jpg", "pieces/p5.jpg"]) {
+      expect(tree).not.toContain(img);
+    }
+  });
 });
