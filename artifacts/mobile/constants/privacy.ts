@@ -142,8 +142,3 @@ export function getPublicCollectionPieces<P extends PieceLike>(
     (p) => (p.collectionIds ?? []).includes(collection.id) && isPubliclyVisiblePiece(p)
   );
 }
-
-/** The curated Portfolio: every featured, visible piece. */
-export function getPortfolioPieces<P extends PieceLike>(pieces: P[]): P[] {
-  return pieces.filter(isPortfolioPiece);
-}

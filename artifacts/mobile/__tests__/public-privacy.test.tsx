@@ -252,6 +252,15 @@ describe("public surfaces expose only the fixed allowed fields", () => {
     const { toJSON } = render(<PublicSiteScreen />);
     assertOnlyPublicFields(renderedText(toJSON() as JsonNode));
   });
+
+  it("public-site no longer renders a separate 'Selected Works' feed", () => {
+    // The portfolio is collection-driven: works appear inside their collections,
+    // never duplicated in a standalone curated section.
+    const PublicSiteScreen = require("@/app/public-site").default;
+    const { toJSON } = render(<PublicSiteScreen />);
+    const text = renderedText(toJSON() as JsonNode);
+    expect(text).not.toMatch(/Selected Works/i);
+  });
 });
 
 describe("toPublicPiece is the structural allowlist boundary", () => {

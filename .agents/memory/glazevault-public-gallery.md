@@ -84,3 +84,20 @@ as the `showClayBody` flag). Tiles are a column: `Pressable(tileCol) > tileImage
 `catalogLargeImg`); keep that split when adding tile variants or the caption width
 won't match the image. The local `PublicPiece` interface must list any piece field
 the caption reads (objects are full PotteryPiece cast by `getPublicCollectionPieces`).
+
+## Public homepage is COLLECTION-DRIVEN (no standalone "Selected Works" feed)
+The public site flows Artist Header → public collections directly; there is NO
+separate curated "Selected Works" piece feed. Each public collection is a mini
+exhibition: index eyebrow, title, piece count, intro preview, hero cover, then a
+works grid. `hasContent` = `publicCollections.length > 0`.
+
+**Why:** a standalone curated feed duplicated artwork (a piece showed in Selected
+Works AND inside its collection), which read as repetitive/noisy. Collections now
+carry the storytelling.
+
+**How to apply:** `featuredInPortfolio` / `isPortfolioPiece` is now ONLY an owner-side
+concept — the featured badge (components/PotteryCard.tsx) and the Feature-in-Portfolio
+toggle (app/piece/[id].tsx). It does NOT drive any public homepage section. The
+`getPortfolioPieces` selector was deleted (was only feeding the removed feed); do not
+reintroduce a public portfolio-piece feed. A regression test in
+__tests__/public-privacy.test.tsx asserts the public site renders no "Selected Works".

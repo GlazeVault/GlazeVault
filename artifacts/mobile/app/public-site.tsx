@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   buildPublicMetaLine,
-  getPortfolioPieces,
   getPublicCollectionPieces,
   isCollectionPublic,
   toPublicPiece,
@@ -65,14 +64,9 @@ export default function PublicSiteScreen() {
   const site = profile.publicSite;
   const layout: HomepageLayout = site.homepageLayout;
 
-  // The curated Portfolio is now driven at the piece level: every piece the
-  // artist has hand-picked via "Feature in Portfolio" (which are, by invariant,
-  // public and photographed). This is the headline of the public site.
-  const portfolioPieces = getPortfolioPieces(pieces).map(toPublicPiece);
-
-  // Beyond the curated portfolio, public collections form a broader public
-  // archive. Each is reduced to its publicly visible pieces. Collection public/
-  // private is independent of portfolio curation.
+  // The portfolio is now collection-driven: public collections ARE the
+  // storytelling structure of the site. Each is reduced to its publicly visible
+  // pieces and presented like a mini exhibition (hero, title, intro, works).
   const publicCollections = collections
     .filter(isCollectionPublic)
     .map((c) => {
@@ -88,7 +82,7 @@ export default function PublicSiteScreen() {
     })
     .filter((entry) => entry.pieces.length > 0);
 
-  const hasContent = portfolioPieces.length > 0 || publicCollections.length > 0;
+  const hasContent = publicCollections.length > 0;
 
   const links: { icon: keyof typeof Feather.glyphMap; label: string }[] = [];
   if (site.contactEmail.trim()) links.push({ icon: "mail", label: site.contactEmail.trim() });
@@ -298,32 +292,15 @@ export default function PublicSiteScreen() {
             <View style={[styles.emptyCircle, { backgroundColor: colors.secondary }]}>
               <Feather name="layers" size={20} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Nothing in your portfolio yet</Text>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No collections published yet</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              Open a photographed piece and turn on “Feature in Portfolio” to fill your site.
+              Make a collection public to share a body of work as its own quiet exhibition.
             </Text>
           </View>
         ) : null}
 
-        {/* Curated portfolio — hand-picked pieces */}
-        {portfolioPieces.length > 0 ? (
-          <View style={styles.collectionSection}>
-            <View style={styles.collectionHeader}>
-              <Text style={[styles.collectionIndex, { color: colors.emerald }]}>
-                Curated
-              </Text>
-              <Text style={[styles.collectionTitle, { color: colors.foreground }]}>
-                Selected Works
-              </Text>
-              <Text style={[styles.collectionMeta, { color: colors.mutedForeground }]}>
-                {`${portfolioPieces.length} ${portfolioPieces.length === 1 ? "piece" : "pieces"}`}
-              </Text>
-            </View>
-            {renderPieces(portfolioPieces, 0)}
-          </View>
-        ) : null}
-
-        {/* Public collections — broader public archive */}
+        {/* Public collections — the portfolio is now collection-driven, each a
+            mini exhibition flowing straight from the artist header. */}
         {publicCollections.length > 0 ? (
           publicCollections.map(({ collection, pieces: cp, coverUri, coverPieceId, gridPieces }, index) => (
             <View key={collection.id} style={styles.collectionSection}>
