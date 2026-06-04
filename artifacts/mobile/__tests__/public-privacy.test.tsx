@@ -16,7 +16,7 @@
 import { render } from "@testing-library/react-native";
 import React from "react";
 
-import { buildShareContent, toPublicPiece } from "@/constants/privacy";
+import { buildPublicMetaLine, buildShareContent, toPublicPiece } from "@/constants/privacy";
 import type { Collection } from "@/context/CollectionsContext";
 import type { PotteryPiece } from "@/context/PotteryContext";
 
@@ -76,6 +76,11 @@ const mockCollection: Collection = {
   coverImageUri: "cover/distinct.jpg",
   createdAt: "2025-01-01T00:00:00.000Z",
 };
+
+// Mutable so individual tests can vary the public collection set (e.g. drop the
+// explicit cover to exercise the cover-derived-from-a-piece branch). Reset in
+// beforeEach. Factory-referenced outer vars must be `mock`-prefixed.
+let mockCollections: Collection[] = [mockCollection];
 
 // --- Mocks -----------------------------------------------------------------
 // privacy.ts (buildPublicMetaLine / isPubliclyVisiblePiece) is intentionally
@@ -141,7 +146,7 @@ jest.mock("@/context/PotteryContext", () => ({
 }));
 
 jest.mock("@/context/CollectionsContext", () => ({
-  useCollections: () => ({ collections: [mockCollection] }),
+  useCollections: () => ({ collections: mockCollections }),
 }));
 
 jest.mock("@/context/ProfileContext", () => ({
@@ -233,6 +238,7 @@ describe("public surfaces expose only the fixed allowed fields", () => {
     mockRouterParams = {};
     mockViewerProps.length = 0;
     mockShareProps.length = 0;
+    mockCollections = [mockCollection];
   });
 
   it("public piece view (/piece/[id]?public=1) shows only title + clay·dimensions·year", () => {
@@ -261,6 +267,31 @@ describe("public surfaces expose only the fixed allowed fields", () => {
     const { toJSON } = render(<PublicSiteScreen />);
     const text = renderedText(toJSON() as JsonNode);
     expect(text).not.toMatch(/Selected Works/i);
+  });
+
+  it("public collection display shows only title + clay·dimensions·year", () => {
+    // The public collection display is its own public surface: a non-owner
+    // browsing a published collection sees its header (collection title + intro)
+    // and a grid of its publicly visible pieces. Each piece is projected through
+    // toPublicPiece before it renders, so a regression that wired an owner-only
+    // field onto a collection tile must surface here.
+    //
+    // Drop the explicit artist cover so the cover is DERIVED from a sentinel
+    // piece (the `coverPieceId` branch in public-site). That piece then drops
+    // out of the grid, leaving its sibling to render as a captioned tile — a
+    // path the explicit-cover "portfolio tiles" test never exercises.
+    mockCollections = [
+      { ...mockCollection, intro: "ZZINTROPUBLIC a short, public collection note", coverImageUri: undefined },
+    ];
+    const PublicSiteScreen = require("@/app/public-site").default;
+    const { toJSON } = render(<PublicSiteScreen />);
+    const text = renderedText(toJSON() as JsonNode);
+
+    // The collection header (a public surface element) actually rendered...
+    expect(text).toContain(mockCollection.title);
+    expect(text).toContain("ZZINTROPUBLIC");
+    // ...and only the fixed public piece fields crossed onto it.
+    assertOnlyPublicFields(text);
   });
 
   it("the REAL fullscreen viewer paints captions with only title + clay·dimensions·year", () => {
@@ -294,6 +325,34 @@ describe("public surfaces expose only the fixed allowed fields", () => {
       />,
     );
     assertOnlyPublicFields(renderedText(toJSON() as JsonNode));
+  });
+
+  it("public fullscreen viewer preview leaks nothing in caption OR its share payload", () => {
+    // A dedicated guardian for the viewer as a public surface. Build a viewer
+    // item exactly the way the public preview path does — projecting a
+    // sentinel-loaded piece through the public allowlist helpers — then drive the
+    // REAL viewer with the share affordance present. Asserts BOTH the painted
+    // caption tree AND the in-viewer share payload (an off-screen side channel
+    // the caption test above does not inspect) carry only public fields.
+    const pub = toPublicPiece(makePiece("p1"));
+    const item: import("@/components/ImageViewer").ViewerItem = {
+      uri: pub.imageUri,
+      title: pub.title,
+      materials: buildPublicMetaLine(pub),
+      collection: mockCollection.title,
+      share: buildShareContent(pub, "glazevault.art/zz-studio-link"),
+    };
+
+    const { ImageViewer: RealImageViewer } = jest.requireActual(
+      "@/components/ImageViewer",
+    ) as typeof import("@/components/ImageViewer");
+    const { toJSON } = render(
+      <RealImageViewer visible items={[item]} initialIndex={0} onClose={() => {}} />,
+    );
+
+    assertOnlyPublicFields(renderedText(toJSON() as JsonNode));
+    // The share payload the viewer would hand to the share sheet must be clean.
+    assertNoOwnerOnly(item.share, "the in-viewer share payload");
   });
 });
 
