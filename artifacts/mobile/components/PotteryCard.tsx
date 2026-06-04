@@ -14,9 +14,21 @@ interface PotteryCardProps {
   piece: PotteryPiece;
   fromCollectionId?: string;
   showVisibility?: boolean;
+  /**
+   * When true the tile renders at the image's exact natural ratio with no
+   * cropping — used by the Archive masonry where full silhouettes matter. When
+   * false (default) the ratio is clamped to the editorial range, preserving the
+   * existing look of single-column surfaces like Favorites.
+   */
+  preserveAspectRatio?: boolean;
 }
 
-export function PotteryCard({ piece, fromCollectionId, showVisibility = true }: PotteryCardProps) {
+export function PotteryCard({
+  piece,
+  fromCollectionId,
+  showVisibility = true,
+  preserveAspectRatio = false,
+}: PotteryCardProps) {
   const colors = useColors();
   const { toggleFavorite } = usePottery();
   // Per-piece curation/visibility. Status badge priority is calm and singular:
@@ -24,9 +36,11 @@ export function PotteryCard({ piece, fromCollectionId, showVisibility = true }: 
   const isFeatured = isPortfolioPiece(piece);
   const isPublic = isPubliclyVisiblePiece(piece);
 
-  // T006: preserve each pot's natural silhouette. Start at the editorial 4:5
-  // ratio, then relax to the image's true ratio (clamped) once it loads so tall
-  // vases and wide bowls aren't cropped into the same rectangle.
+  // Preserve each pot's natural silhouette. Start at the editorial 4:5 ratio as a
+  // graceful placeholder while the image measures, then relax to the image's true
+  // ratio once it loads so tall vases and wide bowls aren't cropped. In the
+  // Archive masonry (preserveAspectRatio) we keep the *exact* ratio with no
+  // clamp; elsewhere we clamp to a calm editorial range.
   const [aspectRatio, setAspectRatio] = useState(4 / 5);
 
   const handleFavorite = async () => {
@@ -65,19 +79,34 @@ export function PotteryCard({ piece, fromCollectionId, showVisibility = true }: 
         })
       }
     >
-      <View style={[styles.imageWrapper, { aspectRatio }]}>
+      <View
+        style={[
+          styles.imageWrapper,
+          { aspectRatio, backgroundColor: colors.secondary },
+        ]}
+      >
         <Image
           source={resolveImageSource(piece.imageUri)}
           style={StyleSheet.absoluteFill}
-          contentFit="cover"
+          // While the natural ratio is still being measured the wrapper sits at
+          // the 4:5 placeholder, so masonry tiles use `contain` to avoid any
+          // transient crop; once measured the wrapper matches the image exactly
+          // and `contain` fills it edge to edge. Clamped surfaces keep `cover`.
+          contentFit={preserveAspectRatio ? "contain" : "cover"}
           transition={250}
           cachePolicy="memory-disk"
           recyclingKey={piece.id}
           onLoad={(e) => {
             const { width, height } = e.source;
             if (width > 0 && height > 0) {
-              // Clamp so extreme ratios stay graceful in the editorial grid.
-              setAspectRatio(Math.min(Math.max(width / height, 0.62), 1.4));
+              const natural = width / height;
+              // Archive masonry keeps the exact ratio (no crop); other surfaces
+              // clamp to a calm editorial range.
+              setAspectRatio(
+                preserveAspectRatio
+                  ? natural
+                  : Math.min(Math.max(natural, 0.62), 1.4),
+              );
             }
           }}
         />

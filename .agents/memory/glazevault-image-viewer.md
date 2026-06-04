@@ -16,6 +16,21 @@ Built in app/piece/[id].tsx, not the viewer. See `glazevault-public-gallery.md` 
 - otherwise → whole archive.
 - always guard: if the current piece isn't in the scoped set, fall back to `[piece]`.
 
+## Swipe-to-dismiss gesture model
+Vertical swipe up OR down dismisses the viewer (in addition to the X button). A
+root-level `Gesture.Pan` wraps the horizontal paging FlatList in an animated
+"stage" (translateY + slight scale) with the backdrop in a separate absolute
+Animated.View whose opacity fades as |dragY| grows.
+
+**Why:** three gesture systems must coexist — horizontal FlatList paging, per-page
+pinch/double-tap zoom + pan, and the new vertical dismiss.
+
+**How to apply:** dismiss pan is `.enabled(!zoomed)` (zoom owns pan when zoomed),
+`.activeOffsetY([-14,14])` + `.failOffsetX([-16,16])` so horizontal drags yield to
+paging and only vertical drags dismiss. onEnd closes if |translationY|>130 or
+|velocityY|>900 (animate to ±height then runOnJS(onClose)), else springs back to 0.
+Reset `dragY=0` in the visible-open effect (Modal stays mounted between sessions).
+
 ## Zoom/pan reset gotcha
 **Per-page zoom/pan shared values must be reset explicitly**, not only via gesture
 paths. RN `Modal` + `FlatList` cells stay mounted between sessions, so a page can

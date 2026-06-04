@@ -1,6 +1,6 @@
+import { FlashList } from "@shopify/flash-list";
 import React from "react";
 import {
-  FlatList,
   Platform,
   StyleSheet,
   Text,
@@ -43,45 +43,57 @@ export default function GalleryScreen() {
       )
     : pieces;
 
+  const header = (
+    <View style={styles.headerInset}>
+      <View style={styles.header}>
+        <Text style={[styles.eyebrow, { color: colors.cobalt }]}>
+          GlazeVault
+        </Text>
+        <Text style={[styles.heading, { color: colors.foreground }]}>
+          Archive
+        </Text>
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <Text style={[styles.count, { color: colors.mutedForeground }]}>
+          {pieces.length === 0
+            ? "No pieces recorded"
+            : trimmed
+              ? `${filtered.length} of ${pieces.length} ${pieces.length === 1 ? "piece" : "pieces"}`
+              : `${pieces.length} ${pieces.length === 1 ? "piece" : "pieces"}`}
+        </Text>
+        {pieces.length > 0 ? (
+          <View style={styles.searchWrap}>
+            <SearchBar
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search pieces"
+            />
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <FlatList
+      {/* Adaptive two-column masonry. FlashList virtualizes the list while its
+          masonry mode lays each tile out at its natural height, giving the
+          archive an organic, non-uniform rhythm instead of a rigid grid. Tiles
+          keep a stable column as images measure (no optimizeItemArrangement),
+          so browsing stays calm with no column reshuffling. */}
+      <FlashList
         data={filtered}
+        numColumns={2}
+        masonry
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerStyle={[
-          styles.list,
-          { paddingTop: topPad + 32, paddingBottom: insets.bottom + 120 },
-        ]}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            <Text style={[styles.eyebrow, { color: colors.cobalt }]}>
-              GlazeVault
-            </Text>
-            <Text style={[styles.heading, { color: colors.foreground }]}>
-              Archive
-            </Text>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <Text style={[styles.count, { color: colors.mutedForeground }]}>
-              {pieces.length === 0
-                ? "No pieces recorded"
-                : trimmed
-                  ? `${filtered.length} of ${pieces.length} ${pieces.length === 1 ? "piece" : "pieces"}`
-                  : `${pieces.length} ${pieces.length === 1 ? "piece" : "pieces"}`}
-            </Text>
-            {pieces.length > 0 ? (
-              <View style={styles.searchWrap}>
-                <SearchBar
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="Search pieces"
-                />
-              </View>
-            ) : null}
-          </View>
-        }
+        contentContainerStyle={{
+          paddingHorizontal: 15,
+          paddingTop: topPad + 32,
+          paddingBottom: insets.bottom + 120,
+        }}
+        ListHeaderComponent={header}
         ListEmptyComponent={
           trimmed ? (
             <View style={styles.noResults}>
@@ -96,7 +108,11 @@ export default function GalleryScreen() {
             <EmptyState colors={colors} />
           )
         }
-        renderItem={({ item }) => <PotteryCard piece={item} />}
+        renderItem={({ item }) => (
+          <View style={styles.cell}>
+            <PotteryCard piece={item} preserveAspectRatio />
+          </View>
+        )}
       />
     </View>
   );
@@ -104,7 +120,14 @@ export default function GalleryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  list: { paddingHorizontal: 28 },
+  // Each tile is inset by half the gutter so two columns sit 18px apart and the
+  // outer margins land at 24px (15 content padding + 9 cell padding).
+  cell: {
+    paddingHorizontal: 9,
+  },
+  headerInset: {
+    paddingHorizontal: 9,
+  },
   header: {
     marginBottom: 40,
   },
