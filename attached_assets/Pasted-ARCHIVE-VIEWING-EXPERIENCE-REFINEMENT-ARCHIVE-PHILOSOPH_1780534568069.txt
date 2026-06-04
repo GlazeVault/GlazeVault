@@ -1,0 +1,121 @@
+ARCHIVE VIEWING EXPERIENCE REFINEMENT
+
+ARCHIVE PHILOSOPHY
+
+Archive is the permanent memory layer of GlazeVault.
+
+It should prioritize:
+- preservation
+- documentation
+- calm browsing
+- artwork integrity
+
+not social-media presentation behavior.
+
+IMAGE HANDLING RULES
+
+In Archive view:
+- NEVER aggressively crop artwork
+- preserve original image ratios
+- support both vertical and horizontal photography
+- preserve full pottery silhouettes
+
+Archive should support:
+- studio shots
+- installation photos
+- process images
+- shelf documentation
+- detail shots
+- landscape images
+- portrait images
+
+Avoid forcing uniform grids.
+
+Use:
+- adaptive masonry layout
+- organic spacing
+- proportional scaling
+
+ARCHIVE → COLLECTION → PORTFOLIO HIERARCHY
+
+Archive
+= free documentation layer
+
+Collections
+= organized bodies of work
+
+Portfolio
+= highly curated public presentation
+
+Each layer may become progressively more curated,
+but Archive should remain flexible and documentation-first.
+
+COVER IMAGE SYSTEM
+
+Each Piece should support:
+- multiple images
+- optional “Set as Cover Image”
+
+This allows:
+- free documentation inside Archive
+- curated representation inside Collections and Portfolio
+
+VIEWING EXPERIENCE IMPROVEMENT
+
+CURRENT PROBLEM
+
+Viewing pieces currently requires:
+tap
+back
+tap
+back
+
+This interrupts the calm browsing experience.
+
+NEW DIRECTION
+
+Inside Piece Detail / Fullscreen Viewer:
+support swipe-based navigation.
+
+RECOMMENDED GESTURES
+
+Swipe left/right
+→ next or previous piece
+
+Swipe up/down
+→ dismiss viewer
+
+IMPORTANT
+
+Navigation should preserve collection/archive context.
+
+Example:
+Passage Collection
+→ Piece A
+→ swipe
+→ Piece B
+→ swipe
+→ Piece C
+
+Do NOT jump between unrelated collections.
+
+DESIGN GOAL
+
+The experience should feel like:
+- flipping through an exhibition catalog
+- browsing a museum archive
+- moving through a quiet art book
+
+not scrolling a social media feed.
+
+VISUAL PRINCIPLES
+
+Prioritize:
+- calm pacing
+- immersive viewing
+- artwork-first interaction
+- uninterrupted browsing flow
+- generous spacing
+- quiet transitions
+
+GlazeVault should encourage slow viewing and contemplation.
