@@ -585,3 +585,102 @@ describe("the public gate refuses non-visible pieces entirely", () => {
     }
   });
 });
+
+describe("the collection-level gate hides an entire private collection", () => {
+  // The piece-level gate (above) proves a hidden PIECE never surfaces. This
+  // proves the COLLECTION-level gate: a collection whose OWN visibility is
+  // "private" must never render on the public-site at all — not its title,
+  // intro, cover, nor any of its pieces — EVEN when every piece it contains is
+  // fully public and photo-bearing. The gate lives in `isCollectionPublic`,
+  // applied by public-site via `collections.filter(isCollectionPublic)`. A
+  // regression there would publish an entire private collection wholesale, so
+  // this test locks that boundary down. A companion assertion confirms a sibling
+  // PUBLIC collection still renders, proving the filter is selective rather than
+  // a blanket hide.
+  beforeEach(() => {
+    mockRouterParams = {};
+    mockViewerProps.length = 0;
+    mockShareProps.length = 0;
+    mockCollections = [mockCollection];
+    mockPieces = [makePiece("p1"), makePiece("p2")];
+  });
+
+  it("renders nothing from a private collection but keeps a sibling public collection", () => {
+    // A private collection whose content carries unique sentinels — title,
+    // intro, an explicit cover, and a fully-public, photo-bearing piece — none
+    // of which may appear anywhere on the rendered public-site.
+    const PRIVATE = {
+      collectionTitle: "ZZPRIVATECOLLTITLE",
+      collectionIntro: "ZZPRIVATECOLLINTRO a body of work kept off the site",
+      cover: "cover/private-collection.jpg",
+      pieceTitle: "ZZPRIVATECOLLPIECE",
+      photo: "pieces/private-piece.jpg",
+    } as const;
+    // A sibling PUBLIC collection whose content MUST still render, proving the
+    // filter is selective — it hides only the private one, not every collection.
+    const PUBLIC = {
+      collectionTitle: "ZZPUBLICCOLLTITLE",
+      collectionIntro: "ZZPUBLICCOLLINTRO a body of work shown on the site",
+      cover: "cover/public-collection.jpg",
+      pieceTitle: "ZZPUBLICCOLLPIECE",
+      photo: "pieces/public-piece.jpg",
+    } as const;
+
+    mockCollections = [
+      {
+        ...mockCollection,
+        id: "c-private",
+        title: PRIVATE.collectionTitle,
+        intro: PRIVATE.collectionIntro,
+        visibility: "private",
+        coverImageUri: PRIVATE.cover,
+      },
+      {
+        ...mockCollection,
+        id: "c-public",
+        title: PUBLIC.collectionTitle,
+        intro: PUBLIC.collectionIntro,
+        visibility: "public",
+        coverImageUri: PUBLIC.cover,
+      },
+    ];
+    mockPieces = [
+      // Fully public, photo-bearing piece living ONLY in the private collection.
+      makePiece("pp", {
+        title: PRIVATE.pieceTitle,
+        imageUri: PRIVATE.photo,
+        images: [PRIVATE.photo],
+        collectionIds: ["c-private"],
+      }),
+      // Fully public, photo-bearing piece living in the public collection.
+      makePiece("pub", {
+        title: PUBLIC.pieceTitle,
+        imageUri: PUBLIC.photo,
+        images: [PUBLIC.photo],
+        collectionIds: ["c-public"],
+      }),
+    ];
+
+    const PublicSiteScreen = require("@/app/public-site").default;
+    const { toJSON } = render(<PublicSiteScreen />);
+    // Serialize the WHOLE tree (props included) so cover/piece image sources are
+    // inspected too — covers and tiles carry their photo in a prop, not text.
+    const tree = JSON.stringify(toJSON() ?? null);
+
+    // The private collection contributed NOTHING: not its title, not its intro,
+    // not its cover image, and not its (otherwise-public) piece's title or photo.
+    expect(tree).not.toContain(PRIVATE.collectionTitle);
+    expect(tree).not.toContain("ZZPRIVATECOLLINTRO");
+    expect(tree).not.toContain(PRIVATE.cover);
+    expect(tree).not.toContain(PRIVATE.pieceTitle);
+    expect(tree).not.toContain(PRIVATE.photo);
+
+    // The sibling PUBLIC collection still rendered in full — proving the filter
+    // is selective, not a blanket hide of every collection.
+    expect(tree).toContain(PUBLIC.collectionTitle);
+    expect(tree).toContain("ZZPUBLICCOLLINTRO");
+    expect(tree).toContain(PUBLIC.cover);
+    expect(tree).toContain(PUBLIC.pieceTitle);
+    expect(tree).toContain(PUBLIC.photo);
+  });
+});
