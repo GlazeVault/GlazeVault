@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
 import { ImportedText, pickAndExtractText, UnsupportedFileError } from "@/constants/importText";
-import { getPublicCollectionPieces, isCollectionPublic } from "@/constants/privacy";
+import { getFeaturedCollectionPieces, isCollectionPublic } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import {
@@ -64,7 +64,12 @@ export default function ProfileScreen() {
   // from rapid taps on the avatar.
   const pickingAvatar = useRef(false);
 
-  const featuredCollections = collections.filter(isCollectionPublic);
+  // The Profile previews the public Portfolio, so it must match what visitors
+  // see: public collections that contain at least one FEATURED piece. A public
+  // collection with nothing featured is dropped, exactly like the live site.
+  const featuredCollections = collections.filter(
+    (c) => isCollectionPublic(c) && getFeaturedCollectionPieces(c, pieces).length > 0,
+  );
   const site = profile.publicSite;
 
   const startEditing = () => {
@@ -436,7 +441,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-              Public Collections
+              Portfolio
             </Text>
             {featuredCollections.length > 0 && (
               <View style={[styles.countBadge, { backgroundColor: "rgba(107,127,163,0.1)" }]}>
@@ -450,16 +455,16 @@ export default function ProfileScreen() {
             <View style={[styles.publicEmpty, { borderColor: "rgba(120,110,100,0.12)" }]}>
               <Feather name="star" size={16} color={colors.mutedForeground} style={{ opacity: 0.35, marginBottom: 8 }} />
               <Text style={[styles.publicEmptyText, { color: colors.mutedForeground }]}>
-                No public collections yet
+                Nothing featured yet
               </Text>
               <Text style={[styles.publicEmptyHint, { color: colors.mutedForeground }]}>
-                Open a collection and set it to Public
+                Feature pieces in a public collection to show them here
               </Text>
             </View>
           ) : (
             <View style={styles.featuredList}>
               {featuredCollections.map((c) => {
-                const cp = getPublicCollectionPieces(c, pieces);
+                const cp = getFeaturedCollectionPieces(c, pieces);
                 const coverUri =
                   c.coverImageUri || cp.find((p) => p.imageUri)?.imageUri;
                 return (
@@ -639,15 +644,16 @@ export default function ProfileScreen() {
 
           {site.enabled ? (
             <>
-              {/* Featured collections hint — featuring is managed per collection */}
+              {/* Portfolio hint — featuring is managed per piece (the star on
+                  each piece), and only public, featured pieces surface here. */}
               <View style={[styles.siteHintRow, { borderColor: "rgba(120,110,100,0.16)" }]}>
                 <Feather name="star" size={13} color={colors.cobalt} />
                 <Text style={[styles.siteHintText, { color: colors.mutedForeground }]}>
                   {featuredCollections.length === 0
-                    ? "Open a collection and turn on “Show in Portfolio” to add it here."
+                    ? "Feature pieces in a public collection to add them to your portfolio."
                     : `${featuredCollections.length} ${
                         featuredCollections.length === 1 ? "collection is" : "collections are"
-                      } in your portfolio. Manage this from each collection.`}
+                      } in your portfolio. Feature pieces to curate what shows.`}
                 </Text>
               </View>
 

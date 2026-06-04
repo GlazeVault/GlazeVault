@@ -176,3 +176,28 @@ export function getPublicCollectionPieces<P extends PieceLike>(
     (p) => (p.collectionIds ?? []).includes(collection.id) && isPubliclyVisiblePiece(p)
   );
 }
+
+/**
+ * A piece that belongs on the curated public Portfolio: publicly visible AND
+ * hand-picked via the "Feature in Portfolio" star. This is the single gate that
+ * decides what a visitor sees on the portfolio — combine the public-visibility
+ * and featured checks so the rule never depends on UI state.
+ */
+export function isFeaturedPublicPiece(piece: PieceLike): boolean {
+  return isPubliclyVisiblePiece(piece) && !!piece.featuredInPortfolio;
+}
+
+/**
+ * The curated portfolio pieces of a collection: members that are BOTH publicly
+ * visible and featured. This is the source of truth for what renders on the
+ * public portfolio — a public collection with no featured pieces yields an
+ * empty list (and is dropped from the portfolio by its caller).
+ */
+export function getFeaturedCollectionPieces<P extends PieceLike>(
+  collection: { id: string },
+  pieces: P[]
+): P[] {
+  return pieces.filter(
+    (p) => (p.collectionIds ?? []).includes(collection.id) && isFeaturedPublicPiece(p)
+  );
+}

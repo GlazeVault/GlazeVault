@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   buildPublicMetaLine,
-  getPublicCollectionPieces,
+  getFeaturedCollectionPieces,
   isCollectionPublic,
   toPublicPiece,
   type PublicPieceView,
@@ -40,13 +40,15 @@ export default function PublicSiteScreen() {
   const site = profile.publicSite;
   const layout: HomepageLayout = site.homepageLayout;
 
-  // The portfolio is now collection-driven: public collections ARE the
-  // storytelling structure of the site. Each is reduced to its publicly visible
-  // pieces and presented like a mini exhibition (hero, title, intro, works).
+  // The portfolio is a curated exhibition: public collections ARE the
+  // storytelling structure (context), but inside each one ONLY the pieces the
+  // artist has consciously featured appear (focus). A public collection with no
+  // featured pieces is dropped entirely; with nothing featured the portfolio
+  // reads intentionally empty.
   const publicCollections = collections
     .filter(isCollectionPublic)
     .map((c) => {
-      const cp = getPublicCollectionPieces(c, pieces).map(toPublicPiece);
+      const cp = getFeaturedCollectionPieces(c, pieces).map(toPublicPiece);
       // Prefer the artist-chosen cover. Otherwise fall back to a piece that has
       // a photo.
       const fallback = cp.find((p) => p.imageUri) ?? null;

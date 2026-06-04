@@ -22,6 +22,7 @@ import {
   buildPublicMetaLine,
   buildShareContent,
   isCollectionPublic,
+  isFeaturedPublicPiece,
   isPortfolioPiece,
   isPubliclyVisiblePiece,
   toPublicPiece,
@@ -114,14 +115,19 @@ export default function PieceDetailScreen() {
   // collection we stay within that collection; otherwise the whole archive.
   const galleryPieces = (() => {
     if (isPublicView) {
-      // Public gallery: swipe only across publicly visible pieces that share a
-      // collection with this one. Never reach a private/archived piece — that
-      // gate lives in isPubliclyVisiblePiece.
+      // Public gallery: swipe only across FEATURED, publicly visible pieces that
+      // share a PUBLIC collection with this one — i.e. exactly the pieces shown
+      // on the portfolio. Never reach a private/archived/unfeatured piece — that
+      // gate lives in isFeaturedPublicPiece + isCollectionPublic.
       if (piece.collectionIds.length === 0) return [piece];
+      const sharedPublicIds = piece.collectionIds.filter((cid) =>
+        collections.some((c) => c.id === cid && isCollectionPublic(c)),
+      );
+      if (sharedPublicIds.length === 0) return [piece];
       const siblings = pieces.filter(
         (p) =>
-          p.collectionIds.some((cid) => piece.collectionIds.includes(cid)) &&
-          isPubliclyVisiblePiece(p),
+          p.collectionIds.some((cid) => sharedPublicIds.includes(cid)) &&
+          isFeaturedPublicPiece(p),
       );
       return siblings.some((p) => p.id === piece.id) ? siblings : [piece];
     }
