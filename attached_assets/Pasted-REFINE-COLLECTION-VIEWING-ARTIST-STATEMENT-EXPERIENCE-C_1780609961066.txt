@@ -1,0 +1,107 @@
+REFINE COLLECTION VIEWING + ARTIST STATEMENT EXPERIENCE
+
+COLLECTION VIEWING MODE
+
+Current button label:
+“View as Gallery”
+
+Problem:
+The current label is too generic and does not clearly communicate the immersive swipe-based exhibition experience.
+
+The collection already appears gallery-like by default,
+so the action feels redundant and unclear.
+
+NEW DIRECTION
+
+Rename the immersive swipe viewing mode to something more editorial and exhibition-oriented.
+
+Recommended labels:
+- View Exhibition
+- Immersive View
+- Browse Collection
+
+Preferred direction:
+“View Exhibition”
+
+GOAL
+
+The immersive mode should feel like:
+- entering an exhibition
+- flipping through an artist monograph
+- browsing a museum catalog
+
+not opening a generic image gallery.
+
+IMMERSIVE MODE BEHAVIOR
+
+Inside immersive viewing:
+- horizontal swipe between artworks
+- tap to hide/show metadata
+- maintain artwork context and sequence
+- preserve original image ratios
+- support landscape full-width works
+- smooth calm transitions
+- dark or neutral immersive background
+
+Collection overview page remains:
+- editorial
+- scroll-based
+- contextual
+
+Immersive mode becomes:
+- focused
+- sequential
+- contemplative
+
+ARTIST STATEMENT REFINEMENT
+
+Current statement presentation feels:
+- too long
+- visually dense
+- difficult to read on mobile
+
+UPDATE EXPERIENCE
+
+DEFAULT STATE
+- Show only a short preview
+- Approximately 5–7 lines or 1–2 short paragraphs
+- Add “Read Full Statement”
+- Expand inline smoothly without leaving the page
+
+TYPOGRAPHY REFINEMENT
+- Use left-aligned body text
+- Reduce excessive italics
+- Use regular serif for readability
+- Increase paragraph spacing
+- Improve editorial reading rhythm
+
+COLLECTION DESCRIPTION REFINEMENT
+
+Collection descriptions should also:
+- initially appear shortened
+- use 3–4 line preview
+- support “Read more”
+- expand inline smoothly
+
+DESIGN GOAL
+
+The portfolio should prioritize:
+- artwork
+- pacing
+- atmosphere
+- emotional rhythm
+
+Text should feel secondary and discoverable,
+not overwhelming.
+
+Avoid:
+- giant walls of text
+- app-like accordion behavior
+- abrupt truncation
+- generic gallery terminology
+
+GlazeVault should feel like:
+archive
+→ exhibition
+→ artist monograph
+→ immersive viewing environment

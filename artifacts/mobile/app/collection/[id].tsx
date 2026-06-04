@@ -23,6 +23,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ExpandableText } from "@/components/ExpandableText";
 import { PieceStatusBadge } from "@/components/StatusBadge";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { isCollectionPublic } from "@/constants/privacy";
@@ -415,8 +416,15 @@ export default function CollectionDetailScreen() {
                 multiline
                 textAlignVertical="top"
               />
-            ) : collection.intro ? (
-              <Text style={[styles.intro, { color: colors.mutedForeground }]}>{collection.intro}</Text>
+            ) : collection.intro.trim() ? (
+              <ExpandableText
+                text={collection.intro.trim()}
+                color={colors.mutedForeground}
+                textStyle={styles.intro}
+                collapsedLines={4}
+                moreLabel="Read more"
+                lessLabel="Read less"
+              />
             ) : null}
             <Text style={[styles.count, { color: colors.mutedForeground, marginTop: 12 }]}>
               {collectionPieces.length === 0
@@ -442,11 +450,11 @@ export default function CollectionDetailScreen() {
                   });
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="View this collection as an immersive gallery"
+                accessibilityLabel="View this collection as an immersive exhibition"
               >
                 <Feather name="maximize" size={14} color={colors.cobalt} />
                 <Text style={[styles.galleryEntryText, { color: colors.cobalt }]}>
-                  View as gallery
+                  View Exhibition
                 </Text>
               </Pressable>
             ) : null}

@@ -12,6 +12,7 @@ import {
   toPublicPiece,
   type PublicPieceView,
 } from "@/constants/privacy";
+import { ExpandableText } from "@/components/ExpandableText";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import {
@@ -27,36 +28,6 @@ import {
   isLandscapeRatio,
   useImageOrientations,
 } from "@/hooks/useImageOrientations";
-
-function ExpandableIntro({ text, color }: { text: string; color: string }) {
-  const [expanded, setExpanded] = React.useState(false);
-  const [clampable, setClampable] = React.useState(false);
-
-  return (
-    <View style={styles.introWrap}>
-      <Text
-        style={[styles.collectionIntro, { color }]}
-        numberOfLines={expanded ? undefined : 3}
-        onTextLayout={(e) => {
-          if (!clampable && e.nativeEvent.lines.length > 3) setClampable(true);
-        }}
-      >
-        {text}
-      </Text>
-      {clampable ? (
-        <Pressable
-          onPress={() => setExpanded((v) => !v)}
-          hitSlop={8}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.readMore, { color }]}>
-            {expanded ? "Read less" : "Read more"}
-          </Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
 
 export default function PublicSiteScreen() {
   const colors = useColors();
@@ -233,9 +204,14 @@ export default function PublicSiteScreen() {
 
         {profile.statement.trim() ? (
           <View style={[styles.statementCard, { backgroundColor: colors.secondary, borderColor: "rgba(120,110,100,0.12)" }]}>
-            <Text style={[styles.statementText, { color: colors.foreground }]}>
-              {profile.statement.trim()}
-            </Text>
+            <ExpandableText
+              text={profile.statement.trim()}
+              color={colors.foreground}
+              textStyle={styles.statementText}
+              collapsedLines={6}
+              moreLabel="Read Full Statement"
+              lessLabel="Show Less"
+            />
           </View>
         ) : null}
 
@@ -321,18 +297,23 @@ export default function PublicSiteScreen() {
                   ]}
                   onPress={() => router.push(`/piece/${cp[0].id}?public=1&immersive=1`)}
                   accessibilityRole="button"
-                  accessibilityLabel={`View ${collection.title} as an immersive gallery`}
+                  accessibilityLabel={`View ${collection.title} as an immersive exhibition`}
                 >
                   <Feather name="maximize" size={14} color={colors.emerald} />
                   <Text style={[styles.galleryEntryText, { color: colors.emerald }]}>
-                    View as gallery
+                    View Exhibition
                   </Text>
                 </Pressable>
               ) : null}
               {collection.intro.trim() ? (
-                <ExpandableIntro
+                <ExpandableText
                   text={collection.intro.trim()}
                   color={colors.mutedForeground}
+                  textStyle={styles.collectionIntro}
+                  collapsedLines={4}
+                  moreLabel="Read more"
+                  lessLabel="Read less"
+                  containerStyle={styles.introWrap}
                 />
               ) : null}
               {gridPieces.length > 0 ? renderPieces(gridPieces) : null}
@@ -432,10 +413,10 @@ const styles = StyleSheet.create({
   },
   statementText: {
     fontSize: 16,
-    fontFamily: "PlayfairDisplay_400Regular_Italic",
-    lineHeight: 27,
+    fontFamily: "PlayfairDisplay_400Regular",
+    lineHeight: 28,
     letterSpacing: 0.2,
-    textAlign: "center",
+    textAlign: "left",
   },
   links: { gap: 10, alignItems: "center", marginBottom: 4 },
   linkRow: { flexDirection: "row", alignItems: "center", gap: 9, maxWidth: "100%" },
@@ -512,14 +493,6 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontFamily: "Poppins_300Light",
     lineHeight: 22,
-  },
-  readMore: {
-    fontSize: 11,
-    fontFamily: "Poppins_500Medium",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    marginTop: 8,
-    opacity: 0.8,
   },
   // Shared tile structure: a column holding an image box + a quiet caption.
   tileCol: {},
