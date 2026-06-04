@@ -4,7 +4,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -25,6 +24,7 @@ import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
 import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
+import { notice } from "@/lib/notice";
 
 function ChipSelector({
   options,
@@ -120,11 +120,11 @@ function EditPieceForm({ piece }: { piece: PotteryPiece }) {
 
   const handleSave = async () => {
     if (images.length === 0) {
-      Alert.alert("Image required", "Please add a photograph of your piece.");
+      notice({ title: "Image required", message: "Please add a photograph of your piece." });
       return;
     }
     if (!title.trim()) {
-      Alert.alert("Title required", "Give this piece a name.");
+      notice({ title: "Title required", message: "Give this piece a name." });
       return;
     }
     setSaving(true);
@@ -135,7 +135,7 @@ function EditPieceForm({ piece }: { piece: PotteryPiece }) {
       storedImages = await Promise.all(images.map((uri) => persistPieceImage(uri)));
     } catch {
       setSaving(false);
-      Alert.alert("Couldn’t save photo", "We couldn’t store those photos. Please try again.");
+      notice({ title: "Couldn’t save photo", message: "We couldn’t store those photos. Please try again." });
       return;
     }
     const storedCover = storedImages[coverIndex] ?? storedImages[0];

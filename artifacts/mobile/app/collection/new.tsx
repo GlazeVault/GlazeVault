@@ -5,7 +5,6 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Platform,
   Pressable,
   StyleSheet,
@@ -21,6 +20,7 @@ import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
+import { notice } from "@/lib/notice";
 
 export default function NewCollectionScreen() {
   const colors = useColors();
@@ -70,7 +70,7 @@ export default function NewCollectionScreen() {
       }
     } catch (e) {
       console.warn("Failed to pick collection cover", e);
-      Alert.alert("Couldn't add image", "Something went wrong choosing that image.");
+      notice({ title: "Couldn't add image", message: "Something went wrong choosing that image." });
     } finally {
       pickingCover.current = false;
     }
@@ -78,7 +78,7 @@ export default function NewCollectionScreen() {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert("Title required", "Give this collection a name.");
+      notice({ title: "Title required", message: "Give this collection a name." });
       return;
     }
     setSaving(true);

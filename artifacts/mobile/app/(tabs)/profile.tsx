@@ -6,7 +6,6 @@ import { router } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -35,6 +34,7 @@ import {
 } from "@/context/ProfileContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
+import { notice } from "@/lib/notice";
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -91,7 +91,7 @@ export default function ProfileScreen() {
       } catch (e) {
         console.warn("Failed to persist avatar", e);
         setSaving(false);
-        Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
+        notice({ title: "Couldn’t save photo", message: "We couldn’t store that photo. Please try again." });
         return;
       }
     }
@@ -127,7 +127,7 @@ export default function ProfileScreen() {
     if (!site.enabled) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(publicSiteUrl);
-    Alert.alert("Link copied", `${publicSiteUrl} is on your clipboard.`);
+    notice({ title: "Link copied", message: `${publicSiteUrl} is on your clipboard.` });
   };
 
   const handleShareSite = async () => {
@@ -162,7 +162,7 @@ export default function ProfileScreen() {
     if (Platform.OS !== "web") {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission needed", "Allow access to your photo library.");
+        notice({ title: "Permission needed", message: "Allow access to your photo library." });
         return;
       }
     }
@@ -209,7 +209,7 @@ export default function ProfileScreen() {
       }
     } catch (e) {
       console.warn("Failed to copy avatar", e);
-      Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
+      notice({ title: "Couldn’t save photo", message: "We couldn’t store that photo. Please try again." });
       return;
     }
     console.log("Avatar copied successfully:", storedAvatar.slice(0, 64));
@@ -221,7 +221,7 @@ export default function ProfileScreen() {
       console.log("Updated profile avatarUri:", storedAvatar.slice(0, 64));
     } catch (e) {
       console.warn("Failed to save profile avatar", e);
-      Alert.alert("Couldn’t save photo", "Your photo was loaded but couldn’t be saved. Please try again.");
+      notice({ title: "Couldn’t save photo", message: "Your photo was loaded but couldn’t be saved. Please try again." });
     }
   };
 
@@ -232,7 +232,7 @@ export default function ProfileScreen() {
       const result = await pickAndExtractText();
       if (!result) return; // user canceled the picker
       if (!result.text.trim()) {
-        Alert.alert("Nothing to import", "We couldn’t find any readable text in that file.");
+        notice({ title: "Nothing to import", message: "We couldn’t find any readable text in that file." });
         return;
       }
       setImportTarget(target);
@@ -240,9 +240,9 @@ export default function ProfileScreen() {
     } catch (e) {
       console.warn("Import from file failed", e);
       if (e instanceof UnsupportedFileError) {
-        Alert.alert("PDF not supported yet", e.message);
+        notice({ title: "PDF not supported yet", message: e.message });
       } else {
-        Alert.alert("Import failed", e instanceof Error ? e.message : "We couldn’t read that file.");
+        notice({ title: "Import failed", message: e instanceof Error ? e.message : "We couldn’t read that file." });
       }
     } finally {
       setImportBusy(false);

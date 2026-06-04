@@ -2,7 +2,6 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -21,7 +20,7 @@ import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
-import { confirm } from "@/lib/confirm";
+import { chooseAction, notice } from "@/lib/notice";
 
 function ChipSelector({
   options,
@@ -89,11 +88,11 @@ export default function AddScreen() {
 
   const handleSave = async () => {
     if (images.length === 0) {
-      Alert.alert("Image required", "Please add a photograph of your piece.");
+      notice({ title: "Image required", message: "Please add a photograph of your piece." });
       return;
     }
     if (!title.trim()) {
-      Alert.alert("Title required", "Give this piece a name.");
+      notice({ title: "Title required", message: "Give this piece a name." });
       return;
     }
     setSaving(true);
@@ -104,7 +103,7 @@ export default function AddScreen() {
       storedImages = await Promise.all(images.map((uri) => persistPieceImage(uri)));
     } catch {
       setSaving(false);
-      Alert.alert("Couldn’t save photo", "We couldn’t store those photos. Please try again.");
+      notice({ title: "Couldn’t save photo", message: "We couldn’t store those photos. Please try again." });
       return;
     }
     const storedCover = storedImages[coverIndex] ?? storedImages[0];
@@ -118,20 +117,7 @@ export default function AddScreen() {
     // is set on the piece itself). When the piece isn't in one yet, gently offer
     // to file it into a series — Later is always fine.
     if (wasUncollected) {
-      if (Platform.OS === "web") {
-        const wantsCollection = await confirm({
-          title: "Add this piece to a Collection?",
-          message:
-            "Collections help you organize your work into series and projects. You can always do this later.",
-          confirmText: "Choose a Collection",
-          cancelText: "Later",
-        });
-        if (wantsCollection) {
-          router.push({ pathname: "/piece/[id]", params: { id: created.id } });
-        }
-        return;
-      }
-      Alert.alert(
+      chooseAction(
         "Add this piece to a Collection?",
         "Collections help you organize your work into series and projects. You can always do this later.",
         [

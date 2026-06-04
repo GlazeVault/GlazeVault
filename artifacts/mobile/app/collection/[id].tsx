@@ -5,7 +5,6 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   FlatList,
   Modal,
   Platform,
@@ -32,6 +31,7 @@ import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 import { confirm } from "@/lib/confirm";
+import { notice } from "@/lib/notice";
 import {
   buildOrientationRows,
   isLandscapeRatio,
@@ -200,7 +200,7 @@ export default function CollectionDetailScreen() {
       if (Platform.OS !== "web") {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert("Permission needed", "Allow access to your photo library.");
+          notice({ title: "Permission needed", message: "Allow access to your photo library." });
           return;
         }
       }
@@ -250,7 +250,7 @@ export default function CollectionDetailScreen() {
       await updateCollection(collection!.id, { coverImageUri: uploadedUrl });
     } catch (e) {
       console.warn("Failed to upload collection cover", e);
-      Alert.alert("Cover image could not be saved. Please try again.");
+      notice({ title: "Cover image could not be saved. Please try again." });
     } finally {
       pickingCover.current = false;
     }
@@ -287,7 +287,7 @@ export default function CollectionDetailScreen() {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert("Title required", "Give this collection a name.");
+      notice({ title: "Title required", message: "Give this collection a name." });
       return;
     }
     setSaving(true);

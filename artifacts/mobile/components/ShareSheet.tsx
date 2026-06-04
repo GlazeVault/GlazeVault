@@ -2,7 +2,6 @@ import { Feather, FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons
 import * as Haptics from "expo-haptics";
 import React, { useCallback } from "react";
 import {
-  Alert,
   Animated,
   Modal,
   Pressable,
@@ -14,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import type { ShareContent } from "@/constants/privacy";
+import { notice } from "@/lib/notice";
 
 interface ShareOption {
   id: string;
@@ -43,15 +43,15 @@ export function ShareSheet({ visible, onClose, content }: ShareSheetProps) {
       if (label === "Copy Link") {
         onClose();
         setTimeout(() => {
-          Alert.alert("Link copied", `A link to "${content.title}" has been copied to your clipboard.`);
+          notice({ title: "Link copied", message: `A link to "${content.title}" has been copied to your clipboard.` });
         }, 300);
       } else {
         onClose();
         setTimeout(() => {
-          Alert.alert(
-            `Share to ${label}`,
-            `This will open ${label} so you can share "${content.title}". Full integration coming soon.`
-          );
+          notice({
+            title: `Share to ${label}`,
+            message: `This will open ${label} so you can share "${content.title}". Full integration coming soon.`,
+          });
         }, 300);
       }
     },

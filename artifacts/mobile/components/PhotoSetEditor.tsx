@@ -3,7 +3,6 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
 import {
-  Alert,
   Platform,
   Pressable,
   StyleSheet,
@@ -16,6 +15,7 @@ import { ImageCropper } from "@/components/ImageCropper";
 import { removePhoto, reorderPhotos } from "@/constants/photoReorder";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useColors } from "@/hooks/useColors";
+import { chooseAction, notice } from "@/lib/notice";
 
 interface PhotoSetEditorProps {
   images: string[];
@@ -42,7 +42,7 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
     if (Platform.OS !== "web") {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission needed", "Allow access to your photo library.");
+        notice({ title: "Permission needed", message: "Allow access to your photo library." });
         return;
       }
     }
@@ -60,7 +60,7 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Allow camera access to photograph your pottery.");
+      notice({ title: "Permission needed", message: "Allow camera access to photograph your pottery." });
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -75,10 +75,11 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
 
   const handlePickPhoto = () => {
     if (Platform.OS === "web") {
+      // Web has no camera capture flow here; go straight to the file picker.
       pickImage();
       return;
     }
-    Alert.alert("Add Photo", undefined, [
+    chooseAction("Add Photo", undefined, [
       { text: "Camera", onPress: takePhoto },
       { text: "Photo Library", onPress: pickImage },
       { text: "Cancel", style: "cancel" },

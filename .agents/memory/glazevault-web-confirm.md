@@ -13,5 +13,5 @@ Archiving a piece (`handleToggleArchive`) now also goes through `confirm()` (des
 
 **How to apply:**
 - Binary destructive/confirm prompts → replace `Alert.alert` with `await confirm({ title, message, confirmText, destructive: true })`.
-- Multi-option action sheets (3+ buttons, e.g. add.tsx "add to collection?", PhotoSetEditor "Add Photo") can't map to `window.confirm`. Branch `Platform.OS === "web"` to a binary `confirm()` (or direct action) and keep the native `Alert.alert` action sheet.
-- Single-button informational alerts (validation "Title required", "Permission needed", "Link copied") are also no-ops on web but were left as-is — they're notices, not confirmations.
+- Single-button informational notices (validation "Title required", "Permission needed", "Link copied", import/save errors) → use `@/lib/notice` `notice({ title, message })` (`window.alert` on web, single-button `Alert.alert` on native). There are NO remaining `Alert.alert` calls in app/ or components/ — all routed through `confirm`/`notice`/`chooseAction`.
+- Multi-option action sheets (3+ buttons, e.g. add.tsx "add to collection?", PhotoSetEditor "Add Photo") → `@/lib/notice` `chooseAction(title, message, options[])`. Native renders a real multi-button `Alert.alert`; web falls back to a SEQUENCE of `window.confirm` prompts (one per non-cancel option, in order) — first accepted option wins, declining all runs the cancel option. Don't hand-branch `Platform.OS` for these anymore.
