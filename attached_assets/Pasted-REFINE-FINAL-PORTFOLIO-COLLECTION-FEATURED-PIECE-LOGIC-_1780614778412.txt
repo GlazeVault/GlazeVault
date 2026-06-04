@@ -1,0 +1,154 @@
+REFINE FINAL PORTFOLIO / COLLECTION / FEATURED PIECE LOGIC
+
+The current architecture is still mixing:
+- Archive
+- Collections
+- Portfolio
+- Featured
+
+Refactor the logic into this final hierarchy:
+
+FINAL STRUCTURE
+
+Archive
+= permanent master vault of ALL recorded works
+
+Collections
+= organizational / thematic groupings
+
+Portfolio
+= curated selection of FEATURED PUBLIC pieces
+
+IMPORTANT
+
+Portfolio is NOT:
+- all collections
+- entire collections automatically
+- every public piece
+
+Portfolio is:
+artist-selected featured works.
+
+FINAL PIECE FLOW
+
+1. Record Piece
+↓
+2. Save to Archive
+↓
+3. Choose:
+   - Private
+   - Public
+↓
+4. IF Public:
+   allow Collection assignment
+↓
+5. IF Collection selected:
+   allow:
+   “Feature this piece in Portfolio”
+
+IMPORTANT FEATURE RULE
+
+A piece can ONLY be featured if:
+- Public = true
+AND
+- assigned to at least one Collection
+
+This prevents orphan featured works with no curatorial context.
+
+IF piece is Private:
+- cannot be featured
+- cannot appear in public collections
+- cannot appear in portfolio
+
+PORTFOLIO PHILOSOPHY
+
+Portfolio should feel:
+- curated
+- intentional
+- selective
+- exhibition-like
+
+not like:
+- a dump of all collections
+- an automatic public mirror
+- an inventory grid
+
+COLLECTION ROLE
+
+Collections provide:
+- context
+- sequencing
+- artistic world-building
+
+Portfolio pieces should still belong to collections,
+even if only selected pieces become featured.
+
+EXAMPLE
+
+Collection: “Elements”
+Contains:
+- Bowl
+- Vessel
+- Moon Jar
+- Mug
+
+Only:
+- Vessel
+- Moon Jar
+
+may be featured in Portfolio.
+
+This allows:
+- collection context
+- selective curation
+- stronger portfolio quality
+
+REMOVE OLD LOGIC
+
+REMOVE:
+- auto-featuring entire collections
+- collection-level featured requirement
+- conflicting portfolio states
+
+NEW UI FLOW
+
+SAVE SCREEN
+
+Step 1:
+Public or Private?
+
+Step 2:
+IF Public:
+Choose Collection(s)
+
+Step 3:
+IF Collection selected:
+Feature this piece in Portfolio?
+☐ Yes
+☐ Not now
+
+PIECE DETAIL PAGE
+
+Keep:
+- Public / Private
+- Collection assignment
+- Feature in Portfolio
+- Share
+- Edit
+- Retire Piece
+
+REMOVE:
+- confusing Archive actions
+- duplicate portfolio logic
+- collection-level feature dependency
+
+IMPORTANT UX GOAL
+
+The user mental model should feel extremely simple:
+
+“Everything is safely archived.”
+“Some works become public.”
+“Some public works go into collections.”
+“Some selected works become portfolio highlights.”
+
+This must feel intuitive even for older non-technical ceramic artists.
