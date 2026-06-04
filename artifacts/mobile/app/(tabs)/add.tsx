@@ -21,6 +21,7 @@ import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
+import { confirm } from "@/lib/confirm";
 
 function ChipSelector({
   options,
@@ -117,6 +118,19 @@ export default function AddScreen() {
     // is set on the piece itself). When the piece isn't in one yet, gently offer
     // to file it into a series — Later is always fine.
     if (wasUncollected) {
+      if (Platform.OS === "web") {
+        const wantsCollection = await confirm({
+          title: "Add this piece to a Collection?",
+          message:
+            "Collections help you organize your work into series and projects. You can always do this later.",
+          confirmText: "Choose a Collection",
+          cancelText: "Later",
+        });
+        if (wantsCollection) {
+          router.push({ pathname: "/piece/[id]", params: { id: created.id } });
+        }
+        return;
+      }
       Alert.alert(
         "Add this piece to a Collection?",
         "Collections help you organize your work into series and projects. You can always do this later.",

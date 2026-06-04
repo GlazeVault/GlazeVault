@@ -19,3 +19,4 @@
 - [GlazeVault search](glazevault-search.md) — local-only substring filter on both tabs via shared SearchBar; no dedicated search screen/route by design.
 - [GlazeVault mobile jest setup](glazevault-mobile-jest.md) — jest-expo+RTL render tests; pnpm transformIgnore quirks, exact react/rtr version lockstep, no jest.resetModules with top-level RTL import, mock-prefix rule.
 - [GlazeVault immersive viewer](glazevault-immersive-viewer.md) — collections enter the existing ImageViewer via an `immersive=1` route param (reuse, no new screen); firing atmosphere stays owner-only even there (user chose private).
+- [GlazeVault cross-platform confirm](glazevault-web-confirm.md) — Alert.alert is a no-op on react-native-web; use `@/lib/confirm` confirm() (Promise<bool>, window.confirm on web) for confirm/cancel; branch web for 3+ option sheets.

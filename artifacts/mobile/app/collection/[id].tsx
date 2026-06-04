@@ -30,6 +30,7 @@ import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
+import { confirm } from "@/lib/confirm";
 import {
   buildOrientationRows,
   isLandscapeRatio,
@@ -301,25 +302,19 @@ export default function CollectionDetailScreen() {
     setIsEditing(false);
   };
 
-  const handleDelete = () => {
-    Alert.alert(
-      "Delete Collection",
-      `Remove "${collection.title}"? Pieces in this collection will not be deleted.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            for (const p of collectionPieces) {
-              await removePieceFromCollection(id, p.id);
-            }
-            await deleteCollection(id);
-            router.back();
-          },
-        },
-      ]
-    );
+  const handleDelete = async () => {
+    const confirmed = await confirm({
+      title: "Delete Collection",
+      message: `Remove "${collection.title}"? Pieces in this collection will not be deleted.`,
+      confirmText: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    for (const p of collectionPieces) {
+      await removePieceFromCollection(id, p.id);
+    }
+    await deleteCollection(id);
+    router.back();
   };
 
   return (

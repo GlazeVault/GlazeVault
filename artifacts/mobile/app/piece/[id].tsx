@@ -4,9 +4,7 @@ import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DraggablePhotoStrip } from "@/components/DraggablePhotoStrip";
+import { confirm } from "@/lib/confirm";
 import { ImageViewer, type ViewerItem } from "@/components/ImageViewer";
 import { ShareSheet } from "@/components/ShareSheet";
 import {
@@ -245,42 +244,34 @@ export default function PieceDetailScreen() {
     await toggleFavorite(piece.id);
   };
 
-  const handleDelete = () => {
-    Alert.alert("Remove Piece", `Remove "${piece.title}" from your archive?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: async () => {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          await deletePiece(piece.id);
-          router.back();
-        },
-      },
-    ]);
+  const handleDelete = async () => {
+    const confirmed = await confirm({
+      title: "Remove Piece",
+      message: `Remove "${piece.title}" from your archive?`,
+      confirmText: "Remove",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    await deletePiece(piece.id);
+    router.back();
   };
 
-  const handleContextRemove = () => {
+  const handleContextRemove = async () => {
     if (!from) {
-      handleDelete();
+      await handleDelete();
       return;
     }
-    Alert.alert(
-      "Remove from Collection",
-      `Remove "${piece.title}" from this collection? It will stay in your archive.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            await removePieceFromCollection(from, piece.id);
-            router.back();
-          },
-        },
-      ]
-    );
+    const confirmed = await confirm({
+      title: "Remove from Collection",
+      message: `Remove "${piece.title}" from this collection? It will stay in your archive.`,
+      confirmText: "Remove",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await removePieceFromCollection(from, piece.id);
+    router.back();
   };
 
   // Toggle membership of a single collection. Adding a piece to a collection is
@@ -324,6 +315,17 @@ export default function PieceDetailScreen() {
   };
 
   const handleToggleArchive = async () => {
+    // Archiving hides a piece from the public site, so confirm it; restoring is
+    // non-destructive and applies immediately.
+    if (!piece.archived) {
+      const confirmed = await confirm({
+        title: "Archive Piece",
+        message: `Archive "${piece.title}"? It will be hidden from your public portfolio but stays in your archive.`,
+        confirmText: "Archive",
+        destructive: true,
+      });
+      if (!confirmed) return;
+    }
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await updatePiece(piece.id, { archived: !piece.archived });
   };
