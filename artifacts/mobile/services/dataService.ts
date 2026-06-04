@@ -109,20 +109,12 @@ function guessContentType(uri: string): string {
 
 // ── Pieces ──────────────────────────────────────────────────────────────────
 
-// The new piece state (multi-collection membership + curation/discovery flags)
-// is stored as a JSON blob in the existing `public_data_settings` column. That
-// column was a deprecated leftover from the old per-piece publishing model and
-// is otherwise unused, so we repurpose it as a generic meta blob — this lets the
-// app persist the new fields WITHOUT a Supabase schema change. The single
-// `collection_id` column is still written (first membership) for back-compat and
-// as a fallback read source for rows saved before this blob existed.
-type PieceMeta = {
-  collectionIds?: string[];
-  featuredInPortfolio?: boolean;
-  isPublic?: boolean;
-  archived?: boolean;
-};
-
+// A piece's organization + curation state lives in explicit, typed columns:
+// `collection_ids` (multi-collection membership) plus the `featured_in_portfolio`
+// / `is_public` / `archived` booleans. These replaced an opaque JSON meta blob
+// (`public_data_settings`) and the singular `collection_id` fallback column —
+// the data is now legible, queryable, and indexable. See supabase/schema.sql for
+// the migration that backfilled these from the retired blob.
 type PieceRow = {
   id: string;
   title: string;
@@ -137,8 +129,10 @@ type PieceRow = {
   image_url: string;
   created_at: string;
   is_favorite: boolean;
-  collection_id: string | null;
-  public_data_settings: PieceMeta | null;
+  collection_ids: string[] | null;
+  featured_in_portfolio: boolean | null;
+  is_public: boolean | null;
+  archived: boolean | null;
 };
 
 function pieceToRow(p: PotteryPiece): PieceRow {
@@ -156,23 +150,17 @@ function pieceToRow(p: PotteryPiece): PieceRow {
     image_url: p.imageUri,
     created_at: p.createdAt,
     is_favorite: p.isFavorite,
-    collection_id: p.collectionIds[0] ?? null,
-    public_data_settings: {
-      collectionIds: p.collectionIds,
-      featuredInPortfolio: p.featuredInPortfolio,
-      isPublic: p.isPublic,
-      archived: p.archived,
-    },
+    collection_ids: p.collectionIds,
+    featured_in_portfolio: p.featuredInPortfolio,
+    is_public: p.isPublic,
+    archived: p.archived,
   };
 }
 
 function rowToPiece(r: PieceRow): PotteryPiece {
-  const meta = (r.public_data_settings ?? {}) as PieceMeta;
-  const collectionIds = Array.isArray(meta.collectionIds)
-    ? meta.collectionIds.filter((id): id is string => typeof id === "string")
-    : r.collection_id
-      ? [r.collection_id]
-      : [];
+  const collectionIds = Array.isArray(r.collection_ids)
+    ? r.collection_ids.filter((id): id is string => typeof id === "string")
+    : [];
   return {
     id: r.id,
     title: r.title ?? "",
@@ -188,9 +176,9 @@ function rowToPiece(r: PieceRow): PotteryPiece {
     createdAt: r.created_at ?? new Date().toISOString(),
     isFavorite: r.is_favorite ?? false,
     collectionIds,
-    featuredInPortfolio: !!meta.featuredInPortfolio,
-    isPublic: !!meta.isPublic,
-    archived: !!meta.archived,
+    featuredInPortfolio: !!r.featured_in_portfolio,
+    isPublic: !!r.is_public,
+    archived: !!r.archived,
   };
 }
 

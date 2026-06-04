@@ -1,29 +1,38 @@
 ---
 name: GlazeVault Supabase column status
-description: Which Supabase columns are genuinely dead vs. actively used (despite legacy-sounding names/comments).
+description: Which Supabase pieces/collections columns are alive vs. dead, after curation state was promoted to typed columns.
 ---
 
-# GlazeVault Supabase columns: dead vs. alive
+# GlazeVault Supabase columns: alive vs. dead
 
 DB-column access is centralized in `services/dataService.ts` (`pieceToRow`/`rowToPiece`,
 `collectionToRow`/`rowToCollection`). That is the authoritative place to check whether a
 column is read/written — app-model fields with similar names (in contexts/screens) are NOT
 the same thing as DB columns.
 
-**Genuinely dead (safe to drop):**
-- `pieces.visibility` — not in the row type, never read/written.
-- `collections.featured_on_site` — "Show in Portfolio" moved to the piece level; never read/written.
+**Pieces — current typed columns (alive):**
+- `pieces.collection_ids text[]` — multi-collection membership.
+- `pieces.featured_in_portfolio`, `pieces.is_public`, `pieces.archived` — curation/discovery booleans.
+  These replaced the repurposed JSON blob; they back `constants/privacy.ts` gating.
 
-**Actively used despite legacy-sounding names — DO NOT DROP:**
-- `pieces.public_data_settings` — REPURPOSED into a JSON meta blob holding
-  `{ collectionIds, featuredInPortfolio, isPublic, archived }`. Dropping it loses all
-  multi-collection membership + curation flags and breaks save/load.
-- `collections.visibility` — the source of truth for a collection's public/private state.
+**Retired (dropped from live DB + create-table; backfill+drop kept idempotent in schema.sql):**
+- `pieces.public_data_settings` (jsonb) — the old repurposed meta blob. Backfilled into the
+  typed columns, then dropped. Some legacy rows held the EVEN OLDER per-field publish shape
+  (`showCone`, `showYear`, …) with no curation keys → those correctly default to false.
+- `pieces.collection_id` (singular) — was the first-membership fallback; superseded by
+  `collection_ids`, dropped after backfill.
+- `pieces.visibility` — long dead (never in row type); finally dropped.
 
-**Why:** A task once asserted all three of (`pieces.visibility`, `pieces.public_data_settings`,
-`collections.visibility`) were dead and asked to drop them. Two were still load-bearing; only
-`pieces.visibility` was actually dead. Always verify against `dataService.ts` before dropping.
+**Collections (alive despite legacy-sounding name):**
+- `collections.visibility` — source of truth for a collection's public/private state.
+- `collections.featured_on_site` — dead, dropped (Portfolio moved to piece level).
 
-**How to apply:** When retiring DB columns, drop only ones absent from the dataService row
-mappers. Use idempotent `alter table ... drop column if exists` and place collection drops
-AFTER the `create table` so a fresh-DB run doesn't fail.
+**Why:** Curation state used to be squeezed into a single JSON blob to dodge a schema change.
+It was promoted to typed columns (legible/queryable). The backfill matched `rowToPiece` exactly,
+verified on the live DB before dropping the blob.
+
+**How to apply:** Sandbox CAN run Supabase DDL via the pooler — connect with
+`psql "${SUPABASE_POOLER_URL/aws-0/aws-1}"` (the secret's host region is wrong). After any DDL,
+run `notify pgrst, 'reload schema';` so the app's PostgREST API sees the change. When retiring a
+column: backfill first, verify against dataService row mappers, then `drop column if exists`,
+placing drops AFTER `create table` so a fresh-DB run doesn't fail.

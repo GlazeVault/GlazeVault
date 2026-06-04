@@ -23,23 +23,64 @@ create table if not exists public.pieces (
   image_url            text not null default '',
   created_at           timestamptz not null default now(),
   is_favorite          boolean not null default false,
-  -- REPURPOSED: `public_data_settings` (originally the old per-field publishing
-  -- toggles) is now a generic JSON meta blob holding the piece's organization +
-  -- curation state: { collectionIds: text[], featuredInPortfolio, isPublic,
-  -- archived }. This lets the app store multi-collection membership and the
-  -- Portfolio/Public flags WITHOUT a schema change. `collection_id` keeps the
-  -- first membership for back-compat and as a fallback when the blob is absent.
-  public_data_settings jsonb,
-  collection_id        text
+  -- Explicit, typed organization + curation columns. `collection_ids` holds the
+  -- piece's multi-collection membership; the three booleans drive curation +
+  -- discovery (see constants/privacy.ts). These replaced an opaque JSON meta
+  -- blob (`public_data_settings`) so the state is legible, queryable, indexable.
+  collection_ids        text[]  not null default '{}',
+  featured_in_portfolio boolean not null default false,
+  is_public             boolean not null default false,
+  archived              boolean not null default false
 );
 
 -- Idempotent migrations for existing databases (create table above only runs on
 -- fresh setups, so new columns must also be added here).
 alter table public.pieces add column if not exists year text not null default '';
 
--- Retire the legacy per-piece publishing column. The app no longer reads or
--- writes `pieces.visibility`; piece public/private state now lives in the
--- `public_data_settings` JSON blob (isPublic). Dropped here for existing DBs.
+-- ── Promote curation/organization state to typed columns ─────────────────────
+-- These columns were previously squeezed into a single repurposed JSON blob
+-- (`public_data_settings`), with `collection_id` (singular) kept as a fallback
+-- for the first membership. Add the typed columns, backfill from the blob (and
+-- from `collection_id`), then retire the blob + the singular column.
+alter table public.pieces add column if not exists collection_ids text[]  not null default '{}';
+alter table public.pieces add column if not exists featured_in_portfolio boolean not null default false;
+alter table public.pieces add column if not exists is_public             boolean not null default false;
+alter table public.pieces add column if not exists archived              boolean not null default false;
+
+-- Backfill the typed columns from the legacy JSON blob. Guarded on the blob's
+-- existence so this is a no-op on fresh databases (where the column was never
+-- created). Rows still carrying the OLD per-field publishing shape (showCone,
+-- showYear, …) lack the curation keys, so they correctly default to false and
+-- fall back to `collection_id` for membership — matching the app's old reader.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'pieces'
+      and column_name = 'public_data_settings'
+  ) then
+    update public.pieces set
+      collection_ids = case
+        when jsonb_typeof(public_data_settings->'collectionIds') = 'array'
+          then coalesce(
+            (select array_agg(value)
+               from jsonb_array_elements_text(public_data_settings->'collectionIds') as value),
+            '{}'::text[])
+        when collection_id is not null then array[collection_id]
+        else '{}'::text[]
+      end,
+      featured_in_portfolio = coalesce((public_data_settings->>'featuredInPortfolio')::boolean, false),
+      is_public             = coalesce((public_data_settings->>'isPublic')::boolean, false),
+      archived              = coalesce((public_data_settings->>'archived')::boolean, false);
+  end if;
+end $$;
+
+-- Retire the JSON blob and the singular `collection_id` only after backfill.
+alter table public.pieces drop column if exists public_data_settings;
+alter table public.pieces drop column if exists collection_id;
+
+-- Retire the long-dead per-piece publishing column. The app never read or wrote
+-- `pieces.visibility`; piece public/private state now lives in `is_public`.
 alter table public.pieces drop column if exists visibility;
 
 -- ── collections ─────────────────────────────────────────────────────────────
