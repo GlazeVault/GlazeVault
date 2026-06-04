@@ -72,6 +72,8 @@ export async function persistPieceImage(uri: string): Promise<string> {
  * a piece is read in (cache load, remote row, addPiece):
  *
  * - Drops empty/non-string entries from `images`.
+ * - Drops duplicate entries, keeping the first occurrence (so a photo never
+ *   appears twice in a piece's set, and the cover is never double-counted).
  * - If `images` is empty, seeds it from the cover (back-compat: older rows only
  *   had `imageUri`).
  * - If the cover is empty, adopts the first image.
@@ -84,9 +86,14 @@ export function coalesceImages(
   imageUri: string | undefined | null,
   images: readonly (string | undefined | null)[] | undefined | null,
 ): { imageUri: string; images: string[] } {
-  const list = Array.isArray(images)
-    ? images.filter((u): u is string => typeof u === "string" && u.length > 0)
-    : [];
+  const seen = new Set<string>();
+  const list = (Array.isArray(images) ? images : [])
+    .filter((u): u is string => typeof u === "string" && u.length > 0)
+    .filter((u) => {
+      if (seen.has(u)) return false;
+      seen.add(u);
+      return true;
+    });
   let cover = typeof imageUri === "string" ? imageUri : "";
   let result = list;
   if (result.length === 0) {

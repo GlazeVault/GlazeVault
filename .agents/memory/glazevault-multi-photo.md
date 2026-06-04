@@ -13,8 +13,10 @@ includes the cover).
 normalizer.** It is the only place that reconciles the two fields and must be
 called at every boundary that produces a piece: cache load (`normalizePiece`),
 remote row mapping (`rowToPiece`), and creation (`addPiece`). It drops empties,
-fills an empty `images` from the cover, fills an empty cover from `images[0]`, and
-guarantees the cover is a member of `images`.
+**dedupes duplicate URIs (keeping first occurrence)**, fills an empty `images`
+from the cover, fills an empty cover from `images[0]`, and guarantees the cover is
+a member of `images`. Unit-tested in `__tests__/coalesce-images.test.ts` (those
+four cases + the cover∈images invariant).
 
 **Why the public projection is unchanged:** multiple photos are an OWNER-only
 feature. `toPublicPiece` (constants/privacy.ts) still exposes a single `imageUri`,
