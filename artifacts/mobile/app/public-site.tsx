@@ -10,6 +10,8 @@ import {
   getPortfolioPieces,
   getPublicCollectionPieces,
   isCollectionPublic,
+  toPublicPiece,
+  type PublicPieceView,
 } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
@@ -21,15 +23,6 @@ import {
 } from "@/context/ProfileContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
-
-interface PublicPiece {
-  id: string;
-  title: string;
-  imageUri: string;
-  clay: string;
-  dimensions: string;
-  year: string;
-}
 
 function ExpandableIntro({ text, color }: { text: string; color: string }) {
   const [expanded, setExpanded] = React.useState(false);
@@ -75,7 +68,7 @@ export default function PublicSiteScreen() {
   // The curated Portfolio is now driven at the piece level: every piece the
   // artist has hand-picked via "Feature in Portfolio" (which are, by invariant,
   // public and photographed). This is the headline of the public site.
-  const portfolioPieces = getPortfolioPieces(pieces) as PublicPiece[];
+  const portfolioPieces = getPortfolioPieces(pieces).map(toPublicPiece);
 
   // Beyond the curated portfolio, public collections form a broader public
   // archive. Each is reduced to its publicly visible pieces. Collection public/
@@ -83,7 +76,7 @@ export default function PublicSiteScreen() {
   const publicCollections = collections
     .filter(isCollectionPublic)
     .map((c) => {
-      const cp = getPublicCollectionPieces(c, pieces) as PublicPiece[];
+      const cp = getPublicCollectionPieces(c, pieces).map(toPublicPiece);
       // Prefer the artist-chosen cover. Otherwise fall back to a piece that has
       // a photo.
       const fallback = cp.find((p) => p.imageUri) ?? null;
@@ -110,7 +103,7 @@ export default function PublicSiteScreen() {
   // whispered metadata line built via the shared buildPublicMetaLine helper, so
   // cards, collections and the detail page always render the exact same string.
   // Empty fields drop out.
-  const renderCaption = (piece: PublicPiece) => {
+  const renderCaption = (piece: PublicPieceView) => {
     const title = piece.title.trim();
     const meta = buildPublicMetaLine(piece);
     if (!title && !meta) return null;
@@ -130,7 +123,7 @@ export default function PublicSiteScreen() {
     );
   };
 
-  const renderTile = (piece: PublicPiece, imageStyle: object, wrapperStyle?: object) => {
+  const renderTile = (piece: PublicPieceView, imageStyle: object, wrapperStyle?: object) => {
     return (
       <Pressable
         key={piece.id}
@@ -161,7 +154,7 @@ export default function PublicSiteScreen() {
   // Asymmetric "art book" rhythm for the default layout: alternating large /
   // small pairs with staggered offsets and an occasional full-width cinematic
   // image, separated by generous negative space.
-  const renderCatalog = (cp: PublicPiece[], seed = 0) => {
+  const renderCatalog = (cp: PublicPieceView[], seed = 0) => {
     const rows: React.ReactNode[] = [];
     let i = 0;
     let rowIndex = 0;
@@ -216,7 +209,7 @@ export default function PublicSiteScreen() {
     return <View style={styles.catalogWrap}>{rows}</View>;
   };
 
-  const renderPieces = (collectionPieces: PublicPiece[], seed = 0) => {
+  const renderPieces = (collectionPieces: PublicPieceView[], seed = 0) => {
     if (layout === "editorial") {
       return (
         <View style={styles.editorialWrap}>

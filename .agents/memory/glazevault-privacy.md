@@ -35,8 +35,12 @@ Do NOT reintroduce the old two-arg `isPubliclyVisiblePiece(piece, collections)` 
 ## Migration is conservative → Portfolio starts EMPTY
 Existing pieces default to not-featured, not-public, not-archived. **Tell the user the Portfolio starts empty and they curate it.** **Why:** no accidental public exposure on upgrade.
 
-## Fixed public fields
-Public output is a FIXED set: **Title, Photo, Clay, Dimensions, Year** via `buildPublicMetaLine(piece)`. Public piece detail renders ONLY title + photo + meta line — NEVER `notes`/glaze/cone/firing on any `?public=1` surface.
+## Fixed public fields + structural projection boundary
+Public output is a FIXED allowlist: **id, title, imageUri, clay, dimensions, year** (meta line = clay·dimensions·year via `buildPublicMetaLine`). NEVER `notes`/glaze/cone/firing/firingEnvironment/price/tags on any public surface.
+- `toPublicPiece(piece)` in `constants/privacy.ts` is the SINGLE enforcement boundary: it returns a `PublicPieceView` containing ONLY the allowlist keys, so private fields cannot leak even by accident. Every public surface (public-site tiles, `/piece/[id]?public=1` detail + its fullscreen-viewer caption mapping) must consume `toPublicPiece(p)` and render only from it — never the raw piece.
+- **Why:** "protect studio knowledge by default" — type-only casts (`as PublicPiece[]`) don't strip runtime fields; a physical projection does. **How to apply:** to expose a NEW public field, add it to `PublicPieceView` + `toPublicPiece` + the privacy guard test (`__tests__/public-privacy.test.tsx`) — nowhere else. The guard test renders both public surfaces with per-field sentinels and also asserts `toPublicPiece` keys == allowlist; it FAILS if any owner-only sentinel appears.
+- cone/firing temp is owner-only by default (NOT shown publicly) even though it's a permissible public field — there is no per-field public toggle, so default-safe wins and the guard test locks cone as private.
+- ShareSheet is currently a stub (renders only the title); real share/export must also go through `toPublicPiece`.
 
 ## Public Site (generated gallery)
 - Curated Portfolio = `getPortfolioPieces(pieces)` (featured pieces). Optional public-collections section gated by `isCollectionPublic`.

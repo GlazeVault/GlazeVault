@@ -5,6 +5,59 @@ export interface PublicMetaPiece {
 }
 
 /**
+ * The exhaustive allowlist of piece fields that may EVER cross onto a public,
+ * non-owner surface — the portfolio, public collection pages, the public piece
+ * view, fullscreen-viewer captions, shared links, and any future feed /
+ * discover / search / exported surface.
+ *
+ * Everything else a piece carries is private studio knowledge and must never be
+ * shown publicly: glaze recipes, firing schedules, kiln/process notes, clay-body
+ * formulas, test results, cone / firing environment, pricing, collector notes,
+ * unfinished experiments, and internal tags.
+ *
+ * `toPublicPiece` is the single boundary that enforces this. Public surfaces
+ * must consume the `PublicPieceView` it returns — never the raw piece — so a
+ * private field cannot leak even by accident, because the projected object
+ * physically contains only these keys. To expose a NEW public field, add it
+ * here AND to the privacy guard test — nowhere else.
+ */
+export interface PublicPieceView {
+  id: string;
+  title: string;
+  imageUri: string;
+  clay: string;
+  dimensions: string;
+  year: string;
+}
+
+/** Loose input shape so any owner piece (or partial) can be projected safely. */
+type ProjectablePiece = {
+  id: string;
+  title?: string;
+  imageUri?: string;
+  clay?: string;
+  dimensions?: string;
+  year?: string;
+};
+
+/**
+ * Strip a piece down to ONLY the public allowlist. This is the one place where
+ * an owner record becomes safe to render publicly: the returned object carries
+ * no glaze, firing, notes, pricing, tags, or any other studio field, so it is
+ * structurally impossible for those to reach a public surface.
+ */
+export function toPublicPiece(piece: ProjectablePiece): PublicPieceView {
+  return {
+    id: piece.id,
+    title: piece.title ?? "",
+    imageUri: piece.imageUri ?? "",
+    clay: piece.clay ?? "",
+    dimensions: piece.dimensions ?? "",
+    year: piece.year ?? "",
+  };
+}
+
+/**
  * Builds the single quiet metadata line shown on EVERY public surface
  * (portfolio cards, public collection display, piece detail, fullscreen viewer).
  *

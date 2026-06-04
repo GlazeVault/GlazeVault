@@ -22,6 +22,7 @@ import {
   buildPublicMetaLine,
   isPortfolioPiece,
   isPubliclyVisiblePiece,
+  toPublicPiece,
 } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
@@ -104,12 +105,15 @@ export default function PieceDetailScreen() {
   })();
   const viewerItems: ViewerItem[] = galleryPieces.map((p) => {
     if (isPublicView) {
-      // Captions use the shared buildPublicMetaLine helper, so the fullscreen
-      // viewer reads identically to the detail page and the portfolio cards.
+      // Project to the public allowlist first, then read only from it, so the
+      // fullscreen viewer can never receive a private studio field. Captions use
+      // the shared buildPublicMetaLine helper, so the viewer reads identically
+      // to the detail page and the portfolio cards.
+      const pub = toPublicPiece(p);
       return {
-        uri: p.imageUri,
-        title: p.title,
-        materials: buildPublicMetaLine(p),
+        uri: pub.imageUri,
+        title: pub.title,
+        materials: buildPublicMetaLine(pub),
       };
     }
     return {
@@ -242,10 +246,13 @@ export default function PieceDetailScreen() {
       );
     }
 
-    // One quiet, editorial metadata line (clay · dimensions · year) shared with
-    // the portfolio cards + fullscreen viewer via buildPublicMetaLine, so the
-    // same string renders identically on every public surface.
-    const publicMeta = buildPublicMetaLine(piece);
+    // Project to the public allowlist, then render ONLY from it — the detail
+    // page can never read a private studio field. The metadata line (clay ·
+    // dimensions · year) is shared with the portfolio cards + fullscreen viewer
+    // via buildPublicMetaLine, so the same string renders identically on every
+    // public surface.
+    const publicView = toPublicPiece(piece);
+    const publicMeta = buildPublicMetaLine(publicView);
 
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -268,19 +275,19 @@ export default function PieceDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
         >
-          {piece.imageUri ? (
+          {publicView.imageUri ? (
             <Pressable
               onPress={() => setViewerVisible(true)}
               accessibilityRole="imagebutton"
-              accessibilityLabel={`View ${piece.title ? piece.title : "piece"} fullscreen`}
+              accessibilityLabel={`View ${publicView.title ? publicView.title : "piece"} fullscreen`}
             >
               <Image
-                source={resolveImageSource(piece.imageUri)}
+                source={resolveImageSource(publicView.imageUri)}
                 style={styles.heroImage}
                 contentFit="cover"
                 transition={220}
                 cachePolicy="memory-disk"
-                recyclingKey={piece.id}
+                recyclingKey={publicView.id}
               />
               {galleryPieces.length > 1 ? (
                 <View style={styles.galleryHint}>
@@ -299,8 +306,8 @@ export default function PieceDetailScreen() {
 
           <View style={styles.content}>
             <Text style={[styles.eyebrow, { color: colors.emerald }]}>Public View</Text>
-            {piece.title ? (
-              <Text style={[styles.title, { color: colors.foreground }]}>{piece.title}</Text>
+            {publicView.title ? (
+              <Text style={[styles.title, { color: colors.foreground }]}>{publicView.title}</Text>
             ) : null}
 
             {publicMeta ? (
@@ -314,7 +321,7 @@ export default function PieceDetailScreen() {
         <ShareSheet
           visible={shareVisible}
           onClose={() => setShareVisible(false)}
-          pieceTitle={piece.title || "Untitled piece"}
+          pieceTitle={publicView.title || "Untitled piece"}
         />
 
         <ImageViewer

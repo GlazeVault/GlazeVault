@@ -16,6 +16,7 @@
 import { render } from "@testing-library/react-native";
 import React from "react";
 
+import { toPublicPiece } from "@/constants/privacy";
 import type { Collection } from "@/context/CollectionsContext";
 import type { PotteryPiece } from "@/context/PotteryContext";
 
@@ -55,7 +56,10 @@ function makePiece(id: string): PotteryPiece {
     imageUri: `pieces/${id}.jpg`,
     createdAt: "2025-01-01T00:00:00.000Z",
     isFavorite: false,
-    collectionId: "c1",
+    collectionIds: ["c1"],
+    featuredInPortfolio: true,
+    isPublic: true,
+    archived: false,
   };
 }
 
@@ -65,12 +69,12 @@ const mockCollection: Collection = {
   id: "c1",
   title: "Public Collection Name",
   intro: "",
-  featuredOnSite: true,
+  visibility: "public",
   // Distinct cover so the pieces still render as captioned grid tiles (a piece
   // matching the cover image is dropped from the grid by design).
   coverImageUri: "cover/distinct.jpg",
   createdAt: "2025-01-01T00:00:00.000Z",
-} as Collection;
+};
 
 // --- Mocks -----------------------------------------------------------------
 // privacy.ts (buildPublicMetaLine / isPubliclyVisiblePiece) is intentionally
@@ -104,8 +108,25 @@ jest.mock("@/constants/seedImages", () => ({
   resolveImageSource: (uri: string) => ({ uri }),
 }));
 
-jest.mock("@/components/ImageViewer", () => ({ ImageViewer: () => null }));
-jest.mock("@/components/ShareSheet", () => ({ ShareSheet: () => null }));
+// Capture the props handed to the fullscreen viewer and the share sheet so the
+// test can guard these OFF-SCREEN side channels too — a caption or share
+// payload could carry a private field even when nothing private is painted to
+// the visible tree. Factory-referenced outer vars must be `mock`-prefixed.
+const mockViewerProps: Array<Record<string, unknown>> = [];
+const mockShareProps: Array<Record<string, unknown>> = [];
+
+jest.mock("@/components/ImageViewer", () => ({
+  ImageViewer: (props: Record<string, unknown>) => {
+    mockViewerProps.push(props);
+    return null;
+  },
+}));
+jest.mock("@/components/ShareSheet", () => ({
+  ShareSheet: (props: Record<string, unknown>) => {
+    mockShareProps.push(props);
+    return null;
+  },
+}));
 
 jest.mock("@/context/PotteryContext", () => ({
   usePottery: () => ({
@@ -193,9 +214,24 @@ function assertOnlyPublicFields(text: string): void {
 
 // --- Tests -----------------------------------------------------------------
 
+/** Fail if any owner-only sentinel survives anywhere in a serialized payload. */
+function assertNoOwnerOnly(payload: unknown, where: string): void {
+  const serialized = JSON.stringify(payload ?? null);
+  for (const [field, value] of Object.entries(OWNER_ONLY_SENTINELS)) {
+    if (serialized.includes(value)) {
+      throw new Error(
+        `Privacy leak: owner-only field "${field}" reached ${where}. ` +
+          `Public-mode child components must receive only projected (PublicPieceView) data.`,
+      );
+    }
+  }
+}
+
 describe("public surfaces expose only the fixed allowed fields", () => {
   beforeEach(() => {
     mockRouterParams = {};
+    mockViewerProps.length = 0;
+    mockShareProps.length = 0;
   });
 
   it("public piece view (/piece/[id]?public=1) shows only title + clay·dimensions·year", () => {
@@ -203,11 +239,37 @@ describe("public surfaces expose only the fixed allowed fields", () => {
     const PieceDetailScreen = require("@/app/piece/[id]").default;
     const { toJSON } = render(<PieceDetailScreen />);
     assertOnlyPublicFields(renderedText(toJSON() as JsonNode));
+
+    // Off-screen side channels: the fullscreen viewer captions and the share
+    // payload must also carry no private field, even though they aren't painted.
+    expect(mockViewerProps.length).toBeGreaterThan(0);
+    mockViewerProps.forEach((p) => assertNoOwnerOnly(p.items, "the fullscreen viewer items"));
+    mockShareProps.forEach((p) => assertNoOwnerOnly(p, "the share sheet"));
   });
 
   it("public-site portfolio tiles show only title + clay·dimensions·year", () => {
     const PublicSiteScreen = require("@/app/public-site").default;
     const { toJSON } = render(<PublicSiteScreen />);
     assertOnlyPublicFields(renderedText(toJSON() as JsonNode));
+  });
+});
+
+describe("toPublicPiece is the structural allowlist boundary", () => {
+  it("projects a piece to exactly the public fields and nothing else", () => {
+    const projected = toPublicPiece(makePiece("p1"));
+    // The projected object's keys ARE the allowlist — no more, no less.
+    expect(Object.keys(projected).sort()).toEqual(
+      ["clay", "dimensions", "id", "imageUri", "title", "year"].sort(),
+    );
+    // No owner-only value survives the projection, by value.
+    const serialized = JSON.stringify(projected);
+    for (const [field, value] of Object.entries(OWNER_ONLY_SENTINELS)) {
+      if (serialized.includes(value)) {
+        throw new Error(
+          `Privacy leak: owner-only field "${field}" survived toPublicPiece. ` +
+            `The projection must drop every field outside the public allowlist.`,
+        );
+      }
+    }
   });
 });
