@@ -13,6 +13,7 @@ import {
 
 import { DraggablePhotoStrip } from "@/components/DraggablePhotoStrip";
 import { ImageCropper } from "@/components/ImageCropper";
+import { removePhoto, reorderPhotos } from "@/constants/photoReorder";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useColors } from "@/hooks/useColors";
 
@@ -97,31 +98,14 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
   };
 
   const handleRemove = (index: number) => {
-    const next = images.filter((_, i) => i !== index);
-    let nextCover = coverIndex;
-    if (index === coverIndex) {
-      nextCover = 0; // cover removed → fall back to the first remaining photo
-    } else if (index < coverIndex) {
-      nextCover = coverIndex - 1; // shift to track the same photo
-    }
-    onChange(next, next.length === 0 ? 0 : Math.min(nextCover, next.length - 1));
+    const result = removePhoto(images, coverIndex, index);
+    onChange(result.images, result.coverIndex);
   };
 
   const handleReorder = (from: number, to: number) => {
     if (from === to) return;
-    const next = [...images];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    // Keep the cover pointed at the same photo it referenced before the move.
-    let nextCover = coverIndex;
-    if (coverIndex === from) {
-      nextCover = to;
-    } else if (from < coverIndex && to >= coverIndex) {
-      nextCover = coverIndex - 1;
-    } else if (from > coverIndex && to <= coverIndex) {
-      nextCover = coverIndex + 1;
-    }
-    onChange(next, nextCover);
+    const result = reorderPhotos(images, coverIndex, from, to);
+    onChange(result.images, result.coverIndex);
   };
 
   const coverUri = images[coverIndex] ?? images[0];
