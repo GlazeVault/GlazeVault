@@ -310,6 +310,25 @@ export default function PublicSiteScreen() {
                   <Feather name="layers" size={26} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
                 </View>
               )}
+              {cp.length > 0 ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.galleryEntry,
+                    {
+                      borderColor: "rgba(120,110,100,0.22)",
+                      opacity: pressed ? 0.65 : 1,
+                    },
+                  ]}
+                  onPress={() => router.push(`/piece/${cp[0].id}?public=1&immersive=1`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${collection.title} as an immersive gallery`}
+                >
+                  <Feather name="maximize" size={14} color={colors.emerald} />
+                  <Text style={[styles.galleryEntryText, { color: colors.emerald }]}>
+                    View as gallery
+                  </Text>
+                </Pressable>
+              ) : null}
               {collection.intro.trim() ? (
                 <ExpandableIntro
                   text={collection.intro.trim()}
@@ -470,6 +489,23 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: "uppercase",
     marginTop: 10,
+  },
+  galleryEntry: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  galleryEntryText: {
+    fontSize: 12,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1,
+    textTransform: "uppercase",
   },
   introWrap: { marginTop: 18, marginBottom: 4 },
   collectionIntro: {

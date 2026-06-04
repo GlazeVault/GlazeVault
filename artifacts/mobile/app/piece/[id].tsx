@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Modal,
@@ -54,7 +54,12 @@ function InfoRow({
 }
 
 export default function PieceDetailScreen() {
-  const params = useLocalSearchParams<{ id: string; from?: string; public?: string }>();
+  const params = useLocalSearchParams<{
+    id: string;
+    from?: string;
+    public?: string;
+    immersive?: string;
+  }>();
   const { id, from } = params;
   const isPublicView = params.public === "1";
   const {
@@ -77,6 +82,19 @@ export default function PieceDetailScreen() {
   const [viewerVisible, setViewerVisible] = useState(false);
   // Offset (within the current piece's photos) the viewer should open at.
   const [viewerStart, setViewerStart] = useState(0);
+
+  // Optional "view as gallery" entry: when a collection launches the immersive
+  // art-book viewer it routes here with ?immersive=1, so we open the fullscreen
+  // viewer straight away at the start of the sequence. All the scoping/privacy
+  // logic for the swipe set still lives below — this just auto-opens it.
+  const autoImmersive = params.immersive === "1";
+  useEffect(() => {
+    if (autoImmersive) {
+      setViewerStart(0);
+      setViewerVisible(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoImmersive, id]);
 
   if (!piece) {
     return (
@@ -167,7 +185,14 @@ export default function PieceDetailScreen() {
     let start = 0;
     galleryPieces.forEach((p) => {
       if (p.id === piece.id) start = items.length;
-      const materials = [p.clay, p.glaze || p.cone, p.year].filter(Boolean).join("  ·  ");
+      // Owner-only caption (never reaches a public surface): a museum-label line
+      // that includes the firing atmosphere. Firing is read with the established
+      // firingEnvironment || firing fallback and is deliberately excluded from
+      // every public projection (see toPublicPiece / buildPublicMetaLine).
+      const firingAtmosphere = p.firingEnvironment || p.firing;
+      const materials = [p.clay, p.glaze || p.cone, firingAtmosphere, p.year]
+        .filter(Boolean)
+        .join("  ·  ");
       const collection = ownerCollectionName(p);
       // Sharing is always a public surface — buildShareContent projects through
       // the public allowlist, so even the owner's share carries no studio field.

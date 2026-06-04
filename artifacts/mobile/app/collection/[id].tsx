@@ -428,6 +428,33 @@ export default function CollectionDetailScreen() {
                 ? "No pieces in this collection"
                 : `${collectionPieces.length} ${collectionPieces.length === 1 ? "piece" : "pieces"}`}
             </Text>
+            {!isEditing && collectionPieces.length > 0 ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.galleryEntry,
+                  {
+                    borderColor: "rgba(120,110,100,0.22)",
+                    opacity: pressed ? 0.65 : 1,
+                  },
+                ]}
+                onPress={() => {
+                  const first =
+                    collectionPieces.find((p) => p.imageUri) ?? collectionPieces[0];
+                  if (!first) return;
+                  router.push({
+                    pathname: "/piece/[id]",
+                    params: { id: first.id, from: id, immersive: "1" },
+                  });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="View this collection as an immersive gallery"
+              >
+                <Feather name="maximize" size={14} color={colors.cobalt} />
+                <Text style={[styles.galleryEntryText, { color: colors.cobalt }]}>
+                  View as gallery
+                </Text>
+              </Pressable>
+            ) : null}
             {isEditing ? (
               <Pressable
                 style={[
@@ -887,6 +914,23 @@ const styles = StyleSheet.create({
     minHeight: 60,
   },
   count: { fontSize: 12, fontFamily: "Poppins_400Regular", letterSpacing: 0.3 },
+  galleryEntry: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  galleryEntryText: {
+    fontSize: 12,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
   editActions: {
     flexDirection: "row",
     alignItems: "center",

@@ -11,9 +11,10 @@
  * This index math is easy to break in a refactor — an off-by-one or a switch
  * back to per-piece indexing would open the viewer on the wrong photo (or the
  * wrong piece). These tests render the real owner detail screen with multiple
- * multi-photo pieces, tap the hero and each thumbnail, and assert the
- * ImageViewer is handed an `initialIndex` whose flattened item is exactly the
- * photo that was tapped.
+ * multi-photo pieces, tap the hero, and assert the ImageViewer is handed an
+ * `initialIndex` whose flattened item is exactly the cover photo (the hero is
+ * the only thumbnail that opens the viewer; the detail strip's thumbnails now
+ * promote the tapped photo to cover instead — see the photo-reorder tests).
  */
 import { fireEvent, render } from "@testing-library/react-native";
 import React from "react";
@@ -188,25 +189,5 @@ describe("owner viewer opens at the tapped photo's flattened index", () => {
     const props = mockViewerProps[mockViewerProps.length - 1];
     expect(props.initialIndex).toBe(PIECE_C_START + 1);
     expect(lastOpenedUri()).toBe("pieces/c1.jpg");
-  });
-
-  it("tapping each thumbnail opens at that exact photo (flattened)", () => {
-    const PieceDetailScreen = require("@/app/piece/[id]").default;
-    const { getByLabelText } = render(<PieceDetailScreen />);
-
-    // Thumbnails are labelled "View photo N of M" (1-based) over PIECE_C's
-    // photos [c0, c1, c2]; tapping photo N opens flattened PIECE_C_START+(N-1).
-    const expectations: Array<[string, number, string]> = [
-      ["View photo 1 of 3", PIECE_C_START + 0, "pieces/c0.jpg"],
-      ["View photo 2 of 3", PIECE_C_START + 1, "pieces/c1.jpg"],
-      ["View photo 3 of 3", PIECE_C_START + 2, "pieces/c2.jpg"],
-    ];
-
-    for (const [label, expectedIndex, expectedUri] of expectations) {
-      fireEvent.press(getByLabelText(label));
-      const props = mockViewerProps[mockViewerProps.length - 1];
-      expect(props.initialIndex).toBe(expectedIndex);
-      expect(lastOpenedUri()).toBe(expectedUri);
-    }
   });
 });
