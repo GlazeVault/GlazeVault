@@ -1,32 +1,34 @@
 ---
 name: GlazeVault editorial read-more text
-description: Shared ExpandableText for statement/collection descriptions, and why clampability is estimated not measured.
+description: Shared ExpandableText for statement/bio/collection descriptions and why its preview is computed, not clamped.
 ---
 
 # Editorial read-more (ExpandableText)
 
-`components/ExpandableText.tsx` is the single read-more used for the public
-artist statement and for collection descriptions (public portfolio + owner
-collection page). Preview clamps to `collapsedLines`, expands INLINE (no nav);
-when expanded and the source has blank-line-separated paragraphs it renders them
-with paragraph spacing.
+One shared component drives every long-text field: the public artist statement,
+the artist bio, and collection descriptions (public portfolio + owner collection
+page). Preview is short, expands INLINE (no nav/modal); blank-line paragraphs get
+spacing.
 
-- **Decide "is it clampable" from a newline-aware line ESTIMATE, never from
-  measured layout.** **Why:** react-native-web does not fire `onTextLayout` (and
-  jest-expo doesn't either), so a measure-only approach leaves long text clamped
-  with NO "Read more" control on the web/canvas target. A plain char-count
-  threshold also fails for statements written with many short MANUAL line breaks
-  — count each `\n` plus soft-wrap per segment. `onTextLayout` is kept only to
-  refine the estimate on native. **How to apply:** any future clamp/expand UI on
-  this app must gate the toggle on the estimate; treat web as the default target.
-- **Reset `expanded`/`clampable` on a `[text, collapsedLines]` effect** so a
-  recycled row or navigation between collections never keeps stale toggle state.
+- **The preview is COMPUTED to end at a clean boundary — never clamped mid-word.**
+  **Why:** the user's hard requirement is no awkward cuts ("I realize ho…").
+  CSS line-clamp / `numberOfLines` truncates mid-word and (on web) needs
+  `onTextLayout`, which react-native-web never fires. **How to apply:** cut at the
+  last sentence/paragraph boundary that fits a line-budget estimate; fall back to
+  a whole-word cut (then show "…") only for a single over-long opening sentence;
+  hard-cut a length only for an unbreakable token with no word boundary.
+- **Keep `numberOfLines={collapsedLines}` as a hard HEIGHT cap on the collapsed
+  preview** even though the cut is computed. **Why:** the line estimate is
+  fixed-width and undershoots for CJK glyphs / large fonts / long tokens, which
+  would otherwise render a too-tall preview. Do not remove it again.
+- Boundaries include CJK terminal punctuation (。！？), and an abbreviation
+  denylist + lowercase-follow heuristic keep "Dr.", "U.S.", "e.g." from reading
+  as sentence ends. **Why:** this is a Korean-artist app, so CJK + clean prose
+  cuts matter. Residual, accepted: "Dr." before a name not on the denylist.
 
 # Portfolio voice / labels
 
-- The immersive collection entry button is **"View Exhibition"** (not "View as
-  gallery") on both owner and public surfaces — the experience is framed as an
-  exhibition/monograph, not a generic image gallery.
-- The artist statement is **left-aligned, regular serif** (PlayfairDisplay
-  Regular, NOT italic) with a short preview — the prior centered-italic wall read
-  as too dense. Text is meant to feel secondary/discoverable; artwork leads.
+- Immersive collection entry button is **"View Exhibition"** (not "View as
+  gallery") on owner + public surfaces — framed as an exhibition, not a gallery.
+- Statement AND bio are **left-aligned, regular serif** (PlayfairDisplay Regular,
+  not italic/centered) — long-form reads as secondary to the artwork.

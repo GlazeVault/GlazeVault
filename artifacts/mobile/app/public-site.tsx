@@ -199,7 +199,15 @@ export default function PublicSiteScreen() {
         </View>
 
         {profile.bio.trim() ? (
-          <Text style={[styles.bio, { color: colors.foreground }]}>{profile.bio.trim()}</Text>
+          <ExpandableText
+            text={profile.bio.trim()}
+            color={colors.foreground}
+            textStyle={styles.bio}
+            collapsedLines={6}
+            moreLabel="Read More"
+            lessLabel="Show Less"
+            containerStyle={styles.bioWrap}
+          />
         ) : null}
 
         {profile.statement.trim() ? (
@@ -398,12 +406,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   url: { fontSize: 12, fontFamily: "Poppins_300Light", letterSpacing: 0.3, marginTop: 6 },
+  bioWrap: { marginBottom: 22 },
   bio: {
-    fontSize: 14,
-    fontFamily: "Poppins_300Light",
-    lineHeight: 23,
-    textAlign: "center",
-    marginBottom: 22,
+    fontSize: 15,
+    fontFamily: "PlayfairDisplay_400Regular",
+    lineHeight: 25,
+    letterSpacing: 0.2,
+    textAlign: "left",
   },
   statementCard: {
     padding: 22,
