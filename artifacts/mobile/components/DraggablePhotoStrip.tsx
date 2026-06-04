@@ -1,11 +1,15 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import React, { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
+  scrollTo,
+  useAnimatedRef,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
+  useFrameCallback,
   useSharedValue,
   withTiming,
   type SharedValue,
@@ -19,6 +23,11 @@ const GAP = 12;
 const STRIDE = ITEM_W + GAP;
 const ITEM_H = (ITEM_W * 5) / 4;
 const TOP_PAD = 8;
+
+// How close (px) the finger must get to a strip edge before auto-scroll kicks
+// in, and the peak scroll speed (px/frame ~= px per 16ms) at the very edge.
+const EDGE_ZONE = 56;
+const MAX_AUTO_SCROLL = 9;
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -58,46 +67,110 @@ export function DraggablePhotoStrip({
   const dragX = useSharedValue(0);
   const [scrollEnabled, setScrollEnabled] = useState(true);
 
+  // Scroll bookkeeping so reorder math stays correct while the strip
+  // auto-scrolls under the finger.
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const containerRef = useRef<View>(null);
+  const scrollOffset = useSharedValue(0); // live content offset
+  const scrollStart = useSharedValue(0); // offset captured when a drag begins
+  const autoScroll = useSharedValue(0); // px/frame to advance while edge-held
+  const viewportW = useSharedValue(0); // visible strip width
+  const stripPageX = useSharedValue(0); // strip's left edge in window coords
+  const contentW = useSharedValue(0); // total scrollable content width
+
   const contentWidth = count * STRIDE + ITEM_W + 8;
 
-  return (
-    <ScrollView
-      horizontal
-      scrollEnabled={scrollEnabled}
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={[styles.content, { width: contentWidth }]}
-    >
-      <View style={[styles.canvas, { width: contentWidth }]}>
-        {images.map((uri, index) => (
-          <Thumb
-            key={`${uri}-${index}`}
-            uri={uri}
-            index={index}
-            count={count}
-            isCover={index === coverIndex}
-            colors={colors}
-            activeIndex={activeIndex}
-            hoverIndex={hoverIndex}
-            dragX={dragX}
-            onReorder={onReorder}
-            onSetCover={onSetCover}
-            onRemove={onRemove}
-            setScrollEnabled={setScrollEnabled}
-          />
-        ))}
+  useEffect(() => {
+    contentW.value = contentWidth;
+  }, [contentWidth, contentW]);
 
-        <Pressable
-          style={({ pressed }) => [
-            styles.addTile,
-            { left: count * STRIDE, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-          ]}
-          onPress={onAdd}
-        >
-          <Feather name="plus" size={20} color={colors.mutedForeground} />
-          <Text style={[styles.addTileText, { color: colors.mutedForeground }]}>Add</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollOffset.value = e.contentOffset.x;
+  });
+
+  const handleLayout = () => {
+    containerRef.current?.measureInWindow((x, _y, w) => {
+      stripPageX.value = x;
+      viewportW.value = w;
+    });
+  };
+
+  // Per-frame pump: while a drag holds near an edge, nudge the scroll offset and
+  // re-derive the hover slot from the dragged item's content displacement
+  // (original slot + finger travel + how far we've scrolled since lift-off).
+  useFrameCallback(() => {
+    "worklet";
+    if (activeIndex.value === -1 || autoScroll.value === 0) return;
+    const maxScroll = Math.max(0, contentW.value - viewportW.value);
+    const next = Math.min(
+      Math.max(scrollOffset.value + autoScroll.value, 0),
+      maxScroll,
+    );
+    if (next === scrollOffset.value) return;
+    scrollOffset.value = next;
+    scrollTo(scrollRef, next, 0, false);
+    const displacement =
+      activeIndex.value * STRIDE + dragX.value + (next - scrollStart.value);
+    const target = Math.round(displacement / STRIDE);
+    hoverIndex.value = Math.min(Math.max(target, 0), count - 1);
+  });
+
+  return (
+    <View ref={containerRef} onLayout={handleLayout}>
+      <Animated.ScrollView
+        ref={scrollRef}
+        horizontal
+        scrollEnabled={scrollEnabled}
+        showsHorizontalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={[styles.content, { width: contentWidth }]}
+      >
+        <View style={[styles.canvas, { width: contentWidth }]}>
+          {images.map((uri, index) => (
+            <Thumb
+              key={`${uri}-${index}`}
+              uri={uri}
+              index={index}
+              count={count}
+              isCover={index === coverIndex}
+              colors={colors}
+              activeIndex={activeIndex}
+              hoverIndex={hoverIndex}
+              dragX={dragX}
+              scrollOffset={scrollOffset}
+              scrollStart={scrollStart}
+              autoScroll={autoScroll}
+              viewportW={viewportW}
+              stripPageX={stripPageX}
+              onReorder={onReorder}
+              onSetCover={onSetCover}
+              onRemove={onRemove}
+              setScrollEnabled={setScrollEnabled}
+            />
+          ))}
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.addTile,
+              {
+                left: count * STRIDE,
+                borderColor: colors.border,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+            onPress={onAdd}
+          >
+            <Feather name="plus" size={20} color={colors.mutedForeground} />
+            <Text
+              style={[styles.addTileText, { color: colors.mutedForeground }]}
+            >
+              Add
+            </Text>
+          </Pressable>
+        </View>
+      </Animated.ScrollView>
+    </View>
   );
 }
 
@@ -110,6 +183,11 @@ function Thumb({
   activeIndex,
   hoverIndex,
   dragX,
+  scrollOffset,
+  scrollStart,
+  autoScroll,
+  viewportW,
+  stripPageX,
   onReorder,
   onSetCover,
   onRemove,
@@ -123,6 +201,11 @@ function Thumb({
   activeIndex: SharedValue<number>;
   hoverIndex: SharedValue<number>;
   dragX: SharedValue<number>;
+  scrollOffset: SharedValue<number>;
+  scrollStart: SharedValue<number>;
+  autoScroll: SharedValue<number>;
+  viewportW: SharedValue<number>;
+  stripPageX: SharedValue<number>;
   onReorder: (from: number, to: number) => void;
   onSetCover: (index: number) => void;
   onRemove: (index: number) => void;
@@ -134,12 +217,33 @@ function Thumb({
       activeIndex.value = index;
       hoverIndex.value = index;
       dragX.value = 0;
+      scrollStart.value = scrollOffset.value;
+      autoScroll.value = 0;
       runOnJS(setScrollEnabled)(false);
     })
     .onUpdate((e) => {
       dragX.value = e.translationX;
-      const target = Math.round((index * STRIDE + dragX.value) / STRIDE);
+      // Displacement of the dragged item in content space: original slot +
+      // finger travel + scroll that happened since the drag started.
+      const displacement =
+        index * STRIDE + dragX.value + (scrollOffset.value - scrollStart.value);
+      const target = Math.round(displacement / STRIDE);
       hoverIndex.value = Math.min(Math.max(target, 0), count - 1);
+
+      // Edge auto-scroll: ramp speed up the closer the finger is to an edge.
+      const local = e.absoluteX - stripPageX.value;
+      if (local < EDGE_ZONE) {
+        const ramp = Math.min((EDGE_ZONE - local) / EDGE_ZONE, 1);
+        autoScroll.value = -MAX_AUTO_SCROLL * ramp;
+      } else if (local > viewportW.value - EDGE_ZONE) {
+        const ramp = Math.min(
+          (local - (viewportW.value - EDGE_ZONE)) / EDGE_ZONE,
+          1,
+        );
+        autoScroll.value = MAX_AUTO_SCROLL * ramp;
+      } else {
+        autoScroll.value = 0;
+      }
     })
     .onEnd(() => {
       const from = index;
@@ -147,19 +251,24 @@ function Thumb({
       activeIndex.value = -1;
       hoverIndex.value = -1;
       dragX.value = 0;
+      autoScroll.value = 0;
       if (to >= 0 && from !== to) {
         runOnJS(onReorder)(from, to);
       }
     })
     .onFinalize(() => {
+      autoScroll.value = 0;
       runOnJS(setScrollEnabled)(true);
     });
 
   const animatedStyle = useAnimatedStyle(() => {
     const isActive = activeIndex.value === index;
     if (isActive) {
+      // Add the scroll delta so the lifted thumbnail tracks the finger even as
+      // the strip scrolls beneath it.
+      const translateX = dragX.value + (scrollOffset.value - scrollStart.value);
       return {
-        transform: [{ translateX: dragX.value }, { scale: 1.08 }],
+        transform: [{ translateX }, { scale: 1.08 }],
         zIndex: 20,
         opacity: 0.96,
       };
@@ -173,14 +282,19 @@ function Thumb({
       }
     }
     return {
-      transform: [{ translateX: withTiming(shift, { duration: 160 }) }, { scale: 1 }],
+      transform: [
+        { translateX: withTiming(shift, { duration: 160 }) },
+        { scale: 1 },
+      ],
       zIndex: 1,
       opacity: 1,
     };
   });
 
   return (
-    <Animated.View style={[styles.item, { left: index * STRIDE }, animatedStyle]}>
+    <Animated.View
+      style={[styles.item, { left: index * STRIDE }, animatedStyle]}
+    >
       <GestureDetector gesture={pan}>
         <Pressable
           style={[
@@ -198,7 +312,9 @@ function Thumb({
             contentFit="cover"
           />
           {isCover ? (
-            <View style={[styles.coverDot, { backgroundColor: colors.emerald }]}>
+            <View
+              style={[styles.coverDot, { backgroundColor: colors.emerald }]}
+            >
               <Feather name="star" size={9} color="#FFFFFF" />
             </View>
           ) : null}
@@ -263,5 +379,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
   },
-  addTileText: { fontSize: 11, fontFamily: "Poppins_400Regular", letterSpacing: 0.3 },
+  addTileText: {
+    fontSize: 11,
+    fontFamily: "Poppins_400Regular",
+    letterSpacing: 0.3,
+  },
 });
