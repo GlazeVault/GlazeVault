@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import type { ShareContent } from "@/constants/privacy";
 
 interface ShareOption {
   id: string;
@@ -25,10 +26,14 @@ interface ShareOption {
 interface ShareSheetProps {
   visible: boolean;
   onClose: () => void;
-  pieceTitle: string;
+  // Pre-projected, public-safe content built by `buildShareContent`. The sheet
+  // only ever receives this allowlisted payload (title + clay·dimensions·year
+  // meta line + public site link) — never the raw piece — so no owner-only
+  // studio field can reach a share.
+  content: ShareContent;
 }
 
-export function ShareSheet({ visible, onClose, pieceTitle }: ShareSheetProps) {
+export function ShareSheet({ visible, onClose, content }: ShareSheetProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
@@ -38,19 +43,19 @@ export function ShareSheet({ visible, onClose, pieceTitle }: ShareSheetProps) {
       if (label === "Copy Link") {
         onClose();
         setTimeout(() => {
-          Alert.alert("Link copied", `A link to "${pieceTitle}" has been copied to your clipboard.`);
+          Alert.alert("Link copied", `A link to "${content.title}" has been copied to your clipboard.`);
         }, 300);
       } else {
         onClose();
         setTimeout(() => {
           Alert.alert(
             `Share to ${label}`,
-            `This will open ${label} so you can share "${pieceTitle}". Full integration coming soon.`
+            `This will open ${label} so you can share "${content.title}". Full integration coming soon.`
           );
         }, 300);
       }
     },
-    [onClose, pieceTitle]
+    [onClose, content.title]
   );
 
   const socialPlatforms: ShareOption[] = [
@@ -159,7 +164,7 @@ export function ShareSheet({ visible, onClose, pieceTitle }: ShareSheetProps) {
             <View>
               <Text style={[styles.heading, { color: colors.foreground }]}>Share</Text>
               <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
-                {pieceTitle}
+                {content.title}
               </Text>
             </View>
             <Pressable

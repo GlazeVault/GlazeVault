@@ -20,6 +20,7 @@ import { ImageViewer, type ViewerItem } from "@/components/ImageViewer";
 import { ShareSheet } from "@/components/ShareSheet";
 import {
   buildPublicMetaLine,
+  buildShareContent,
   isPortfolioPiece,
   isPubliclyVisiblePiece,
   toPublicPiece,
@@ -27,6 +28,7 @@ import {
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
+import { PUBLIC_SITE_DOMAIN, publicSiteSlug, useProfile } from "@/context/ProfileContext";
 import { useColors } from "@/hooks/useColors";
 
 function InfoRow({
@@ -62,8 +64,10 @@ export default function PieceDetailScreen() {
     removePieceFromCollection,
   } = usePottery();
   const { collections } = useCollections();
+  const { profile } = useProfile();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const shareUrl = `${PUBLIC_SITE_DOMAIN}/${publicSiteSlug(profile.name)}`;
   const piece = pieces.find((p) => p.id === id);
   const [shareVisible, setShareVisible] = useState(false);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
@@ -321,7 +325,7 @@ export default function PieceDetailScreen() {
         <ShareSheet
           visible={shareVisible}
           onClose={() => setShareVisible(false)}
-          pieceTitle={publicView.title || "Untitled piece"}
+          content={buildShareContent(publicView, shareUrl)}
         />
 
         <ImageViewer
@@ -831,7 +835,7 @@ export default function PieceDetailScreen() {
       <ShareSheet
         visible={shareVisible}
         onClose={() => setShareVisible(false)}
-        pieceTitle={piece.title}
+        content={buildShareContent(piece, shareUrl)}
       />
 
       <ImageViewer

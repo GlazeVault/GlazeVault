@@ -16,7 +16,7 @@
 import { render } from "@testing-library/react-native";
 import React from "react";
 
-import { toPublicPiece } from "@/constants/privacy";
+import { buildShareContent, toPublicPiece } from "@/constants/privacy";
 import type { Collection } from "@/context/CollectionsContext";
 import type { PotteryPiece } from "@/context/PotteryContext";
 
@@ -293,6 +293,48 @@ describe("public surfaces expose only the fixed allowed fields", () => {
       />,
     );
     assertOnlyPublicFields(renderedText(toJSON() as JsonNode));
+  });
+});
+
+describe("sharing a piece exposes only the fixed allowed fields", () => {
+  // Sharing is another way a piece's details leave the app — the share text /
+  // payload reaches whoever the artist shares with. It must carry the same fixed
+  // public set as every other public surface: title + clay·dimensions·year +
+  // the public site link, and NO owner-only studio field.
+  const SHARE_URL = "glazevault.art/zz-studio-link";
+
+  it("buildShareContent carries title + clay·dimensions·year + link, never owner-only data", () => {
+    // Drive the REAL builder used by ShareSheet with a piece whose every field
+    // (public AND owner-only) carries a unique sentinel.
+    const content = buildShareContent(makePiece("p1"), SHARE_URL);
+    const serialized = JSON.stringify(content);
+
+    // Every allowed public field is present in the share content...
+    expect(content.message).toContain(PUBLIC_SENTINELS.title);
+    expect(content.message).toContain(PUBLIC_SENTINELS.clay);
+    expect(content.message).toContain(PUBLIC_SENTINELS.dimensions);
+    expect(content.message).toContain(PUBLIC_SENTINELS.year);
+    // ...along with the public site link.
+    expect(content.message).toContain(SHARE_URL);
+    expect(content.url).toBe(SHARE_URL);
+    expect(content.title).toBe(PUBLIC_SENTINELS.title);
+
+    // ...and no owner-only field leaks into ANY part of the payload.
+    for (const [field, value] of Object.entries(OWNER_ONLY_SENTINELS)) {
+      if (serialized.includes(value)) {
+        throw new Error(
+          `Privacy leak: owner-only field "${field}" reached the share content. ` +
+            `Sharing may only expose title, the clay · dimensions · year meta line, and the public site link.`,
+        );
+      }
+    }
+  });
+
+  it("projects through the public allowlist even when handed a raw owner piece", () => {
+    // The builder must be safe-by-construction: passing the full owner record
+    // (not a pre-projected piece) still drops every studio field.
+    const content = buildShareContent(makePiece("p2"), SHARE_URL);
+    assertNoOwnerOnly(content, "the share content");
   });
 });
 

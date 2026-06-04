@@ -76,6 +76,40 @@ export function buildPublicMetaLine(piece: PublicMetaPiece): string {
     .join("  ·  ");
 }
 
+/** The text/payload produced when a piece is shared (copy-link, social, etc.). */
+export interface ShareContent {
+  title: string;
+  message: string;
+  url: string;
+}
+
+/**
+ * Builds the content used when SHARING a piece. Sharing is just another public
+ * surface — the moment a piece's details leave the app they reach whoever the
+ * artist shares with — so the share payload may only ever carry the same fixed
+ * public set as every other public surface: the piece title, the quiet
+ * clay · dimensions · year meta line, and the public site link.
+ *
+ * The piece is projected through `toPublicPiece` FIRST, so glaze recipes, firing
+ * schedules, cone / firing environment, studio notes, pricing and every other
+ * owner-only field are physically dropped before the message is assembled and
+ * cannot leak into a share even by accident. Empty fields are omitted so the
+ * message has no blank lines.
+ */
+export function buildShareContent(
+  piece: ProjectablePiece,
+  shareUrl: string,
+): ShareContent {
+  const pub = toPublicPiece(piece);
+  const title = (pub.title ?? "").trim() || "Untitled piece";
+  const meta = buildPublicMetaLine(pub);
+  const message = [title, meta, (shareUrl ?? "").trim()]
+    .map((v) => (v ?? "").trim())
+    .filter(Boolean)
+    .join("\n");
+  return { title, message, url: (shareUrl ?? "").trim() };
+}
+
 // Minimal structural shapes the helpers need. Declared here (rather than
 // importing the context types) so this module stays dependency-free and the
 // helpers can be reused anywhere without import cycles.
