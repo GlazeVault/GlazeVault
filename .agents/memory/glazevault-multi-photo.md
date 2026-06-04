@@ -31,6 +31,18 @@ to any public/share surface — that would leak owner-only photos.
 (not the same slot) — order flows purely through `images[]`, so persistence and
 `image_urls` follow automatically with no dataService change.
 
+**DraggablePhotoStrip is shared by the editor AND the owner detail screen
+(`app/piece/[id].tsx`).** Its `onRemove`/`onAdd` props are OPTIONAL: omit them and
+the strip renders with no × remove buttons and no trailing "Add" tile (read-light
+mode for the detail screen, which only allows reorder + re-pick cover). `contentWidth`
+drops the add-tile slot when `onAdd` is absent. On the detail screen, set-cover and
+reorder persist DIRECTLY via `updatePiece({ imageUri, images })` — no re-`persistPieceImage`
+needed because the stored URIs are already durable (data:/relative/remote, all
+idempotent). The detail screen tracks the cover by URI (not index): reorder passes the
+unchanged `imageUri` + reordered `images`, so the same photo stays cover with no index
+remap. Tapping a detail thumbnail now SETS COVER (it no longer opens the viewer — the
+hero still does).
+
 **Owner viewer flattens, public viewer does not.** In `app/piece/[id].tsx` the
 owner branch builds `viewerItems` as one entry PER PHOTO across in-scope pieces and
 tracks `pieceStartIndex` (where the current piece's photos start) + `viewerStart`

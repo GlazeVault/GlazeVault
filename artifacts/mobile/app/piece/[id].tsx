@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { DraggablePhotoStrip } from "@/components/DraggablePhotoStrip";
 import { ImageViewer, type ViewerItem } from "@/components/ImageViewer";
 import { ShareSheet } from "@/components/ShareSheet";
 import {
@@ -188,6 +189,30 @@ export default function PieceDetailScreen() {
   const openViewerAt = (offset: number) => {
     setViewerStart(offset);
     setViewerVisible(true);
+  };
+
+  // Promote a thumbnail to the cover. Order is untouched; the photo simply
+  // becomes `imageUri`. Because it is already a member of `images[]`, the
+  // coalesceImages cover∈images invariant is preserved.
+  const handleSetCover = async (index: number) => {
+    const next = ownerImages[index];
+    if (!next || next === piece.imageUri) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await updatePiece(piece.id, { imageUri: next, images: ownerImages });
+  };
+
+  // Drag-to-reorder the photo set. The cover is re-pointed so it keeps
+  // referencing the SAME photo it did before the move (not the same slot), so
+  // the cover stays a member of images[] and never changes identity on reorder.
+  const handleReorder = async (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    const next = [...ownerImages];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Cover identity is preserved by URI, so order can shuffle freely while the
+    // same photo stays the cover.
+    await updatePiece(piece.id, { imageUri: piece.imageUri, images: next });
   };
 
   const handleFavorite = async () => {
@@ -455,38 +480,20 @@ export default function PieceDetailScreen() {
           ) : null}
         </Pressable>
 
-        {/* Thumbnail strip — tap a photo to open the viewer at that photo */}
+        {/* Thumbnail strip — tap a photo to make it the cover, hold and drag to
+            reorder. The cover always stays a member of the photo set. */}
         {ownerImages.length > 1 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.thumbStrip}
-          >
-            {ownerImages.map((uri, index) => {
-              const isCover = index === coverOffset;
-              return (
-                <Pressable
-                  key={`${uri}-${index}`}
-                  style={[
-                    styles.heroThumb,
-                    {
-                      borderColor: isCover ? colors.emerald : "rgba(120,110,100,0.18)",
-                      borderWidth: isCover ? 2 : 1,
-                    },
-                  ]}
-                  onPress={() => openViewerAt(index)}
-                  accessibilityRole="imagebutton"
-                  accessibilityLabel={`View photo ${index + 1} of ${ownerImages.length}`}
-                >
-                  <Image
-                    source={resolveImageSource(uri)}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="cover"
-                  />
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <View style={styles.thumbStrip}>
+            <DraggablePhotoStrip
+              images={ownerImages}
+              coverIndex={coverOffset}
+              onReorder={handleReorder}
+              onSetCover={handleSetCover}
+            />
+            <Text style={[styles.thumbHint, { color: colors.mutedForeground }]}>
+              Tap a photo to make it the cover · hold and drag to reorder
+            </Text>
+          </View>
         ) : null}
 
         {/* Content */}
@@ -985,16 +992,14 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   thumbStrip: {
-    flexDirection: "row",
-    gap: 10,
     paddingHorizontal: 28,
-    paddingTop: 16,
+    paddingTop: 12,
   },
-  heroThumb: {
-    width: 60,
-    aspectRatio: 4 / 5,
-    borderRadius: 10,
-    overflow: "hidden",
+  thumbHint: {
+    fontSize: 12,
+    fontFamily: "Poppins_300Light",
+    letterSpacing: 0.2,
+    marginTop: 8,
   },
   content: { paddingHorizontal: 28, paddingTop: 28 },
   eyebrow: {

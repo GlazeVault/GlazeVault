@@ -37,8 +37,10 @@ interface DraggablePhotoStripProps {
   /** Move the photo at `from` to `to`, preserving which photo is the cover. */
   onReorder: (from: number, to: number) => void;
   onSetCover: (index: number) => void;
-  onRemove: (index: number) => void;
-  onAdd: () => void;
+  /** Optional. When omitted, thumbnails render without a remove (×) button. */
+  onRemove?: (index: number) => void;
+  /** Optional. When omitted, the trailing "Add" tile is not rendered. */
+  onAdd?: () => void;
 }
 
 /**
@@ -78,7 +80,9 @@ export function DraggablePhotoStrip({
   const stripPageX = useSharedValue(0); // strip's left edge in window coords
   const contentW = useSharedValue(0); // total scrollable content width
 
-  const contentWidth = count * STRIDE + ITEM_W + 8;
+  const contentWidth = onAdd
+    ? count * STRIDE + ITEM_W + 8
+    : (count - 1) * STRIDE + ITEM_W + 8;
 
   useEffect(() => {
     contentW.value = contentWidth;
@@ -150,24 +154,26 @@ export function DraggablePhotoStrip({
             />
           ))}
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.addTile,
-              {
-                left: count * STRIDE,
-                borderColor: colors.border,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-            onPress={onAdd}
-          >
-            <Feather name="plus" size={20} color={colors.mutedForeground} />
-            <Text
-              style={[styles.addTileText, { color: colors.mutedForeground }]}
+          {onAdd ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.addTile,
+                {
+                  left: count * STRIDE,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+              onPress={onAdd}
             >
-              Add
-            </Text>
-          </Pressable>
+              <Feather name="plus" size={20} color={colors.mutedForeground} />
+              <Text
+                style={[styles.addTileText, { color: colors.mutedForeground }]}
+              >
+                Add
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </Animated.ScrollView>
     </View>
@@ -208,7 +214,7 @@ function Thumb({
   stripPageX: SharedValue<number>;
   onReorder: (from: number, to: number) => void;
   onSetCover: (index: number) => void;
-  onRemove: (index: number) => void;
+  onRemove?: (index: number) => void;
   setScrollEnabled: (enabled: boolean) => void;
 }) {
   const pan = Gesture.Pan()
@@ -320,13 +326,15 @@ function Thumb({
           ) : null}
         </Pressable>
       </GestureDetector>
-      <Pressable
-        style={[styles.removeBtn, { backgroundColor: colors.foreground }]}
-        onPress={() => onRemove(index)}
-        hitSlop={6}
-      >
-        <Feather name="x" size={12} color={colors.background} />
-      </Pressable>
+      {onRemove ? (
+        <Pressable
+          style={[styles.removeBtn, { backgroundColor: colors.foreground }]}
+          onPress={() => onRemove(index)}
+          hitSlop={6}
+        >
+          <Feather name="x" size={12} color={colors.background} />
+        </Pressable>
+      ) : null}
     </Animated.View>
   );
 }
