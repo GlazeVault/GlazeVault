@@ -10,8 +10,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PotteryCard } from "@/components/PotteryCard";
 import { SearchBar } from "@/components/SearchBar";
-import { usePottery } from "@/context/PotteryContext";
+import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  buildOrientationRows,
+  isLandscapeRatio,
+  useImageOrientations,
+} from "@/hooks/useImageOrientations";
 
 function EmptyState({ colors }: { colors: ReturnType<typeof useColors> }) {
   return (
@@ -42,6 +47,16 @@ export default function GalleryScreen() {
           .some((field) => field.toLowerCase().includes(trimmed))
       )
     : pieces;
+
+  // Measure each cover's natural orientation so landscape pieces break out into
+  // their own full-width "catalog plate" row while portrait/square stay paired
+  // two-up. Unmeasured pieces default to portrait until their ratio resolves.
+  const orientations = useImageOrientations(filtered.map((p) => p.imageUri));
+  const rows = buildOrientationRows(
+    filtered,
+    (p) => p.id,
+    (p) => isLandscapeRatio(orientations[p.imageUri]),
+  );
 
   const header = (
     <View style={styles.headerInset}>
@@ -75,16 +90,13 @@ export default function GalleryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Adaptive two-column masonry. FlashList virtualizes the list while its
-          masonry mode lays each tile out at its natural height, giving the
-          archive an organic, non-uniform rhythm instead of a rigid grid. Tiles
-          keep a stable column as images measure (no optimizeItemArrangement),
-          so browsing stays calm with no column reshuffling. */}
+      {/* Orientation-aware grid. Portrait/square pieces pair two-up; landscape
+          pieces break out into their own full-width row so wide work reads like
+          a catalog plate. Rows are pre-built so FlashList still virtualizes a
+          single column while supporting the full-width span. */}
       <FlashList
-        data={filtered}
-        numColumns={2}
-        masonry
-        keyExtractor={(item) => item.id}
+        data={rows}
+        keyExtractor={(item) => item.key}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -108,11 +120,38 @@ export default function GalleryScreen() {
             <EmptyState colors={colors} />
           )
         }
-        renderItem={({ item }) => (
-          <View style={styles.cell}>
-            <PotteryCard piece={item} preserveAspectRatio />
-          </View>
-        )}
+        renderItem={({ item }) =>
+          item.kind === "full" ? (
+            // Landscape pieces span the full grid width like a wide catalog
+            // plate, shown at their true ratio with no crop.
+            <View style={styles.cell}>
+              <PotteryCard
+                piece={item.item}
+                preserveAspectRatio
+                initialAspectRatio={orientations[item.item.imageUri]}
+              />
+            </View>
+          ) : (
+            <View style={styles.pairRow}>
+              <View style={styles.pairCell}>
+                <PotteryCard
+                  piece={item.left}
+                  preserveAspectRatio
+                  initialAspectRatio={orientations[item.left.imageUri]}
+                />
+              </View>
+              <View style={styles.pairCell}>
+                {item.right ? (
+                  <PotteryCard
+                    piece={item.right}
+                    preserveAspectRatio
+                    initialAspectRatio={orientations[item.right.imageUri]}
+                  />
+                ) : null}
+              </View>
+            </View>
+          )
+        }
       />
     </View>
   );
@@ -121,8 +160,16 @@ export default function GalleryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   // Each tile is inset by half the gutter so two columns sit 18px apart and the
-  // outer margins land at 24px (15 content padding + 9 cell padding).
+  // outer margins land at 24px (15 content padding + 9 cell padding). A full-width
+  // landscape cell uses the same inset so it lines up flush with the columns.
   cell: {
+    paddingHorizontal: 9,
+  },
+  pairRow: {
+    flexDirection: "row",
+  },
+  pairCell: {
+    flex: 1,
     paddingHorizontal: 9,
   },
   headerInset: {

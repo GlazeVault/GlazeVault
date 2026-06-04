@@ -21,6 +21,12 @@ interface PotteryCardProps {
    * existing look of single-column surfaces like Favorites.
    */
   preserveAspectRatio?: boolean;
+  /**
+   * Seeds the wrapper at a known natural ratio (from `useImageOrientations`) so a
+   * full-width landscape tile doesn't flash the 4:5 portrait placeholder before
+   * the image measures itself on load.
+   */
+  initialAspectRatio?: number;
 }
 
 export function PotteryCard({
@@ -28,6 +34,7 @@ export function PotteryCard({
   fromCollectionId,
   showVisibility = true,
   preserveAspectRatio = false,
+  initialAspectRatio,
 }: PotteryCardProps) {
   const colors = useColors();
   const { toggleFavorite } = usePottery();
@@ -41,7 +48,9 @@ export function PotteryCard({
   // ratio once it loads so tall vases and wide bowls aren't cropped. In the
   // Archive masonry (preserveAspectRatio) we keep the *exact* ratio with no
   // clamp; elsewhere we clamp to a calm editorial range.
-  const [aspectRatio, setAspectRatio] = useState(4 / 5);
+  const [aspectRatio, setAspectRatio] = useState(
+    preserveAspectRatio && initialAspectRatio ? initialAspectRatio : 4 / 5,
+  );
 
   const handleFavorite = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

@@ -114,6 +114,17 @@ jest.mock("@/constants/seedImages", () => ({
   resolveImageSource: (uri: string) => ({ uri }),
 }));
 
+// Orientation measurement relies on react-native's Image.getSize, whose
+// jest-expo mock is incompatible with RN 0.81's promise-based ImageLoader (it
+// throws "success is not a function"). The real grid layout is exercised
+// elsewhere; for the privacy guard we only care which fields render, so stub the
+// measuring hook to skip native sizing while keeping the real row/landscape
+// helpers intact.
+jest.mock("@/hooks/useImageOrientations", () => {
+  const actual = jest.requireActual("@/hooks/useImageOrientations");
+  return { ...actual, useImageOrientations: () => ({}) };
+});
+
 // Capture the props handed to the fullscreen viewer and the share sheet so the
 // test can guard these OFF-SCREEN side channels too — a caption or share
 // payload could carry a private field even when nothing private is painted to

@@ -29,6 +29,11 @@ import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  buildOrientationRows,
+  isLandscapeRatio,
+  useImageOrientations,
+} from "@/hooks/useImageOrientations";
 import { uploadImage } from "@/services/dataService";
 import { isSupabaseConfigured } from "@/services/supabase";
 
@@ -67,27 +72,23 @@ function FadeInView({
   return <Animated.View style={[style, animatedStyle]}>{children}</Animated.View>;
 }
 
-type TileVariant = "feature" | "spread" | "pair";
-
-const TILE_ASPECT: Record<TileVariant, number> = {
-  feature: 4 / 5,
-  spread: 3 / 2,
-  pair: 3 / 4,
-};
-
 /**
- * A single artwork tile for the editorial gallery. Tapping opens the piece
+ * A single artwork tile for the gallery. The image is shown at its true natural
+ * ratio with `contain` so pottery silhouettes are never cropped; landscape work
+ * is given a full-width row by the orientation layout. Tapping opens the piece
  * detail (which hosts the fullscreen viewer), so the viewer is preserved.
  */
 function GalleryTile({
   piece,
-  variant,
+  span,
+  ratio,
   fromCollectionId,
   published,
   colors,
 }: {
   piece: PotteryPiece;
-  variant: TileVariant;
+  span: "full" | "half";
+  ratio: number;
   fromCollectionId: string;
   published: boolean;
   colors: TileColors;
@@ -97,7 +98,7 @@ function GalleryTile({
 
   const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-  const isFeature = variant === "feature" || variant === "spread";
+  const isFeature = span === "full";
 
   // Keep the gallery quiet: show just the essentials (material · cone). The
   // full firing details live on the piece detail page.
@@ -124,11 +125,11 @@ function GalleryTile({
         })
       }
     >
-      <View style={[styles.tileImage, { aspectRatio: TILE_ASPECT[variant] }]}>
+      <View style={[styles.tileImage, { aspectRatio: ratio }]}>
         <Image
           source={resolveImageSource(piece.imageUri)}
           style={StyleSheet.absoluteFill}
-          contentFit="cover"
+          contentFit="contain"
           transition={320}
           cachePolicy="memory-disk"
           recyclingKey={piece.id}
@@ -171,55 +172,6 @@ function GalleryTile({
   );
 }
 
-type GalleryRow =
-  | { key: string; kind: "feature" | "spread"; piece: PotteryPiece }
-  | {
-      key: string;
-      kind: "pair";
-      left: PotteryPiece;
-      right: PotteryPiece;
-      raise: "left" | "right";
-    };
-
-/**
- * Arranges pieces into a calm, asymmetric exhibition rhythm: a tall feature,
- * a staggered pair, a wide spread, then a pair again. Pairs alternate which
- * side is raised so the eye never settles into a grid.
- */
-function buildGalleryRows(pieces: PotteryPiece[]): GalleryRow[] {
-  const pattern: TileVariant[] = ["feature", "pair", "spread", "pair"];
-  const rows: GalleryRow[] = [];
-  let i = 0;
-  let p = 0;
-  let pairCount = 0;
-
-  while (i < pieces.length) {
-    const kind = pattern[p % pattern.length];
-    if (kind === "pair") {
-      if (i + 1 < pieces.length) {
-        rows.push({
-          key: pieces[i].id,
-          kind: "pair",
-          left: pieces[i],
-          right: pieces[i + 1],
-          raise: pairCount % 2 === 0 ? "right" : "left",
-        });
-        pairCount += 1;
-        i += 2;
-      } else {
-        rows.push({ key: pieces[i].id, kind: "feature", piece: pieces[i] });
-        i += 1;
-      }
-    } else {
-      rows.push({ key: pieces[i].id, kind, piece: pieces[i] });
-      i += 1;
-    }
-    p += 1;
-  }
-
-  return rows;
-}
-
 export default function CollectionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
@@ -230,6 +182,9 @@ export default function CollectionDetailScreen() {
 
   const collection = getCollection(id);
   const collectionPieces = pieces.filter((p) => p.collectionIds.includes(id));
+  // Measured natural ratios for every piece in this collection (superset of the
+  // grid), so the works grid can lay out landscape work full-width with no crop.
+  const orientations = useImageOrientations(collectionPieces.map((p) => p.imageUri));
 
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(collection?.title ?? "");
@@ -316,8 +271,6 @@ export default function CollectionDetailScreen() {
     );
   }
 
-  console.log("Loaded collection cover:", collection.coverImageUri);
-
   // Display fallback order: explicit cover -> first piece in this collection
   // that actually has a photo (skipping imageless pieces so the banner never
   // falls back to a blank/placeholder while later pieces do have images).
@@ -331,7 +284,11 @@ export default function CollectionDetailScreen() {
   const gridPieces = activeCover
     ? collectionPieces.filter((p) => p.imageUri !== activeCover)
     : collectionPieces;
-  const galleryRows = buildGalleryRows(gridPieces);
+  const galleryRows = buildOrientationRows(
+    gridPieces,
+    (p) => p.id,
+    (p) => isLandscapeRatio(orientations[p.imageUri]),
+  );
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -593,31 +550,37 @@ export default function CollectionDetailScreen() {
           <FadeInView index={index} style={styles.galleryRow}>
             {item.kind === "pair" ? (
               <View style={styles.pairRow}>
-                <View style={[styles.pairCol, item.raise === "left" && styles.pairRaised]}>
+                <View style={styles.pairCol}>
                   <GalleryTile
                     piece={item.left}
-                    variant="pair"
+                    span="half"
+                    ratio={orientations[item.left.imageUri] ?? 0.8}
                     fromCollectionId={id}
                     published={isPubliclyVisiblePiece(item.left)}
                     colors={colors}
                   />
                 </View>
-                <View style={[styles.pairCol, item.raise === "right" && styles.pairRaised]}>
-                  <GalleryTile
-                    piece={item.right}
-                    variant="pair"
-                    fromCollectionId={id}
-                    published={isPubliclyVisiblePiece(item.right)}
-                    colors={colors}
-                  />
+                <View style={styles.pairCol}>
+                  {item.right ? (
+                    <GalleryTile
+                      piece={item.right}
+                      span="half"
+                      ratio={orientations[item.right.imageUri] ?? 0.8}
+                      fromCollectionId={id}
+                      published={isPubliclyVisiblePiece(item.right)}
+                      colors={colors}
+                    />
+                  ) : null}
                 </View>
               </View>
             ) : (
+              // Landscape pieces get their own full-width catalog-plate row.
               <GalleryTile
-                piece={item.piece}
-                variant={item.kind}
+                piece={item.item}
+                span="full"
+                ratio={orientations[item.item.imageUri] ?? 1.4}
                 fromCollectionId={id}
-                published={isPubliclyVisiblePiece(item.piece)}
+                published={isPubliclyVisiblePiece(item.item)}
                 colors={colors}
               />
             )}
@@ -1001,7 +964,6 @@ const styles = StyleSheet.create({
   galleryRow: { marginBottom: 40 },
   pairRow: { flexDirection: "row", gap: 16 },
   pairCol: { flex: 1 },
-  pairRaised: { marginTop: 34 },
   tileImage: {
     width: "100%",
     borderRadius: 18,

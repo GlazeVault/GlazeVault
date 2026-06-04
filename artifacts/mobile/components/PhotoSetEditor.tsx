@@ -109,6 +109,15 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
 
   const coverUri = images[coverIndex] ?? images[0];
 
+  // Frame the cropper to the photo's own natural ratio so adding a landscape
+  // shot keeps it landscape — the maker can still pinch to reframe, but nothing
+  // is force-cropped to 4:5. Falls back to the cropper's 4:5 default if the
+  // picker didn't report dimensions.
+  const cropAspect =
+    cropSource?.width && cropSource?.height
+      ? cropSource.width / cropSource.height
+      : undefined;
+
   if (images.length === 0) {
     return (
       <>
@@ -142,6 +151,7 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
           uri={cropSource?.uri ?? null}
           sourceWidth={cropSource?.width}
           sourceHeight={cropSource?.height}
+          aspectRatio={cropAspect}
           onCancel={() => setCropSource(null)}
           onConfirm={handleCropConfirm}
         />
@@ -162,7 +172,7 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
           <Image
             source={resolveImageSource(coverUri)}
             style={StyleSheet.absoluteFill}
-            contentFit="cover"
+            contentFit="contain"
           />
           <View style={[styles.coverBadge, { backgroundColor: colors.emerald }]}>
             <Feather name="star" size={11} color="#FFFFFF" />
@@ -229,6 +239,7 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
         uri={cropSource?.uri ?? null}
         sourceWidth={cropSource?.width}
         sourceHeight={cropSource?.height}
+        aspectRatio={cropAspect}
         onCancel={() => setCropSource(null)}
         onConfirm={handleCropConfirm}
       />

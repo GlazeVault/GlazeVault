@@ -22,6 +22,11 @@ import {
 } from "@/context/ProfileContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  buildOrientationRows,
+  isLandscapeRatio,
+  useImageOrientations,
+} from "@/hooks/useImageOrientations";
 
 function ExpandableIntro({ text, color }: { text: string; color: string }) {
   const [expanded, setExpanded] = React.useState(false);
@@ -84,6 +89,13 @@ export default function PublicSiteScreen() {
 
   const hasContent = publicCollections.length > 0;
 
+  // Measure natural ratios for every piece shown in the grids (flattened across
+  // all public collections) so landscape work can break out full-width with no
+  // crop, just like the Archive and collection views.
+  const orientations = useImageOrientations(
+    publicCollections.flatMap((e) => e.gridPieces.map((p) => p.imageUri)),
+  );
+
   const links: { icon: keyof typeof Feather.glyphMap; label: string }[] = [];
   if (site.contactEmail.trim()) links.push({ icon: "mail", label: site.contactEmail.trim() });
   if (profile.instagram.trim()) links.push({ icon: "instagram", label: profile.instagram.trim() });
@@ -117,19 +129,23 @@ export default function PublicSiteScreen() {
     );
   };
 
-  const renderTile = (piece: PublicPieceView, imageStyle: object, wrapperStyle?: object) => {
+  // A single piece tile: shown at its true natural ratio with `contain` so the
+  // pottery silhouette is never cropped. `span` only affects the unmeasured
+  // default (full rows lean landscape, half rows lean portrait).
+  const renderTile = (piece: PublicPieceView, span: "full" | "half") => {
+    const ratio = orientations[piece.imageUri] ?? (span === "full" ? 1.4 : 0.8);
     return (
       <Pressable
         key={piece.id}
-        style={({ pressed }) => [styles.tileCol, wrapperStyle, { opacity: pressed ? 0.85 : 1 }]}
+        style={({ pressed }) => [styles.tileCol, { opacity: pressed ? 0.85 : 1 }]}
         onPress={() => router.push(`/piece/${piece.id}?public=1`)}
       >
-        <View style={[styles.tileImage, imageStyle]}>
+        <View style={[styles.tileImage, { aspectRatio: ratio }]}>
           {piece.imageUri ? (
             <Image
               source={resolveImageSource(piece.imageUri)}
               style={StyleSheet.absoluteFill}
-              contentFit="cover"
+              contentFit="contain"
               transition={220}
               cachePolicy="memory-disk"
               recyclingKey={piece.id}
@@ -145,87 +161,39 @@ export default function PublicSiteScreen() {
     );
   };
 
-  // Asymmetric "art book" rhythm for the default layout: alternating large /
-  // small pairs with staggered offsets and an occasional full-width cinematic
-  // image, separated by generous negative space.
-  const renderCatalog = (cp: PublicPieceView[], seed = 0) => {
-    const rows: React.ReactNode[] = [];
-    let i = 0;
-    let rowIndex = 0;
-    while (i < cp.length) {
-      const remaining = cp.length - i;
-      // Seed the rhythm with the collection index so alignment and offsets vary
-      // across collections instead of every lone piece hugging the same side.
-      const beat = rowIndex + seed;
-      // An occasional full-bleed cinematic image breaks up the pair rhythm.
-      const wideRow = rowIndex % 3 === 2 && remaining >= 2;
-      if (wideRow) {
-        rows.push(
-          <View key={`row-${rowIndex}`}>{renderTile(cp[i], styles.catalogWideImg, styles.fullWidth)}</View>,
-        );
-        i += 1;
-      } else if (remaining === 1) {
-        // A lone piece sits offset with negative space beside it, alternating
-        // side and drop so collections don't stack identically on the left.
-        const alignEnd = beat % 2 === 1;
-        rows.push(
-          <View
-            key={`row-${rowIndex}`}
-            style={[styles.catalogSoloRow, alignEnd ? styles.soloEnd : styles.soloStart]}
-          >
-            {renderTile(cp[i], styles.catalogSoloImg, [styles.catalogSoloCol, alignEnd ? styles.catalogSoloDrop : null])}
-          </View>,
-        );
-        i += 1;
-      } else {
-        const largeLeft = beat % 2 === 0;
-        const a = cp[i];
-        const b = cp[i + 1];
-        rows.push(
-          <View key={`row-${rowIndex}`} style={styles.catalogPairRow}>
-            {largeLeft ? (
-              <>
-                {renderTile(a, styles.catalogLargeImg, styles.catalogLargeCol)}
-                {renderTile(b, styles.catalogSmallImg, [styles.catalogSmallCol, styles.catalogStagger])}
-              </>
-            ) : (
-              <>
-                {renderTile(a, styles.catalogSmallImg, [styles.catalogSmallCol, styles.catalogStaggerDeep])}
-                {renderTile(b, styles.catalogLargeImg, styles.catalogLargeCol)}
-              </>
-            )}
-          </View>,
-        );
-        i += 2;
-      }
-      rowIndex += 1;
-    }
-    return <View style={styles.catalogWrap}>{rows}</View>;
-  };
-
-  const renderPieces = (collectionPieces: PublicPieceView[], seed = 0) => {
+  // Orientation-aware grid shared by every layout. Editorial stacks each piece
+  // full-width; otherwise portrait/square pieces pair two-up while landscape
+  // work breaks out into its own full-width catalog plate. Either way, nothing
+  // is cropped.
+  const renderPieces = (collectionPieces: PublicPieceView[]) => {
     if (layout === "editorial") {
       return (
         <View style={styles.editorialWrap}>
-          {collectionPieces.map((p) => renderTile(p, styles.editorialImg, styles.fullWidth))}
+          {collectionPieces.map((p) => renderTile(p, "full"))}
         </View>
       );
     }
-    if (layout === "masonry") {
-      const colA = collectionPieces.filter((_, i) => i % 2 === 0);
-      const colB = collectionPieces.filter((_, i) => i % 2 === 1);
-      return (
-        <View style={styles.masonryWrap}>
-          <View style={styles.masonryCol}>
-            {colA.map((p, i) => renderTile(p, [styles.masonryImg, i % 2 === 0 ? styles.masonryTall : styles.masonryShort], styles.fullWidth))}
-          </View>
-          <View style={styles.masonryCol}>
-            {colB.map((p, i) => renderTile(p, [styles.masonryImg, i % 2 === 0 ? styles.masonryShort : styles.masonryTall], styles.fullWidth))}
-          </View>
-        </View>
-      );
-    }
-    return renderCatalog(collectionPieces, seed);
+    const rows = buildOrientationRows(
+      collectionPieces,
+      (p) => p.id,
+      (p) => isLandscapeRatio(orientations[p.imageUri]),
+    );
+    return (
+      <View style={styles.gridWrap}>
+        {rows.map((row) =>
+          row.kind === "full" ? (
+            <View key={row.key}>{renderTile(row.item, "full")}</View>
+          ) : (
+            <View key={row.key} style={styles.gridPairRow}>
+              <View style={styles.gridPairCol}>{renderTile(row.left, "half")}</View>
+              <View style={styles.gridPairCol}>
+                {row.right ? renderTile(row.right, "half") : null}
+              </View>
+            </View>
+          ),
+        )}
+      </View>
+    );
   };
 
   return (
@@ -348,7 +316,7 @@ export default function PublicSiteScreen() {
                   <Feather name="layers" size={26} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
                 </View>
               )}
-              {gridPieces.length > 0 ? renderPieces(gridPieces, index) : null}
+              {gridPieces.length > 0 ? renderPieces(gridPieces) : null}
             </View>
           ))
         ) : null}
@@ -519,8 +487,12 @@ const styles = StyleSheet.create({
   },
   // Shared tile structure: a column holding an image box + a quiet caption.
   tileCol: {},
-  tileImage: { width: "100%", borderRadius: 12, overflow: "hidden" },
-  fullWidth: { width: "100%" },
+  tileImage: {
+    width: "100%",
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "rgba(120,110,100,0.06)",
+  },
   caption: { marginTop: 14, gap: 5, paddingHorizontal: 2 },
   captionTitle: {
     fontFamily: "PlayfairDisplay_400Regular",
@@ -535,31 +507,12 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     opacity: 0.65,
   },
-  // Catalog layout (asymmetric art-book rhythm)
-  catalogWrap: { gap: 40, marginTop: 18 },
-  catalogPairRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
-  catalogLargeCol: { flex: 1.6 },
-  catalogLargeImg: { aspectRatio: 0.82 },
-  catalogSmallCol: { flex: 1 },
-  catalogSmallImg: { aspectRatio: 0.92 },
-  catalogStagger: { marginTop: 30 },
-  catalogStaggerDeep: { marginTop: 48 },
-  catalogWideImg: { aspectRatio: 16 / 9 },
-  catalogSoloRow: { flexDirection: "row" },
-  soloStart: { justifyContent: "flex-start" },
-  soloEnd: { justifyContent: "flex-end" },
-  catalogSoloCol: { width: "68%" },
-  catalogSoloImg: { aspectRatio: 0.86 },
-  catalogSoloDrop: { marginTop: 36 },
-  // Editorial layout
+  // Orientation grid: portrait/square paired two-up, landscape full-width.
+  gridWrap: { gap: 28, marginTop: 18 },
+  gridPairRow: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
+  gridPairCol: { flex: 1 },
+  // Editorial layout: every piece stacked full-width.
   editorialWrap: { gap: 20, marginTop: 14 },
-  editorialImg: { aspectRatio: 4 / 3 },
-  // Masonry layout
-  masonryWrap: { flexDirection: "row", gap: 10, marginTop: 14 },
-  masonryCol: { flex: 1, gap: 18 },
-  masonryImg: { borderRadius: 10 },
-  masonryTall: { aspectRatio: 0.78 },
-  masonryShort: { aspectRatio: 1.1 },
   tilePlaceholder: { alignItems: "center", justifyContent: "center" },
   empty: { alignItems: "center", paddingTop: 12, gap: 10 },
   emptyCircle: {
