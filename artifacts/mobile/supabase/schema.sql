@@ -23,8 +23,6 @@ create table if not exists public.pieces (
   image_url            text not null default '',
   created_at           timestamptz not null default now(),
   is_favorite          boolean not null default false,
-  -- `visibility` is a legacy per-piece publishing column, no longer read/written.
-  visibility           text not null default 'private',
   -- REPURPOSED: `public_data_settings` (originally the old per-field publishing
   -- toggles) is now a generic JSON meta blob holding the piece's organization +
   -- curation state: { collectionIds: text[], featuredInPortfolio, isPublic,
@@ -39,6 +37,11 @@ create table if not exists public.pieces (
 -- fresh setups, so new columns must also be added here).
 alter table public.pieces add column if not exists year text not null default '';
 
+-- Retire the legacy per-piece publishing column. The app no longer reads or
+-- writes `pieces.visibility`; piece public/private state now lives in the
+-- `public_data_settings` JSON blob (isPublic). Dropped here for existing DBs.
+alter table public.pieces drop column if exists visibility;
+
 -- ── collections ─────────────────────────────────────────────────────────────
 create table if not exists public.collections (
   id                text primary key,
@@ -46,12 +49,15 @@ create table if not exists public.collections (
   intro             text not null default '',
   created_at        timestamptz not null default now(),
   -- The collection's public/private state (independent of the Portfolio, which is
-  -- now curated per-piece). The legacy `featured_on_site` column is no longer
-  -- read/written; it is left in place (default false) so omitting it is safe.
+  -- now curated per-piece).
   visibility        text not null default 'private',
-  featured_on_site  boolean not null default false,
   cover_image_url   text
 );
+
+-- Retire the legacy collection column. "Show in Portfolio" moved to the piece
+-- level, so the app no longer reads or writes `collections.featured_on_site`.
+-- Dropped here for existing DBs.
+alter table public.collections drop column if exists featured_on_site;
 
 -- ── profiles (single row, id = 'default' until auth is added) ────────────────
 create table if not exists public.profiles (

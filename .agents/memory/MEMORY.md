@@ -11,6 +11,7 @@
 - [GlazeVault collection layout](glazevault-collection-layout.md) — collection detail dedupes cover==piece image out of grid; empty-state gated on collectionPieces not gridPieces; editorial feature/pair/spread rhythm.
 - [GlazeVault public gallery](glazevault-public-gallery.md) — public piece-detail swipe set must filter isPubliclyVisiblePiece + showPhotos within same collection (not bare collectionId); captions honor per-piece publicDataSettings.
 - [GlazeVault Supabase persistence](glazevault-supabase.md) — Supabase=source of truth, AsyncStorage=cache; gated on EXPO_PUBLIC_* (restart expo after change); remote-wins but cache-only creations preserved; NO offline edit/delete sync queue (intentional).
+- [GlazeVault schema column status](glazevault-schema-columns.md) — dead (droppable): pieces.visibility, collections.featured_on_site; ALIVE despite legacy names: pieces.public_data_settings (repurposed blob), collections.visibility; verify via dataService.ts.
 - [GlazeVault context reactivity](glazevault-context-reactivity.md) — getPiece reads a non-reactive ref; rendered must-stay-fresh values (badges/toggles) must read the reactive `pieces` list; getPiece ok only for one-shot form init.
 - [GlazeVault search](glazevault-search.md) — local-only substring filter on both tabs via shared SearchBar; no dedicated search screen/route by design.
 - [GlazeVault mobile jest setup](glazevault-mobile-jest.md) — jest-expo+RTL render tests; pnpm transformIgnore quirks, exact react/rtr version lockstep, no jest.resetModules with top-level RTL import, mock-prefix rule.

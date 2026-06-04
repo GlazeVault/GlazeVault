@@ -1,7 +1,7 @@
 # GlazeVault — Supabase setup
 
 GlazeVault syncs all data (pieces, collections, profile, public-site settings,
-visibility, `publicDataSettings`, `featuredOnSite`, and image URLs) to Supabase.
+collection visibility, the per-piece curation blob, and image URLs) to Supabase.
 AsyncStorage is only an offline cache. Until the two keys below are set, the app
 runs fully offline against that cache — no crashes, just no cloud sync.
 
