@@ -120,11 +120,11 @@ function EditPieceForm({ piece }: { piece: PotteryPiece }) {
 
   const handleSave = async () => {
     if (images.length === 0) {
-      notice({ title: "Image required", message: "Please add a photograph of your piece." });
+      notice({ title: "Image required", message: "Please add a photograph of your piece.", variant: "error" });
       return;
     }
     if (!title.trim()) {
-      notice({ title: "Title required", message: "Give this piece a name." });
+      notice({ title: "Title required", message: "Give this piece a name.", variant: "error" });
       return;
     }
     setSaving(true);
@@ -135,7 +135,7 @@ function EditPieceForm({ piece }: { piece: PotteryPiece }) {
       storedImages = await Promise.all(images.map((uri) => persistPieceImage(uri)));
     } catch {
       setSaving(false);
-      notice({ title: "Couldn’t save photo", message: "We couldn’t store those photos. Please try again." });
+      notice({ title: "Couldn’t save photo", message: "We couldn’t store those photos. Please try again.", variant: "error" });
       return;
     }
     const storedCover = storedImages[coverIndex] ?? storedImages[0];

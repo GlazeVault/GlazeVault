@@ -91,7 +91,7 @@ export default function ProfileScreen() {
       } catch (e) {
         console.warn("Failed to persist avatar", e);
         setSaving(false);
-        notice({ title: "Couldn’t save photo", message: "We couldn’t store that photo. Please try again." });
+        notice({ title: "Couldn’t save photo", message: "We couldn’t store that photo. Please try again.", variant: "error" });
         return;
       }
     }
@@ -127,7 +127,7 @@ export default function ProfileScreen() {
     if (!site.enabled) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(publicSiteUrl);
-    notice({ title: "Link copied", message: `${publicSiteUrl} is on your clipboard.` });
+    notice({ title: "Link copied", message: `${publicSiteUrl} is on your clipboard.`, variant: "success" });
   };
 
   const handleShareSite = async () => {
@@ -209,7 +209,7 @@ export default function ProfileScreen() {
       }
     } catch (e) {
       console.warn("Failed to copy avatar", e);
-      notice({ title: "Couldn’t save photo", message: "We couldn’t store that photo. Please try again." });
+      notice({ title: "Couldn’t save photo", message: "We couldn’t store that photo. Please try again.", variant: "error" });
       return;
     }
     console.log("Avatar copied successfully:", storedAvatar.slice(0, 64));
@@ -221,7 +221,7 @@ export default function ProfileScreen() {
       console.log("Updated profile avatarUri:", storedAvatar.slice(0, 64));
     } catch (e) {
       console.warn("Failed to save profile avatar", e);
-      notice({ title: "Couldn’t save photo", message: "Your photo was loaded but couldn’t be saved. Please try again." });
+      notice({ title: "Couldn’t save photo", message: "Your photo was loaded but couldn’t be saved. Please try again.", variant: "error" });
     }
   };
 
@@ -242,7 +242,7 @@ export default function ProfileScreen() {
       if (e instanceof UnsupportedFileError) {
         notice({ title: "PDF not supported yet", message: e.message });
       } else {
-        notice({ title: "Import failed", message: e instanceof Error ? e.message : "We couldn’t read that file." });
+        notice({ title: "Import failed", message: e instanceof Error ? e.message : "We couldn’t read that file.", variant: "error" });
       }
     } finally {
       setImportBusy(false);

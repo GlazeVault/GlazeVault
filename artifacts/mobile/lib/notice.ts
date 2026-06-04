@@ -1,9 +1,16 @@
 import { Alert, Platform } from "react-native";
 
+import { showToast, type ToastVariant } from "@/lib/toast";
+
 export type NoticeOptions = {
   title: string;
   message?: string;
   buttonText?: string;
+  /**
+   * Controls toast styling on web. Native alerts ignore this. Defaults to
+   * "info".
+   */
+  variant?: ToastVariant;
 };
 
 /**
@@ -11,21 +18,19 @@ export type NoticeOptions = {
  *
  * React Native's `Alert.alert` is a no-op on react-native-web, so validation
  * errors, permission denials, and success messages silently never appeared on
- * the Expo web target. This resolves to a real `window.alert` on web and a
- * native single-button alert on iOS/Android. Mirrors `@/lib/confirm` for the
- * informational (non-confirming) case.
+ * the Expo web target. On web this now renders a branded in-app toast (see
+ * `@/components/ToastHost`) instead of the blocking, unstyled `window.alert`;
+ * on iOS/Android it still resolves to a native single-button alert. Mirrors
+ * `@/lib/confirm` for the informational (non-confirming) case.
  */
 export function notice({
   title,
   message,
   buttonText = "OK",
+  variant = "info",
 }: NoticeOptions): Promise<void> {
   if (Platform.OS === "web") {
-    if (typeof window === "undefined" || typeof window.alert !== "function") {
-      return Promise.resolve();
-    }
-    const body = message ? `${title}\n\n${message}` : title;
-    window.alert(body);
+    showToast({ title, message, variant });
     return Promise.resolve();
   }
 

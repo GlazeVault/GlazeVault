@@ -70,7 +70,7 @@ export default function NewCollectionScreen() {
       }
     } catch (e) {
       console.warn("Failed to pick collection cover", e);
-      notice({ title: "Couldn't add image", message: "Something went wrong choosing that image." });
+      notice({ title: "Couldn't add image", message: "Something went wrong choosing that image.", variant: "error" });
     } finally {
       pickingCover.current = false;
     }
@@ -78,7 +78,7 @@ export default function NewCollectionScreen() {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      notice({ title: "Title required", message: "Give this collection a name." });
+      notice({ title: "Title required", message: "Give this collection a name.", variant: "error" });
       return;
     }
     setSaving(true);

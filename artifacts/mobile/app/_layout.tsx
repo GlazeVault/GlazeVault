@@ -20,6 +20,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ToastHost } from "@/components/ToastHost";
 import { CollectionsProvider } from "@/context/CollectionsContext";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { PotteryProvider } from "@/context/PotteryContext";
@@ -81,6 +82,7 @@ export default function RootLayout() {
                         options={{ presentation: "card" }}
                       />
                     </Stack>
+                    <ToastHost />
                   </KeyboardProvider>
                 </GestureHandlerRootView>
               </ProfileProvider>
