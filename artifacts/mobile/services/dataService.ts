@@ -15,6 +15,7 @@ import {
   supabase,
 } from "./supabase";
 
+import { coalesceImages } from "@/constants/imageStorage";
 import type { Collection } from "@/context/CollectionsContext";
 import type { ArtistProfile } from "@/context/ProfileContext";
 import type { PotteryPiece } from "@/context/PotteryContext";
@@ -127,6 +128,9 @@ type PieceRow = {
   dimensions: string;
   year: string;
   image_url: string;
+  // Ordered set of all photo URLs. `image_url` (the cover) is always a member.
+  // Older rows predate this column; `rowToPiece` reconciles via `coalesceImages`.
+  image_urls: string[] | null;
   created_at: string;
   is_favorite: boolean;
   collection_ids: string[] | null;
@@ -148,6 +152,7 @@ function pieceToRow(p: PotteryPiece): PieceRow {
     dimensions: p.dimensions,
     year: p.year,
     image_url: p.imageUri,
+    image_urls: p.images,
     created_at: p.createdAt,
     is_favorite: p.isFavorite,
     collection_ids: p.collectionIds,
@@ -161,6 +166,9 @@ function rowToPiece(r: PieceRow): PotteryPiece {
   const collectionIds = Array.isArray(r.collection_ids)
     ? r.collection_ids.filter((id): id is string => typeof id === "string")
     : [];
+  // Reconcile the cover (`image_url`) with the full photo set so older rows
+  // (which only had `image_url`) seed `images`, and the cover is always present.
+  const { imageUri, images } = coalesceImages(r.image_url, r.image_urls);
   return {
     id: r.id,
     title: r.title ?? "",
@@ -172,7 +180,8 @@ function rowToPiece(r: PieceRow): PotteryPiece {
     firingEnvironment: r.firing_environment ?? r.firing ?? "",
     dimensions: r.dimensions ?? "",
     year: r.year ?? "",
-    imageUri: r.image_url ?? "",
+    imageUri,
+    images,
     createdAt: r.created_at ?? new Date().toISOString(),
     isFavorite: r.is_favorite ?? false,
     collectionIds,
@@ -199,8 +208,21 @@ export async function loadPieces(): Promise<PotteryPiece[]> {
  */
 export async function savePiece(piece: PotteryPiece): Promise<PotteryPiece> {
   const client = requireClient();
-  const imageUrl = await uploadImage(piece.imageUri, "pieces");
-  const toSave: PotteryPiece = { ...piece, imageUri: imageUrl ?? piece.imageUri };
+  // Normalize first so the cover is guaranteed to be a member of the photo set,
+  // then upload every photo (uploadImage is idempotent for already-remote URLs)
+  // and remap the cover to its uploaded URL by position.
+  const { imageUri, images } = coalesceImages(piece.imageUri, piece.images);
+  const coverIndex = Math.max(0, images.indexOf(imageUri));
+  const uploaded = await Promise.all(
+    images.map((uri) => uploadImage(uri, "pieces")),
+  );
+  const uploadedImages = uploaded.map((url, i) => url ?? images[i]);
+  const uploadedCover = uploadedImages[coverIndex] ?? imageUri;
+  const toSave: PotteryPiece = {
+    ...piece,
+    imageUri: uploadedCover,
+    images: uploadedImages,
+  };
   const { error } = await client.from("pieces").upsert(pieceToRow(toSave));
   if (error) throw error;
   return toSave;

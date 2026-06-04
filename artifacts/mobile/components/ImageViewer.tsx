@@ -23,13 +23,25 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ShareSheet } from "@/components/ShareSheet";
+import type { ShareContent } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 
-/** A single image with its caption text. */
+/**
+ * A single artwork page and the quiet context shown alongside it. The viewer is
+ * an extension of the piece detail, not a bare photo gallery, so each item
+ * carries the metadata painted in the bottom overlay and a public-safe share
+ * payload for the top-overlay share action.
+ */
 export type ViewerItem = {
   uri: string;
   title?: string;
+  /** Middle meta line, e.g. "Stoneware · Cone 10 · 2024". */
   materials?: string;
+  /** Collection name shown beneath the meta line, when the piece has one. */
+  collection?: string;
+  /** Public-safe share content (already projected) for this piece. */
+  share?: ShareContent;
 };
 
 type Props = {
@@ -195,6 +207,7 @@ export function ImageViewer({ visible, items, initialIndex, onClose }: Props) {
   const [index, setIndex] = useState(initialIndex);
   const [uiVisible, setUiVisible] = useState(true);
   const [zoomed, setZoomed] = useState(false);
+  const [shareVisible, setShareVisible] = useState(false);
   // Bumped on each open so every page snaps its zoom/pan back to identity.
   const [resetSignal, setResetSignal] = useState(0);
 
@@ -209,6 +222,7 @@ export function ImageViewer({ visible, items, initialIndex, onClose }: Props) {
       setIndex(initialIndex);
       setUiVisible(true);
       setZoomed(false);
+      setShareVisible(false);
       setResetSignal((n) => n + 1);
       dragY.value = 0;
     }
@@ -350,17 +364,30 @@ export function ImageViewer({ visible, items, initialIndex, onClose }: Props) {
               {index + 1} / {items.length}
             </Text>
           )}
-          <View style={styles.closeBtn} />
+          {current?.share ? (
+            <Pressable
+              onPress={() => setShareVisible(true)}
+              hitSlop={12}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Share this piece"
+            >
+              <Feather name="share-2" size={19} color={PAPER} />
+            </Pressable>
+          ) : (
+            <View style={styles.closeBtn} />
+          )}
         </Animated.View>
 
-        {/* Bottom caption */}
-        {current && (current.title || current.materials) ? (
+        {/* Bottom caption — title, the quiet meta line, and the collection name,
+            so swiping through pieces keeps the artwork context (never image-only). */}
+        {current && (current.title || current.materials || current.collection) ? (
           <Animated.View
             pointerEvents="none"
             style={[styles.caption, uiStyle]}
           >
             <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.55)"]}
+              colors={["transparent", "rgba(0,0,0,0.6)"]}
               style={[styles.captionGradient, { paddingBottom: insets.bottom + 28 }]}
             >
               {current.title ? (
@@ -373,10 +400,26 @@ export function ImageViewer({ visible, items, initialIndex, onClose }: Props) {
                   {current.materials}
                 </Text>
               ) : null}
+              {current.collection ? (
+                <Text style={styles.captionCollection} numberOfLines={1}>
+                  {current.collection}
+                </Text>
+              ) : null}
             </LinearGradient>
           </Animated.View>
         ) : null}
       </View>
+
+      {/* Share — rendered inside the viewer's Modal so sharing stays immersive
+          (no second top-level modal). Only mounts when the current piece has a
+          public-safe share payload. */}
+      {current?.share ? (
+        <ShareSheet
+          visible={shareVisible}
+          onClose={() => setShareVisible(false)}
+          content={current.share}
+        />
+      ) : null}
     </Modal>
   );
 }
@@ -436,5 +479,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.3,
     marginTop: 4,
+  },
+  captionCollection: {
+    color: "rgba(245,240,232,0.5)",
+    fontFamily: "Poppins_400Regular",
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginTop: 8,
   },
 });

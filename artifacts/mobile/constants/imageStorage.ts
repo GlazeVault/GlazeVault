@@ -65,3 +65,36 @@ export async function persistPieceImage(uri: string): Promise<string> {
   source.copy(dest);
   return `${IMAGES_DIR}/${filename}`;
 }
+
+/**
+ * Reconciles a piece's cover (`imageUri`) with its ordered photo set (`images`)
+ * so the two are always consistent. This is the single normalizer used wherever
+ * a piece is read in (cache load, remote row, addPiece):
+ *
+ * - Drops empty/non-string entries from `images`.
+ * - If `images` is empty, seeds it from the cover (back-compat: older rows only
+ *   had `imageUri`).
+ * - If the cover is empty, adopts the first image.
+ * - Guarantees the cover is a member of `images` (prepends it if missing).
+ *
+ * The returned `imageUri` is always the cover and is always present in `images`
+ * (unless the piece genuinely has no photos, in which case both are empty).
+ */
+export function coalesceImages(
+  imageUri: string | undefined | null,
+  images: readonly (string | undefined | null)[] | undefined | null,
+): { imageUri: string; images: string[] } {
+  const list = Array.isArray(images)
+    ? images.filter((u): u is string => typeof u === "string" && u.length > 0)
+    : [];
+  let cover = typeof imageUri === "string" ? imageUri : "";
+  let result = list;
+  if (result.length === 0) {
+    result = cover ? [cover] : [];
+  } else if (!cover) {
+    cover = result[0];
+  } else if (!result.includes(cover)) {
+    result = [cover, ...result];
+  }
+  return { imageUri: cover, images: result };
+}

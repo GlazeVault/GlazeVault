@@ -21,6 +21,9 @@ create table if not exists public.pieces (
   dimensions           text not null default '',
   year                 text not null default '',
   image_url            text not null default '',
+  -- Ordered set of all photo URLs for the piece; `image_url` (the cover) is
+  -- always a member. Older rows predate this column (see migration below).
+  image_urls           text[] not null default '{}',
   created_at           timestamptz not null default now(),
   is_favorite          boolean not null default false,
   -- Explicit, typed organization + curation columns. `collection_ids` holds the
@@ -36,6 +39,17 @@ create table if not exists public.pieces (
 -- Idempotent migrations for existing databases (create table above only runs on
 -- fresh setups, so new columns must also be added here).
 alter table public.pieces add column if not exists year text not null default '';
+
+-- ── Multiple photos per piece ────────────────────────────────────────────────
+-- `image_urls` holds the ordered photo set; `image_url` remains the cover and is
+-- always a member. Backfill seeds the array from the existing cover for any row
+-- that predates the column (empty array + non-empty cover), so the cover never
+-- vanishes from a piece's photo set.
+alter table public.pieces add column if not exists image_urls text[] not null default '{}';
+update public.pieces
+  set image_urls = array[image_url]
+  where coalesce(array_length(image_urls, 1), 0) = 0
+    and image_url <> '';
 
 -- ── Promote curation/organization state to typed columns ─────────────────────
 -- These columns were previously squeezed into a single repurposed JSON blob

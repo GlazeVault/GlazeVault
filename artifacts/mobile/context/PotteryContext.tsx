@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
+import { coalesceImages } from "@/constants/imageStorage";
 import { isSupabaseConfigured } from "@/services/supabase";
 import {
   deletePiece as deletePieceRemote,
@@ -19,7 +20,12 @@ export interface PotteryPiece {
   firingEnvironment: string;
   dimensions: string;
   year: string;
+  // Cover/primary photo. Stays the single accessor every curated surface reads,
+  // so adding `images` below was fully backward compatible.
   imageUri: string;
+  // Ordered set of all photos for the piece. Always includes `imageUri` (the
+  // cover). Kept consistent with the cover via `coalesceImages`.
+  images: string[];
   createdAt: string;
   isFavorite: boolean;
   // Organization: a piece can live in zero or more collections.
@@ -40,6 +46,7 @@ interface PotteryContextType {
       | "id"
       | "createdAt"
       | "isFavorite"
+      | "images"
       | "collectionIds"
       | "featuredInPortfolio"
       | "isPublic"
@@ -48,7 +55,7 @@ interface PotteryContextType {
       Partial<
         Pick<
           PotteryPiece,
-          "collectionIds" | "featuredInPortfolio" | "isPublic" | "archived"
+          "images" | "collectionIds" | "featuredInPortfolio" | "isPublic" | "archived"
         >
       >
   ) => Promise<PotteryPiece>;
@@ -107,6 +114,7 @@ function normalizePiece(
     dimensions: "",
     year: "",
     imageUri: "",
+    images: [],
     createdAt: new Date().toISOString(),
     isFavorite: false,
     collectionIds: [],
@@ -122,6 +130,11 @@ function normalizePiece(
   if (!base.firingEnvironment && base.firing) {
     base.firingEnvironment = base.firing;
   }
+  // Keep the cover and the full photo set consistent (older rows had only the
+  // single `imageUri`; this seeds `images` from it).
+  const reconciled = coalesceImages(base.imageUri, base.images);
+  base.imageUri = reconciled.imageUri;
+  base.images = reconciled.images;
   return base;
 }
 
@@ -155,10 +168,15 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
       if (!isSupabaseConfigured) return;
       try {
         const saved = await savePieceRemote(piece);
-        if (saved.imageUri !== piece.imageUri) {
+        const imagesChanged =
+          saved.images.length !== piece.images.length ||
+          saved.images.some((uri, i) => uri !== piece.images[i]);
+        if (saved.imageUri !== piece.imageUri || imagesChanged) {
           await persist(
             piecesRef.current.map((p) =>
-              p.id === saved.id ? { ...p, imageUri: saved.imageUri } : p
+              p.id === saved.id
+                ? { ...p, imageUri: saved.imageUri, images: saved.images }
+                : p
             )
           );
         }
@@ -253,6 +271,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
         | "id"
         | "createdAt"
         | "isFavorite"
+        | "images"
         | "collectionIds"
         | "featuredInPortfolio"
         | "isPublic"
@@ -261,18 +280,21 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
         Partial<
           Pick<
             PotteryPiece,
-            "collectionIds" | "featuredInPortfolio" | "isPublic" | "archived"
+            "images" | "collectionIds" | "featuredInPortfolio" | "isPublic" | "archived"
           >
         >
     ) => {
       const current = piecesRef.current;
       const firingEnvironment = piece.firingEnvironment || piece.firing || "";
+      const { imageUri, images } = coalesceImages(piece.imageUri, piece.images);
       const newPiece: PotteryPiece = {
         collectionIds: [],
         featuredInPortfolio: false,
         isPublic: false,
         archived: false,
         ...piece,
+        imageUri,
+        images,
         firingEnvironment,
         firing: firingEnvironment,
         id: Date.now().toString() + Math.random().toString(36).substring(2, 9),

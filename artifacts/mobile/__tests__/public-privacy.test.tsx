@@ -54,6 +54,7 @@ function makePiece(id: string): PotteryPiece {
     firing: OWNER_ONLY_SENTINELS.firing,
     firingEnvironment: OWNER_ONLY_SENTINELS.firingEnvironment,
     imageUri: `pieces/${id}.jpg`,
+    images: [`pieces/${id}.jpg`],
     createdAt: "2025-01-01T00:00:00.000Z",
     isFavorite: false,
     collectionIds: ["c1"],

@@ -1,7 +1,4 @@
-import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -17,11 +14,10 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ImageCropper } from "@/components/ImageCropper";
+import { PhotoSetEditor } from "@/components/PhotoSetEditor";
 import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
-import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -75,10 +71,8 @@ export default function AddScreen() {
   const { addPiece } = usePottery();
   const { collections } = useCollections();
   const insets = useSafeAreaInsets();
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [cropSource, setCropSource] = useState<
-    { uri: string; width?: number; height?: number } | null
-  >(null);
+  const [images, setImages] = useState<string[]>([]);
+  const [coverIndex, setCoverIndex] = useState(0);
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [clay, setClay] = useState("");
@@ -92,55 +86,8 @@ export default function AddScreen() {
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const pickImage = async () => {
-    if (Platform.OS !== "web") {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission needed", "Allow access to your photo library.");
-        return;
-      }
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: false,
-      quality: 1,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setCropSource({ uri: asset.uri, width: asset.width, height: asset.height });
-    }
-  };
-
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission needed", "Allow camera access to photograph your pottery.");
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: false,
-      quality: 1,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setCropSource({ uri: asset.uri, width: asset.width, height: asset.height });
-    }
-  };
-
-  const handlePickPhoto = () => {
-    if (Platform.OS === "web") {
-      pickImage();
-      return;
-    }
-    Alert.alert("Add Photo", undefined, [
-      { text: "Camera", onPress: takePhoto },
-      { text: "Photo Library", onPress: pickImage },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  };
-
   const handleSave = async () => {
-    if (!imageUri) {
+    if (images.length === 0) {
       Alert.alert("Image required", "Please add a photograph of your piece.");
       return;
     }
@@ -149,18 +96,21 @@ export default function AddScreen() {
       return;
     }
     setSaving(true);
-    let storedImageUri: string;
+    let storedImages: string[];
     try {
-      storedImageUri = await persistPieceImage(imageUri);
+      // Fail-closed: persist every photo before saving so no temp picker URI is
+      // ever stored. The chosen cover keeps its position in the array.
+      storedImages = await Promise.all(images.map((uri) => persistPieceImage(uri)));
     } catch {
       setSaving(false);
-      Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
+      Alert.alert("Couldn’t save photo", "We couldn’t store those photos. Please try again.");
       return;
     }
-    const created = await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), year: year.trim(), imageUri: storedImageUri, collectionIds: collectionId ? [collectionId] : [] });
+    const storedCover = storedImages[coverIndex] ?? storedImages[0];
+    const created = await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), year: year.trim(), imageUri: storedCover, images: storedImages, collectionIds: collectionId ? [collectionId] : [] });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const wasUncollected = !collectionId;
-    setImageUri(null); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear())); setCollectionId(undefined);
+    setImages([]); setCoverIndex(0); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear())); setCollectionId(undefined);
     setSaving(false);
     router.replace("/");
     // Collections are purely organizational now (a piece's portfolio/public state
@@ -220,49 +170,15 @@ export default function AddScreen() {
       <Text style={[styles.heading, { color: colors.foreground }]}>Record a Piece</Text>
       <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-      {/* Photo card */}
-      <View
-        style={[
-          styles.photoCard,
-          {
-            backgroundColor: colors.secondary,
-            borderColor: colors.border,
-            borderStyle: imageUri ? "solid" : "dashed",
-          },
-        ]}
-      >
-        <Pressable
-          style={({ pressed }) => [
-            styles.imageWrapper,
-            { opacity: pressed && !imageUri ? 0.88 : 1 },
-          ]}
-          onPress={!imageUri ? handlePickPhoto : undefined}
-        >
-          {imageUri ? (
-            <Image
-              source={resolveImageSource(imageUri)}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-            />
-          ) : (
-            <View style={styles.placeholderInner}>
-              <View style={[styles.iconCircle, { backgroundColor: colors.accent }]}>
-                <Feather name="camera" size={24} color={colors.cobalt} />
-              </View>
-              <Text style={[styles.addPhotoTitle, { color: colors.foreground }]}>Add Photograph</Text>
-              <Text style={[styles.addPhotoSub, { color: colors.mutedForeground }]}>
-                Tap to photograph or choose from library
-              </Text>
-            </View>
-          )}
-        </Pressable>
-      </View>
-      {imageUri && (
-        <Pressable style={styles.changePhotoRow} onPress={handlePickPhoto}>
-          <Feather name="camera" size={13} color={colors.mutedForeground} />
-          <Text style={[styles.changePhotoText, { color: colors.mutedForeground }]}>Change photo</Text>
-        </Pressable>
-      )}
+      {/* Photos */}
+      <PhotoSetEditor
+        images={images}
+        coverIndex={coverIndex}
+        onChange={(next, cover) => {
+          setImages(next);
+          setCoverIndex(cover);
+        }}
+      />
 
       <View style={styles.form}>
         <Label text="Title" />
@@ -358,18 +274,6 @@ export default function AddScreen() {
           </Text>
         </Pressable>
       </View>
-
-      <ImageCropper
-        visible={!!cropSource}
-        uri={cropSource?.uri ?? null}
-        sourceWidth={cropSource?.width}
-        sourceHeight={cropSource?.height}
-        onCancel={() => setCropSource(null)}
-        onConfirm={(uri) => {
-          setImageUri(uri);
-          setCropSource(null);
-        }}
-      />
     </KeyboardAwareScrollView>
   );
 }
@@ -379,30 +283,6 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 11, fontFamily: "Poppins_500Medium", letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 6 },
   heading: { fontSize: 32, fontFamily: "PlayfairDisplay_400Regular", letterSpacing: 0.4, lineHeight: 40, marginBottom: 20 },
   divider: { height: 1, width: 40, marginBottom: 28 },
-  photoCard: {
-    width: "100%",
-    borderRadius: 24,
-    overflow: "hidden",
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  imageWrapper: {
-    width: "100%",
-    aspectRatio: 4 / 5,
-  },
-  changePhotoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 10,
-    marginBottom: 16,
-    opacity: 0.65,
-  },
-  changePhotoText: { fontSize: 12, fontFamily: "Poppins_400Regular", letterSpacing: 0.2 },
-  placeholderInner: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
-  iconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  addPhotoTitle: { fontSize: 16, fontFamily: "PlayfairDisplay_400Regular", letterSpacing: 0.2 },
-  addPhotoSub: { fontSize: 12, fontFamily: "Poppins_300Light", textAlign: "center", lineHeight: 19 },
   form: { gap: 6 },
   label: {
     fontSize: 10,

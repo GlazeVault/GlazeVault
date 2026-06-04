@@ -1,7 +1,5 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
-import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -19,11 +17,10 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ImageCropper } from "@/components/ImageCropper";
+import { PhotoSetEditor } from "@/components/PhotoSetEditor";
 import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
-import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -75,7 +72,17 @@ export default function EditPieceScreen() {
   const insets = useSafeAreaInsets();
   const piece = getPiece(id);
 
-  const [imageUri, setImageUri] = useState(piece?.imageUri ?? "");
+  const initialImages =
+    piece?.images && piece.images.length > 0
+      ? piece.images
+      : piece?.imageUri
+        ? [piece.imageUri]
+        : [];
+  const [images, setImages] = useState<string[]>(initialImages);
+  const [coverIndex, setCoverIndex] = useState(() => {
+    const idx = piece?.imageUri ? initialImages.indexOf(piece.imageUri) : 0;
+    return idx >= 0 ? idx : 0;
+  });
   const [title, setTitle] = useState(piece?.title ?? "");
   const [notes, setNotes] = useState(piece?.notes ?? "");
   const [clay, setClay] = useState(piece?.clay ?? "");
@@ -88,9 +95,6 @@ export default function EditPieceScreen() {
   const [year, setYear] = useState(piece?.year ?? "");
   const [collectionIds, setCollectionIds] = useState<string[]>(piece?.collectionIds ?? []);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
-  const [cropSource, setCropSource] = useState<
-    { uri: string; width?: number; height?: number } | null
-  >(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -99,36 +103,27 @@ export default function EditPieceScreen() {
 
   if (!piece) return null;
 
-  const pickImage = async () => {
-    if (Platform.OS !== "web") {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: false,
-      quality: 1,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setCropSource({ uri: asset.uri, width: asset.width, height: asset.height });
-    }
-  };
-
   const handleSave = async () => {
+    if (images.length === 0) {
+      Alert.alert("Image required", "Please add a photograph of your piece.");
+      return;
+    }
     if (!title.trim()) {
       Alert.alert("Title required", "Give this piece a name.");
       return;
     }
     setSaving(true);
-    let storedImageUri: string;
+    let storedImages: string[];
     try {
-      storedImageUri = await persistPieceImage(imageUri);
+      // Fail-closed: persist every photo before saving so no temp picker URI is
+      // ever stored. The chosen cover keeps its position in the array.
+      storedImages = await Promise.all(images.map((uri) => persistPieceImage(uri)));
     } catch {
       setSaving(false);
-      Alert.alert("Couldn’t save photo", "We couldn’t store that photo. Please try again.");
+      Alert.alert("Couldn’t save photo", "We couldn’t store those photos. Please try again.");
       return;
     }
+    const storedCover = storedImages[coverIndex] ?? storedImages[0];
     await updatePiece(id, {
       title: title.trim(),
       notes: notes.trim(),
@@ -139,7 +134,8 @@ export default function EditPieceScreen() {
       firingEnvironment,
       dimensions: dimensions.trim(),
       year: year.trim(),
-      imageUri: storedImageUri,
+      imageUri: storedCover,
+      images: storedImages,
       collectionIds,
     });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -209,24 +205,17 @@ export default function EditPieceScreen() {
         bottomOffset={20}
         showsVerticalScrollIndicator={false}
       >
-        {/* Image */}
-        <Pressable
-          style={[
-            styles.imagePicker,
-            { borderRadius: colors.radius, borderColor: colors.border, backgroundColor: colors.secondary },
-          ]}
-          onPress={pickImage}
-        >
-          <Image
-            source={resolveImageSource(imageUri)}
-            style={[styles.previewImage, { borderRadius: colors.radius }]}
-            contentFit="cover"
+        {/* Photos */}
+        <View style={styles.photosBlock}>
+          <PhotoSetEditor
+            images={images}
+            coverIndex={coverIndex}
+            onChange={(next, cover) => {
+              setImages(next);
+              setCoverIndex(cover);
+            }}
           />
-          <View style={styles.changeOverlay}>
-            <Feather name="camera" size={16} color="#FFFFFF" />
-            <Text style={styles.changeText}>Change photo</Text>
-          </View>
-        </Pressable>
+        </View>
 
         <View style={styles.form}>
           <Label text="Title" />
@@ -298,18 +287,6 @@ export default function EditPieceScreen() {
           </Pressable>
         </View>
       </KeyboardAwareScrollView>
-
-      <ImageCropper
-        visible={!!cropSource}
-        uri={cropSource?.uri ?? null}
-        sourceWidth={cropSource?.width}
-        sourceHeight={cropSource?.height}
-        onCancel={() => setCropSource(null)}
-        onConfirm={(uri) => {
-          setImageUri(uri);
-          setCropSource(null);
-        }}
-      />
 
       {/* Collection picker modal */}
       <Modal
@@ -427,26 +404,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 16, fontFamily: "PlayfairDisplay_400Regular", letterSpacing: 0.3 },
   saveText: { fontSize: 14, fontFamily: "Poppins_500Medium", textAlign: "right" },
   container: { paddingHorizontal: 28, paddingTop: 24 },
-  imagePicker: {
-    width: "100%",
-    aspectRatio: 4 / 5,
-    overflow: "hidden",
-    marginBottom: 28,
-  },
-  previewImage: { width: "100%", height: "100%" },
-  changeOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(45,45,42,0.45)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    gap: 6,
-  },
-  changeText: { color: "#FFFFFF", fontFamily: "Poppins_400Regular", fontSize: 12 },
+  photosBlock: { marginBottom: 20 },
   form: { gap: 4 },
   label: {
     fontSize: 10,

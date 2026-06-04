@@ -21,6 +21,7 @@ import { ShareSheet } from "@/components/ShareSheet";
 import {
   buildPublicMetaLine,
   buildShareContent,
+  isCollectionPublic,
   isPortfolioPiece,
   isPubliclyVisiblePiece,
   toPublicPiece,
@@ -73,6 +74,8 @@ export default function PieceDetailScreen() {
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
   const [updatingCollection, setUpdatingCollection] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
+  // Offset (within the current piece's photos) the viewer should open at.
+  const [viewerStart, setViewerStart] = useState(0);
 
   if (!piece) {
     return (
@@ -107,29 +110,85 @@ export default function PieceDetailScreen() {
     const scoped = from ? pieces.filter((p) => p.collectionIds.includes(from)) : pieces;
     return scoped.some((p) => p.id === piece.id) ? scoped : [piece];
   })();
-  const viewerItems: ViewerItem[] = galleryPieces.map((p) => {
-    if (isPublicView) {
+  // Collection name shown in the viewer caption. When opened from a collection we
+  // name that collection; otherwise the piece's first collection. The public
+  // viewer only ever names a PUBLIC collection, so a private collection's name
+  // never reaches a non-owner surface.
+  const ownerCollectionName = (p: (typeof pieces)[number]): string => {
+    const target = from
+      ? collections.find((c) => c.id === from)
+      : p.collectionIds
+          .map((cid) => collections.find((c) => c.id === cid))
+          .find(Boolean);
+    return target?.title ?? "";
+  };
+  const publicCollectionName = (p: (typeof pieces)[number]): string => {
+    const target = p.collectionIds
+      .map((cid) => collections.find((c) => c.id === cid))
+      .find((c): c is NonNullable<typeof c> => !!c && isCollectionPublic(c));
+    return target?.title ?? "";
+  };
+
+  // The ordered photo set for a piece. Falls back to the single cover for
+  // legacy pieces that predate multi-photo support.
+  const ownerImagesOf = (p: (typeof pieces)[number]): string[] =>
+    p.images && p.images.length > 0 ? p.images : p.imageUri ? [p.imageUri] : [];
+
+  // The public viewer is one-cover-per-piece (privacy projection unchanged): a
+  // non-owner can only ever see each public piece's cover. The owner viewer
+  // FLATTENS to one entry per photo so the owner can swipe through every photo
+  // of every in-scope piece. `pieceStartIndex` is where the current piece's
+  // photos begin in the flattened list.
+  let viewerItems: ViewerItem[];
+  let pieceStartIndex: number;
+  if (isPublicView) {
+    viewerItems = galleryPieces.map((p) => {
       // Project to the public allowlist first, then read only from it, so the
       // fullscreen viewer can never receive a private studio field. Captions use
       // the shared buildPublicMetaLine helper, so the viewer reads identically
-      // to the detail page and the portfolio cards.
+      // to the detail page and the portfolio cards. Share content is built from
+      // the projection too, so it can carry no owner-only field.
       const pub = toPublicPiece(p);
       return {
         uri: pub.imageUri,
         title: pub.title,
         materials: buildPublicMetaLine(pub),
+        collection: publicCollectionName(p),
+        share: buildShareContent(pub, shareUrl),
       };
-    }
-    return {
-      uri: p.imageUri,
-      title: p.title,
-      materials: [p.clay, p.glaze].filter(Boolean).join("  ·  "),
-    };
-  });
-  const viewerIndex = Math.max(
-    0,
-    galleryPieces.findIndex((p) => p.id === piece.id),
-  );
+    });
+    pieceStartIndex = Math.max(
+      0,
+      galleryPieces.findIndex((p) => p.id === piece.id),
+    );
+  } else {
+    const items: ViewerItem[] = [];
+    let start = 0;
+    galleryPieces.forEach((p) => {
+      if (p.id === piece.id) start = items.length;
+      const materials = [p.clay, p.glaze || p.cone, p.year].filter(Boolean).join("  ·  ");
+      const collection = ownerCollectionName(p);
+      // Sharing is always a public surface — buildShareContent projects through
+      // the public allowlist, so even the owner's share carries no studio field.
+      const share = buildShareContent(p, shareUrl);
+      ownerImagesOf(p).forEach((uri) => {
+        items.push({ uri, title: p.title, materials, collection, share });
+      });
+    });
+    viewerItems = items;
+    pieceStartIndex = start;
+  }
+
+  // Current piece's own photos + which one is the cover (the hero always shows
+  // the cover, so the viewer opens there unless a specific thumbnail is tapped).
+  const ownerImages = ownerImagesOf(piece);
+  const coverOffset = Math.max(0, ownerImages.indexOf(piece.imageUri));
+  const viewerIndex = isPublicView ? pieceStartIndex : pieceStartIndex + viewerStart;
+
+  const openViewerAt = (offset: number) => {
+    setViewerStart(offset);
+    setViewerVisible(true);
+  };
 
   const handleFavorite = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -372,9 +431,9 @@ export default function PieceDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
       >
-        {/* Hero image — tap to open the fullscreen viewer */}
+        {/* Hero image — tap to open the fullscreen viewer at the cover */}
         <Pressable
-          onPress={() => setViewerVisible(true)}
+          onPress={() => openViewerAt(coverOffset)}
           accessibilityRole="imagebutton"
           accessibilityLabel={`View ${piece.title} fullscreen`}
         >
@@ -386,15 +445,49 @@ export default function PieceDetailScreen() {
             cachePolicy="memory-disk"
             recyclingKey={piece.id}
           />
-          {galleryPieces.length > 1 ? (
+          {ownerImages.length > 1 ? (
             <View style={styles.galleryHint}>
-              <Feather name="layers" size={11} color="#FFFFFF" />
+              <Feather name="image" size={11} color="#FFFFFF" />
               <Text style={styles.galleryHintText}>
-                {viewerIndex + 1} / {galleryPieces.length}
+                {ownerImages.length} photos
               </Text>
             </View>
           ) : null}
         </Pressable>
+
+        {/* Thumbnail strip — tap a photo to open the viewer at that photo */}
+        {ownerImages.length > 1 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbStrip}
+          >
+            {ownerImages.map((uri, index) => {
+              const isCover = index === coverOffset;
+              return (
+                <Pressable
+                  key={`${uri}-${index}`}
+                  style={[
+                    styles.heroThumb,
+                    {
+                      borderColor: isCover ? colors.emerald : "rgba(120,110,100,0.18)",
+                      borderWidth: isCover ? 2 : 1,
+                    },
+                  ]}
+                  onPress={() => openViewerAt(index)}
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel={`View photo ${index + 1} of ${ownerImages.length}`}
+                >
+                  <Image
+                    source={resolveImageSource(uri)}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                  />
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
 
         {/* Content */}
         <View style={styles.content}>
@@ -890,6 +983,18 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_500Medium",
     letterSpacing: 0.4,
     color: "#FFFFFF",
+  },
+  thumbStrip: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 28,
+    paddingTop: 16,
+  },
+  heroThumb: {
+    width: 60,
+    aspectRatio: 4 / 5,
+    borderRadius: 10,
+    overflow: "hidden",
   },
   content: { paddingHorizontal: 28, paddingTop: 28 },
   eyebrow: {
