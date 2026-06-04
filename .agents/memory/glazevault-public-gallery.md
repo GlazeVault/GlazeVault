@@ -88,12 +88,15 @@ the caption reads (objects are full PotteryPiece cast by `getPublicCollectionPie
 ## Public homepage is COLLECTION-DRIVEN (no standalone "Selected Works" feed)
 The public site flows Artist Header → public collections directly; there is NO
 separate curated "Selected Works" piece feed. Each public collection is a mini
-exhibition: index eyebrow, title, piece count, intro preview, hero cover, then a
-works grid. `hasContent` = `publicCollections.length > 0`.
+exhibition with an IMAGE-FIRST editorial order: index eyebrow → title → piece
+count → hero cover → intro/description preview → works grid. `hasContent` =
+`publicCollections.length > 0`.
 
 **Why:** a standalone curated feed duplicated artwork (a piece showed in Selected
 Works AND inside its collection), which read as repetitive/noisy. Collections now
-carry the storytelling.
+carry the storytelling. The description sits BELOW the hero (not above) so the
+viewer emotionally enters through the image first, then reads — an exhibition-
+catalog feel. Do not move the intro back above the hero.
 
 **How to apply:** `featuredInPortfolio` / `isPortfolioPiece` is now ONLY an owner-side
 concept — the featured badge (components/PotteryCard.tsx) and the Feature-in-Portfolio

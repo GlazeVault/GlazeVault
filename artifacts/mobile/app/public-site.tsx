@@ -287,12 +287,6 @@ export default function PublicSiteScreen() {
                 <Text style={[styles.collectionMeta, { color: colors.mutedForeground }]}>
                   {`${cp.length} ${cp.length === 1 ? "piece" : "pieces"}`}
                 </Text>
-                {collection.intro.trim() ? (
-                  <ExpandableIntro
-                    text={collection.intro.trim()}
-                    color={colors.mutedForeground}
-                  />
-                ) : null}
               </View>
               {coverUri ? (
                 <Pressable
@@ -316,6 +310,12 @@ export default function PublicSiteScreen() {
                   <Feather name="layers" size={26} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
                 </View>
               )}
+              {collection.intro.trim() ? (
+                <ExpandableIntro
+                  text={collection.intro.trim()}
+                  color={colors.mutedForeground}
+                />
+              ) : null}
               {gridPieces.length > 0 ? renderPieces(gridPieces) : null}
             </View>
           ))
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginTop: 10,
   },
-  introWrap: { marginTop: 12 },
+  introWrap: { marginTop: 18, marginBottom: 4 },
   collectionIntro: {
     fontSize: 13.5,
     fontFamily: "Poppins_300Light",
