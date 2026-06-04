@@ -23,6 +23,12 @@ privacy jest guard (`__tests__/public-privacy.test.tsx`) green without edits to
 the allowlist. **How to apply:** never add `images[]` to the public projection or
 to any public/share surface — that would leak owner-only photos.
 
+**Reorder preserves cover, not index.** The editor thumbnail strip
+(DraggablePhotoStrip) is long-press-drag reorderable. Any reorder must remap
+`coverIndex` so it still points at the SAME photo it referenced before the move
+(not the same slot) — order flows purely through `images[]`, so persistence and
+`image_urls` follow automatically with no dataService change.
+
 **Owner viewer flattens, public viewer does not.** In `app/piece/[id].tsx` the
 owner branch builds `viewerItems` as one entry PER PHOTO across in-scope pieces and
 tracks `pieceStartIndex` (where the current piece's photos start) + `viewerStart`

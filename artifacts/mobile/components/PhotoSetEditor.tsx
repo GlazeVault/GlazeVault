@@ -6,12 +6,12 @@ import {
   Alert,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 
+import { DraggablePhotoStrip } from "@/components/DraggablePhotoStrip";
 import { ImageCropper } from "@/components/ImageCropper";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useColors } from "@/hooks/useColors";
@@ -107,6 +107,23 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
     onChange(next, next.length === 0 ? 0 : Math.min(nextCover, next.length - 1));
   };
 
+  const handleReorder = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...images];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    // Keep the cover pointed at the same photo it referenced before the move.
+    let nextCover = coverIndex;
+    if (coverIndex === from) {
+      nextCover = to;
+    } else if (from < coverIndex && to >= coverIndex) {
+      nextCover = coverIndex - 1;
+    } else if (from > coverIndex && to <= coverIndex) {
+      nextCover = coverIndex + 1;
+    }
+    onChange(next, nextCover);
+  };
+
   const coverUri = images[coverIndex] ?? images[0];
 
   // Frame the cropper to the photo's own natural ratio so adding a landscape
@@ -182,56 +199,19 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
       </View>
 
       {/* Thumbnail strip + add tile */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.strip}
-      >
-        {images.map((uri, index) => {
-          const isCover = index === coverIndex;
-          return (
-            <View key={`${uri}-${index}`} style={styles.thumbWrap}>
-              <Pressable
-                style={[
-                  styles.thumb,
-                  {
-                    borderColor: isCover ? colors.emerald : colors.border,
-                    borderWidth: isCover ? 2 : 1,
-                  },
-                ]}
-                onPress={() => handleSetCover(index)}
-              >
-                <Image
-                  source={resolveImageSource(uri)}
-                  style={StyleSheet.absoluteFill}
-                  contentFit="cover"
-                />
-              </Pressable>
-              <Pressable
-                style={[styles.removeBtn, { backgroundColor: colors.foreground }]}
-                onPress={() => handleRemove(index)}
-                hitSlop={6}
-              >
-                <Feather name="x" size={12} color={colors.background} />
-              </Pressable>
-            </View>
-          );
-        })}
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.addTile,
-            { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-          ]}
-          onPress={handlePickPhoto}
-        >
-          <Feather name="plus" size={20} color={colors.mutedForeground} />
-          <Text style={[styles.addTileText, { color: colors.mutedForeground }]}>Add</Text>
-        </Pressable>
-      </ScrollView>
+      <DraggablePhotoStrip
+        images={images}
+        coverIndex={coverIndex}
+        onReorder={handleReorder}
+        onSetCover={handleSetCover}
+        onRemove={handleRemove}
+        onAdd={handlePickPhoto}
+      />
 
       <Text style={[styles.hint, { color: colors.mutedForeground }]}>
-        {images.length > 1 ? "Tap a photo to make it the cover" : "Add more photos of this piece"}
+        {images.length > 1
+          ? "Tap a photo to make it the cover · hold and drag to reorder"
+          : "Add more photos of this piece"}
       </Text>
 
       <ImageCropper
@@ -295,35 +275,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 19,
   },
-  strip: { flexDirection: "row", gap: 12, paddingVertical: 2, paddingRight: 8 },
-  thumbWrap: { width: 72 },
-  thumb: {
-    width: 72,
-    aspectRatio: 4 / 5,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  removeBtn: {
-    position: "absolute",
-    top: -6,
-    right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addTile: {
-    width: 72,
-    aspectRatio: 4 / 5,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  addTileText: { fontSize: 11, fontFamily: "Poppins_400Regular", letterSpacing: 0.3 },
   hint: {
     fontSize: 12,
     fontFamily: "Poppins_300Light",
