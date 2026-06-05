@@ -32,7 +32,7 @@ import { notice } from "@/lib/notice";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
-import { PUBLIC_SITE_DOMAIN, publicSiteSlug, useProfile } from "@/context/ProfileContext";
+import { pieceShareUrl, useProfile } from "@/context/ProfileContext";
 import { useColors } from "@/hooks/useColors";
 
 function InfoRow({
@@ -75,7 +75,6 @@ export default function PieceDetailScreen() {
   const { profile } = useProfile();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const shareUrl = `${PUBLIC_SITE_DOMAIN}/${publicSiteSlug(profile.name)}`;
   const piece = pieces.find((p) => p.id === id);
   const [shareVisible, setShareVisible] = useState(false);
   const [collectionPickerVisible, setCollectionPickerVisible] = useState(false);
@@ -178,7 +177,7 @@ export default function PieceDetailScreen() {
         title: pub.title,
         materials: buildPublicMetaLine(pub),
         collection: publicCollectionName(p),
-        share: buildShareContent(pub, shareUrl),
+        share: buildShareContent(pub, pieceShareUrl(profile.name, p.id)),
       };
     });
     pieceStartIndex = Math.max(
@@ -199,9 +198,13 @@ export default function PieceDetailScreen() {
         .filter(Boolean)
         .join("  ·  ");
       const collection = ownerCollectionName(p);
-      // Sharing is always a public surface — buildShareContent projects through
-      // the public allowlist, so even the owner's share carries no studio field.
-      const share = buildShareContent(p, shareUrl);
+      // Sharing is gated to public content: a private piece offers no share
+      // payload at all, so the owner viewer can never surface a share for it.
+      // When present, buildShareContent still projects through the public
+      // allowlist, so even the owner's share carries no studio field.
+      const share = isPubliclyVisiblePiece(p)
+        ? buildShareContent(p, pieceShareUrl(profile.name, p.id))
+        : undefined;
       ownerImagesOf(p).forEach((uri) => {
         items.push({ uri, title: p.title, materials, collection, share });
       });
@@ -491,7 +494,7 @@ export default function PieceDetailScreen() {
         <ShareSheet
           visible={shareVisible}
           onClose={() => setShareVisible(false)}
-          content={buildShareContent(publicView, shareUrl)}
+          content={buildShareContent(publicView, pieceShareUrl(profile.name, piece.id))}
         />
 
         <ImageViewer
@@ -515,12 +518,14 @@ export default function PieceDetailScreen() {
           <Feather name="arrow-left" size={18} color="#8A7B6C" />
         </Pressable>
         <View style={styles.topRight}>
-          <Pressable
-            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
-            onPress={() => setShareVisible(true)}
-          >
-            <Feather name="share-2" size={18} color="#8A7B6C" />
-          </Pressable>
+          {isPublic ? (
+            <Pressable
+              style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
+              onPress={() => setShareVisible(true)}
+            >
+              <Feather name="share-2" size={18} color="#8A7B6C" />
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -829,24 +834,26 @@ export default function PieceDetailScreen() {
                 </Text>
               </Pressable>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.actionBtn,
-                  styles.shareBtn,
-                  {
-                    backgroundColor: pressed ? colors.secondary : colors.foreground,
-                    borderColor: colors.foreground,
-                    borderRadius: colors.radius,
-                    opacity: pressed ? 0.85 : 1,
-                  },
-                ]}
-                onPress={() => setShareVisible(true)}
-              >
-                <Feather name="share-2" size={14} color={colors.background} />
-                <Text style={[styles.actionBtnText, { color: colors.background }]}>
-                  Share
-                </Text>
-              </Pressable>
+              {isPublic ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.actionBtn,
+                    styles.shareBtn,
+                    {
+                      backgroundColor: pressed ? colors.secondary : colors.foreground,
+                      borderColor: colors.foreground,
+                      borderRadius: colors.radius,
+                      opacity: pressed ? 0.85 : 1,
+                    },
+                  ]}
+                  onPress={() => setShareVisible(true)}
+                >
+                  <Feather name="share-2" size={14} color={colors.background} />
+                  <Text style={[styles.actionBtnText, { color: colors.background }]}>
+                    Share
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
 
             <Pressable
@@ -1019,11 +1026,16 @@ export default function PieceDetailScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      <ShareSheet
-        visible={shareVisible}
-        onClose={() => setShareVisible(false)}
-        content={buildShareContent(piece, shareUrl)}
-      />
+      {/* Owner share — only mounts for a public piece, so a private piece never
+          even constructs a share payload or link (defence in depth beyond the
+          gated buttons above). */}
+      {isPublic ? (
+        <ShareSheet
+          visible={shareVisible}
+          onClose={() => setShareVisible(false)}
+          content={buildShareContent(piece, pieceShareUrl(profile.name, piece.id))}
+        />
+      ) : null}
 
       <ImageViewer
         visible={viewerVisible}

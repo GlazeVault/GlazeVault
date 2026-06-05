@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
   Platform,
   Pressable,
@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
+  buildLinkShareContent,
   buildPublicMetaLine,
   getPortfolioCollectionPieces,
   isCollectionPublic,
@@ -22,9 +23,11 @@ import {
   type PublicPieceView,
 } from "@/constants/privacy";
 import { ExpandableText } from "@/components/ExpandableText";
+import { ShareSheet } from "@/components/ShareSheet";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import {
+  portfolioShareUrl,
   PUBLIC_SITE_DOMAIN,
   publicSiteSlug,
   useProfile,
@@ -49,6 +52,7 @@ export default function PublicSiteScreen() {
   const portraitHeight = Math.max(440, Math.min(winHeight * 0.62, 640));
 
   const site = profile.publicSite;
+  const [shareVisible, setShareVisible] = useState(false);
 
   // The portfolio is a curated exhibition: public collections ARE the
   // storytelling structure (context), but inside each one ONLY the pieces the
@@ -400,7 +404,7 @@ export default function PublicSiteScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Floating back */}
+      {/* Floating back + share */}
       <View style={[styles.topBar, { top: topPad + 10 }]}>
         <Pressable
           style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
@@ -408,11 +412,35 @@ export default function PublicSiteScreen() {
         >
           <Feather name="arrow-left" size={18} color="#8A7B6C" />
         </Pressable>
-        <View style={[styles.previewPill, { backgroundColor: "rgba(107,139,122,0.14)" }]}>
-          <Feather name="eye" size={11} color={colors.emerald} />
-          <Text style={[styles.previewPillText, { color: colors.emerald }]}>Preview</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          {site.enabled ? (
+            <Pressable
+              style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
+              onPress={() => setShareVisible(true)}
+            >
+              <Feather name="share-2" size={16} color="#8A7B6C" />
+            </Pressable>
+          ) : null}
+          <View style={[styles.previewPill, { backgroundColor: "rgba(107,139,122,0.14)" }]}>
+            <Feather name="eye" size={11} color={colors.emerald} />
+            <Text style={[styles.previewPillText, { color: colors.emerald }]}>Preview</Text>
+          </View>
         </View>
       </View>
+
+      {/* Share — only mounts once the public site is enabled, so the portfolio
+          link is never shared before it would resolve. */}
+      {site.enabled ? (
+        <ShareSheet
+          visible={shareVisible}
+          onClose={() => setShareVisible(false)}
+          content={buildLinkShareContent(
+            profile.name ? `${profile.name} — Portfolio` : "Portfolio",
+            portfolioShareUrl(profile.name),
+            "A ceramic portfolio",
+          )}
+        />
+      ) : null}
     </View>
   );
 }

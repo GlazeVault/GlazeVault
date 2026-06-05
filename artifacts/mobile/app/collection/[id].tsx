@@ -23,11 +23,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ExpandableText } from "@/components/ExpandableText";
 import { PieceStatusBadge } from "@/components/StatusBadge";
+import { ShareSheet } from "@/components/ShareSheet";
 import { persistPieceImage } from "@/constants/imageStorage";
-import { isCollectionPublic } from "@/constants/privacy";
+import { buildLinkShareContent, isCollectionPublic } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
+import { collectionShareUrl, useProfile } from "@/context/ProfileContext";
 import { useColors } from "@/hooks/useColors";
 import { confirm } from "@/lib/confirm";
 import { notice } from "@/lib/notice";
@@ -167,6 +169,8 @@ export default function CollectionDetailScreen() {
   // grid), so the works grid can lay out landscape work full-width with no crop.
   const orientations = useImageOrientations(collectionPieces.map((p) => p.imageUri));
 
+  const { profile } = useProfile();
+  const [shareVisible, setShareVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(collection?.title ?? "");
   const [intro, setIntro] = useState(collection?.intro ?? "");
@@ -603,20 +607,44 @@ export default function CollectionDetailScreen() {
           <Feather name="arrow-left" size={18} color="#8A7B6C" />
         </Pressable>
         {!isEditing && (
-          <Pressable
-            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
-            onPress={() => {
-              setTitle(collection.title);
-              setIntro(collection.intro);
-              setIsPublic(isCollectionPublic(collection));
-              setCoverImageUri(collection.coverImageUri ?? "");
-              setIsEditing(true);
-            }}
-          >
-            <Feather name="edit-2" size={16} color="#8A7B6C" />
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            {isCollectionPublic(collection) ? (
+              <Pressable
+                style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
+                onPress={() => setShareVisible(true)}
+              >
+                <Feather name="share-2" size={16} color="#8A7B6C" />
+              </Pressable>
+            ) : null}
+            <Pressable
+              style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
+              onPress={() => {
+                setTitle(collection.title);
+                setIntro(collection.intro);
+                setIsPublic(isCollectionPublic(collection));
+                setCoverImageUri(collection.coverImageUri ?? "");
+                setIsEditing(true);
+              }}
+            >
+              <Feather name="edit-2" size={16} color="#8A7B6C" />
+            </Pressable>
+          </View>
         )}
       </View>
+
+      {/* Share — only mounts for a public collection, so a private collection
+          has no share affordance and its link can never be sent. */}
+      {isCollectionPublic(collection) ? (
+        <ShareSheet
+          visible={shareVisible}
+          onClose={() => setShareVisible(false)}
+          content={buildLinkShareContent(
+            collection.title,
+            collectionShareUrl(profile.name, collection.id),
+            profile.name ? `A collection by ${profile.name}` : "A ceramic collection",
+          )}
+        />
+      ) : null}
 
       <Modal
         visible={coverPickerOpen}

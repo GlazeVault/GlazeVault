@@ -162,6 +162,27 @@ export function buildShareContent(
   return { title, message, url: (shareUrl ?? "").trim() };
 }
 
+/**
+ * Builds share content for a non-piece public surface — a Collection
+ * (mini-exhibition) or the Portfolio. These carry no piece projection, only a
+ * title, an optional quiet subtitle, and the public link, so there is no
+ * owner-only studio field that could leak. Empty parts are dropped so the
+ * message has no blank lines.
+ */
+export function buildLinkShareContent(
+  title: string,
+  shareUrl: string,
+  subtitle?: string,
+): ShareContent {
+  const cleanTitle = (title ?? "").trim() || "GlazeVault";
+  const url = (shareUrl ?? "").trim();
+  const message = [cleanTitle, (subtitle ?? "").trim(), url]
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .join("\n");
+  return { title: cleanTitle, message, url };
+}
+
 // Minimal structural shapes the helpers need. Declared here (rather than
 // importing the context types) so this module stays dependency-free and the
 // helpers can be reused anywhere without import cycles.

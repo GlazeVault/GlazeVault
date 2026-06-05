@@ -189,3 +189,28 @@ export function publicSiteSlug(name: string): string {
 }
 
 export const PUBLIC_SITE_DOMAIN = "glazevault.art";
+
+/**
+ * Canonical, fully-qualified base URL for an artist's public site. Every public
+ * share link (portfolio, collection, piece) is built from this single root so a
+ * copied or natively-shared link is always well-formed (https, no trailing
+ * slash) and stays stable even before the public web pages ship.
+ */
+export function publicBaseUrl(name: string): string {
+  return `https://${PUBLIC_SITE_DOMAIN}/${publicSiteSlug(name)}`;
+}
+
+/** Public link to the artist's portfolio (the public-site root). */
+export function portfolioShareUrl(name: string): string {
+  return publicBaseUrl(name);
+}
+
+/** Public link to a single collection (a mini-exhibition). */
+export function collectionShareUrl(name: string, collectionId: string): string {
+  return `${publicBaseUrl(name)}/collection/${collectionId}`;
+}
+
+/** Public link to a single piece. */
+export function pieceShareUrl(name: string, pieceId: string): string {
+  return `${publicBaseUrl(name)}/piece/${pieceId}`;
+}

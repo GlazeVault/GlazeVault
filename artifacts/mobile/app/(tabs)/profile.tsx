@@ -26,6 +26,7 @@ import { getPortfolioCollectionPieces, isCollectionPublic } from "@/constants/pr
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import {
+  portfolioShareUrl,
   PUBLIC_SITE_DOMAIN,
   publicSiteSlug,
   useProfile,
@@ -119,7 +120,10 @@ export default function ProfileScreen() {
     await updatePublicSite({ enabled: !site.enabled });
   };
 
-  const publicSiteUrl = `${PUBLIC_SITE_DOMAIN}/${publicSiteSlug(profile.name)}`;
+  // Full, well-formed public link (https, no trailing slash) — the single
+  // source for both copy and native share so a shared portfolio link is always
+  // tappable.
+  const publicSiteUrl = portfolioShareUrl(profile.name);
 
   const handleCopyLink = async () => {
     if (!site.enabled) return;
@@ -134,7 +138,7 @@ export default function ProfileScreen() {
     try {
       await Share.share({
         message: `${profile.name ? `${profile.name} — ` : ""}${publicSiteUrl}`,
-        url: `https://${publicSiteUrl}`,
+        url: publicSiteUrl,
         title: profile.name || "My public site",
       });
     } catch (e) {

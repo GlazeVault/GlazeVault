@@ -111,6 +111,14 @@ jest.mock("@/context/ProfileContext", () => ({
   useProfile: () => ({ profile: { name: "Test Artist" } }),
   PUBLIC_SITE_DOMAIN: "glazevault.art",
   publicSiteSlug: (name: string) => name.toLowerCase().replace(/\s+/g, "-"),
+  publicBaseUrl: (name: string) =>
+    `https://glazevault.art/${name.toLowerCase().replace(/\s+/g, "-")}`,
+  portfolioShareUrl: (name: string) =>
+    `https://glazevault.art/${name.toLowerCase().replace(/\s+/g, "-")}`,
+  collectionShareUrl: (name: string, id: string) =>
+    `https://glazevault.art/${name.toLowerCase().replace(/\s+/g, "-")}/collection/${id}`,
+  pieceShareUrl: (name: string, id: string) =>
+    `https://glazevault.art/${name.toLowerCase().replace(/\s+/g, "-")}/piece/${id}`,
 }));
 
 jest.mock("@/hooks/useColors", () => ({

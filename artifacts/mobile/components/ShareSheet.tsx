@@ -1,141 +1,67 @@
-import { Feather, FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import React, { useCallback } from "react";
-import {
-  Animated,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Modal, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import type { ShareContent } from "@/constants/privacy";
 import { notice } from "@/lib/notice";
 
-interface ShareOption {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  accent: string;
-  iconScale?: number;
-}
-
 interface ShareSheetProps {
   visible: boolean;
   onClose: () => void;
-  // Pre-projected, public-safe content built by `buildShareContent`. The sheet
-  // only ever receives this allowlisted payload (title + clay·dimensions·year
-  // meta line + public site link) — never the raw piece — so no owner-only
-  // studio field can reach a share.
+  // Pre-projected, public-safe content built by `buildShareContent` /
+  // `buildLinkShareContent`. The sheet only ever receives this allowlisted
+  // payload (title + quiet meta + public link) — never the raw piece — so no
+  // owner-only studio field can reach a share. The link itself only points at
+  // public surfaces; callers gate the share affordance to public content.
   content: ShareContent;
 }
 
+/**
+ * A calm, two-action share sheet. "Share…" opens the real OS share sheet (the
+ * native iOS share experience) via React Native's Share API; "Copy link" puts
+ * the public URL on the clipboard. There is deliberately no social/commerce
+ * grid — GlazeVault sharing is sending someone to a quiet exhibition, not
+ * broadcasting to a feed.
+ */
 export function ShareSheet({ visible, onClose, content }: ShareSheetProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
-  const handleOption = useCallback(
-    async (label: string) => {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      if (label === "Copy Link") {
-        onClose();
-        setTimeout(() => {
-          notice({ title: "Link copied", message: `A link to "${content.title}" has been copied to your clipboard.` });
-        }, 300);
-      } else {
-        onClose();
-        setTimeout(() => {
-          notice({
-            title: `Share to ${label}`,
-            message: `This will open ${label} so you can share "${content.title}". Full integration coming soon.`,
-          });
-        }, 300);
-      }
-    },
-    [onClose, content.title]
-  );
+  const handleNativeShare = useCallback(async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onClose();
+    try {
+      // `url` is honored by iOS; Android relies on `message` (which already
+      // carries the link), so the URL travels on both platforms.
+      await Share.share(
+        {
+          title: content.title,
+          message: content.message,
+          url: content.url,
+        },
+        { subject: content.title },
+      );
+    } catch (e) {
+      console.warn("Failed to open share sheet", e);
+    }
+  }, [content, onClose]);
 
-  const socialPlatforms: ShareOption[] = [
-    {
-      id: "instagram",
-      label: "Instagram",
-      icon: <FontAwesome name="instagram" size={22} color={colors.foreground} />,
-      accent: "#C4A09A",
-    },
-    {
-      id: "pinterest",
-      label: "Pinterest",
-      icon: <FontAwesome name="pinterest" size={22} color={colors.foreground} />,
-      accent: colors.primary,
-      iconScale: 0.95,
-    },
-    {
-      id: "facebook",
-      label: "Facebook",
-      icon: <FontAwesome name="facebook" size={22} color={colors.foreground} />,
-      accent: colors.cobalt,
-    },
-  ];
-
-  const commercePlatforms: ShareOption[] = [
-    {
-      id: "shopify",
-      label: "Shopify",
-      icon: <MaterialCommunityIcons name="storefront" size={22} color={colors.foreground} />,
-      accent: "#6B8B7A",
-    },
-    {
-      id: "etsy",
-      label: "Etsy",
-      icon: <FontAwesome name="etsy" size={22} color={colors.foreground} />,
-      accent: "#C8A06A",
-      iconScale: 0.92,
-    },
-  ];
-
-  const renderPlatformCell = (opt: ShareOption) => (
-    <Pressable
-      key={opt.id}
-      style={({ pressed }) => [
-        styles.platformCell,
-        { transform: [{ scale: pressed ? 0.97 : 1 }] },
-      ]}
-      onPress={() => handleOption(opt.label)}
-    >
-      {({ pressed }) => (
-        <>
-          <View
-            style={[
-              styles.iconCircle,
-              {
-                backgroundColor: pressed
-                  ? "rgba(160, 145, 130, 0.06)"
-                  : colors.secondary,
-                borderColor: "rgba(120, 110, 100, 0.12)",
-                borderWidth: 0.75,
-              },
-            ]}
-          >
-            <View
-              style={
-                opt.iconScale
-                  ? { transform: [{ scale: opt.iconScale }] }
-                  : undefined
-              }
-            >
-              {opt.icon}
-            </View>
-          </View>
-          <Text style={[styles.platformLabel, { color: colors.mutedForeground }]}>
-            {opt.label}
-          </Text>
-        </>
-      )}
-    </Pressable>
-  );
+  const handleCopyLink = useCallback(async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await Clipboard.setStringAsync(content.url);
+    onClose();
+    setTimeout(() => {
+      notice({
+        title: "Link copied",
+        message: `${content.url} is on your clipboard.`,
+        variant: "success",
+      });
+    }, 250);
+  }, [content.url, onClose]);
 
   return (
     <Modal
@@ -161,9 +87,14 @@ export function ShareSheet({ visible, onClose, content }: ShareSheetProps) {
 
           {/* Header */}
           <View style={styles.header}>
-            <View>
-              <Text style={[styles.heading, { color: colors.foreground }]}>Share</Text>
-              <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
+            <View style={styles.headerText}>
+              <Text style={[styles.heading, { color: colors.foreground }]}>
+                Share
+              </Text>
+              <Text
+                style={[styles.subheading, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+              >
                 {content.title}
               </Text>
             </View>
@@ -176,31 +107,47 @@ export function ShareSheet({ visible, onClose, content }: ShareSheetProps) {
             </Pressable>
           </View>
 
-          {/* Platform groups */}
-          <View style={styles.groups}>
-            <View style={styles.sectionGroup}>
-              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-                Social
+          {/* Link preview */}
+          {content.url ? (
+            <View
+              style={[
+                styles.linkRow,
+                {
+                  backgroundColor: colors.secondary,
+                  borderColor: "rgba(120, 110, 100, 0.12)",
+                },
+              ]}
+            >
+              <Feather name="link" size={14} color={colors.mutedForeground} />
+              <Text
+                style={[styles.linkText, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {content.url.replace(/^https?:\/\//, "")}
               </Text>
-              <View style={styles.platformRow}>
-                {socialPlatforms.map(renderPlatformCell)}
-              </View>
             </View>
+          ) : null}
 
-            <View style={styles.sectionGroup}>
-              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-                Commerce & Portfolio
-              </Text>
-              <View style={styles.platformRow}>
-                {commercePlatforms.map(renderPlatformCell)}
-              </View>
-            </View>
-          </View>
+          {/* Primary action — native OS share sheet */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.shareBtn,
+              {
+                backgroundColor: colors.foreground,
+                borderRadius: colors.radius,
+                opacity: pressed ? 0.88 : 1,
+              },
+            ]}
+            onPress={handleNativeShare}
+          >
+            <Feather name="share-2" size={17} color={colors.background} />
+            <Text style={[styles.shareBtnText, { color: colors.background }]}>
+              Share…
+            </Text>
+          </Pressable>
 
-          {/* Divider */}
-          <View style={[styles.divider, { backgroundColor: "rgba(120, 110, 100, 0.1)" }]} />
-
-          {/* Copy Link */}
+          {/* Secondary action — copy link */}
           <Pressable
             style={({ pressed }) => [
               styles.copyRow,
@@ -209,7 +156,7 @@ export function ShareSheet({ visible, onClose, content }: ShareSheetProps) {
                 borderRadius: 12,
               },
             ]}
-            onPress={() => handleOption("Copy Link")}
+            onPress={handleCopyLink}
           >
             <View
               style={[
@@ -217,21 +164,19 @@ export function ShareSheet({ visible, onClose, content }: ShareSheetProps) {
                 {
                   backgroundColor: "rgba(240, 235, 228, 0.7)",
                   borderColor: "rgba(120, 110, 100, 0.12)",
-                  borderWidth: 0.75,
                 },
               ]}
             >
-              <Feather name="link" size={18} color={colors.foreground} />
+              <Feather name="copy" size={17} color={colors.foreground} />
             </View>
             <View style={styles.copyText}>
               <Text style={[styles.copyLabel, { color: "rgba(45, 45, 42, 0.72)" }]}>
-                Copy Link
+                Copy link
               </Text>
               <Text style={[styles.copySub, { color: colors.mutedForeground }]}>
-                Share a link to this piece
+                Put the public link on your clipboard
               </Text>
             </View>
-            <Feather name="chevron-right" size={16} color={colors.border} style={{ opacity: 0.2 }} />
           </Pressable>
 
           {/* Cancel */}
@@ -274,8 +219,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 28,
+    marginBottom: 22,
   },
+  headerText: { flex: 1, paddingRight: 12 },
   heading: {
     fontSize: 22,
     fontFamily: "PlayfairDisplay_400Regular",
@@ -295,54 +241,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  groups: {
-    marginBottom: 8,
-  },
-  sectionGroup: {
-    marginBottom: 24,
-  },
-  sectionLabel: {
-    fontSize: 9,
-    fontFamily: "Poppins_500Medium",
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
-    marginBottom: 14,
-    opacity: 0.55,
-  },
-  platformRow: {
+  linkRow: {
     flexDirection: "row",
-    justifyContent: "center",
-    gap: 20,
-  },
-  platformCell: {
     alignItems: "center",
-    gap: 12,
-    width: 72,
+    gap: 9,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 0.75,
+    marginBottom: 20,
   },
-  iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  platformLabel: {
-    fontSize: 11,
+  linkText: {
+    flex: 1,
+    fontSize: 12.5,
     fontFamily: "Poppins_400Regular",
     letterSpacing: 0.2,
   },
-  divider: {
-    height: 1,
-    marginBottom: 20,
+  shareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    paddingVertical: 15,
+    marginBottom: 6,
+  },
+  shareBtnText: {
+    fontSize: 14,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.4,
   },
   copyRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: 10,
-    marginBottom: 4,
   },
   copyIcon: {
     width: 44,
@@ -350,7 +283,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: 0.75,
   },
   copyText: { flex: 1, gap: 2 },
   copyLabel: {
@@ -363,7 +296,7 @@ const styles = StyleSheet.create({
   },
   cancelRow: {
     alignItems: "center",
-    paddingTop: 24,
+    paddingTop: 22,
   },
   cancelText: {
     fontSize: 13,
