@@ -26,8 +26,6 @@ import { getPortfolioCollectionPieces, isCollectionPublic } from "@/constants/pr
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import {
-  HOMEPAGE_LAYOUTS,
-  HomepageLayout,
   PUBLIC_SITE_DOMAIN,
   publicSiteSlug,
   useProfile,
@@ -119,11 +117,6 @@ export default function ProfileScreen() {
   const toggleSite = async () => {
     await Haptics.selectionAsync();
     await updatePublicSite({ enabled: !site.enabled });
-  };
-
-  const selectLayout = async (layout: HomepageLayout) => {
-    await Haptics.selectionAsync();
-    await updatePublicSite({ homepageLayout: layout });
   };
 
   const publicSiteUrl = `${PUBLIC_SITE_DOMAIN}/${publicSiteSlug(profile.name)}`;
@@ -657,41 +650,6 @@ export default function ProfileScreen() {
                 </Text>
               </View>
 
-              {/* Homepage layout */}
-              <Text style={[styles.subLabel, { color: colors.mutedForeground, marginTop: 22 }]}>
-                Homepage Layout
-              </Text>
-              <View style={styles.layoutWrap}>
-                {HOMEPAGE_LAYOUTS.map((l) => {
-                  const selected = site.homepageLayout === l.key;
-                  return (
-                    <Pressable
-                      key={l.key}
-                      onPress={() => selectLayout(l.key)}
-                      style={[
-                        styles.layoutCard,
-                        {
-                          backgroundColor: selected ? "rgba(107,127,163,0.1)" : colors.secondary,
-                          borderColor: selected ? colors.cobalt : "rgba(120,110,100,0.14)",
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.layoutLabel,
-                          { color: selected ? colors.cobalt : colors.foreground },
-                        ]}
-                      >
-                        {l.label}
-                      </Text>
-                      <Text style={[styles.layoutHint, { color: colors.mutedForeground }]}>
-                        {l.hint}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
               {/* Contact & commerce */}
               <Text style={[styles.subLabel, { color: colors.mutedForeground, marginTop: 22 }]}>
                 Contact & Shop
@@ -1153,15 +1111,6 @@ const styles = StyleSheet.create({
     borderWidth: 0.75,
   },
   siteHintText: { flex: 1, fontSize: 12, fontFamily: "Poppins_300Light", lineHeight: 19 },
-  layoutWrap: { gap: 8 },
-  layoutCard: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 0.75,
-  },
-  layoutLabel: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
-  layoutHint: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2, marginTop: 2 },
   siteHint: {
     fontSize: 12,
     fontFamily: "Poppins_300Light",

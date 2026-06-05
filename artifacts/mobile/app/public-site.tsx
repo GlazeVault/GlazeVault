@@ -16,7 +16,6 @@ import { ExpandableText } from "@/components/ExpandableText";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import {
-  HomepageLayout,
   PUBLIC_SITE_DOMAIN,
   publicSiteSlug,
   useProfile,
@@ -37,7 +36,6 @@ export default function PublicSiteScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const site = profile.publicSite;
-  const layout: HomepageLayout = site.homepageLayout;
 
   // The portfolio is a curated exhibition: public collections ARE the
   // storytelling structure (context), but inside each one ONLY the pieces the
@@ -101,11 +99,15 @@ export default function PublicSiteScreen() {
     );
   };
 
-  // A single piece tile: shown at its true natural ratio with `contain` so the
-  // pottery silhouette is never cropped. `span` only affects the unmeasured
-  // default (full rows lean landscape, half rows lean portrait).
+  // A single piece tile, always shown with `contain` so the pottery silhouette
+  // is never cropped. Column tiles ("half") keep their natural ratio but are
+  // gently clamped to a calm band so heights vary subtly rather than chaotically;
+  // full-width plates ("full") preserve their true wide ratio for an exhibition
+  // moment.
   const renderTile = (piece: PublicPieceView, span: "full" | "half") => {
-    const ratio = orientations[piece.imageUri] ?? (span === "full" ? 1.4 : 0.8);
+    const natural = orientations[piece.imageUri] ?? (span === "full" ? 1.5 : 0.82);
+    const ratio =
+      span === "half" ? Math.min(Math.max(natural, 0.72), 1.05) : Math.max(natural, 1.2);
     return (
       <Pressable
         key={piece.id}
@@ -133,83 +135,33 @@ export default function PublicSiteScreen() {
     );
   };
 
-  // A uniform CATALOG frame: every piece sits in an identical 4:5 matted box
-  // (contain, so nothing is cropped) for the even, archival, museum rhythm —
-  // deliberately the same size row after row.
-  const renderCatalogTile = (piece: PublicPieceView) => (
-    <Pressable
-      style={({ pressed }) => [styles.tileCol, { opacity: pressed ? 0.85 : 1 }]}
-      onPress={() => router.push(`/piece/${piece.id}?public=1`)}
-    >
-      <View style={[styles.catalogFrame, { borderColor: "rgba(120,110,100,0.16)" }]}>
-        {piece.imageUri ? (
-          <Image
-            source={resolveImageSource(piece.imageUri)}
-            style={StyleSheet.absoluteFill}
-            contentFit="contain"
-            transition={220}
-            cachePolicy="memory-disk"
-            recyclingKey={piece.id}
-          />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, styles.tilePlaceholder, { backgroundColor: colors.secondary }]}>
-            <Feather name="image" size={18} color={colors.mutedForeground} style={{ opacity: 0.3 }} />
-          </View>
-        )}
-      </View>
-      {renderCaption(piece)}
-    </Pressable>
-  );
-
-  // Three deliberately distinct rhythms so switching modes reads instantly:
-  //  · editorial — every piece stacked full-width.
-  //  · catalog   — an orderly museum grid: uniform 4:5 frames, two even
-  //                columns, identical rhythm row after row (matted, never cropped).
-  //  · masonry   — an organic art-book flow: each piece keeps its natural height
-  //                and pieces are packed shortest-column-first so the two columns
-  //                stagger, with landscape work breaking out full-width and large.
-  const renderEditorial = (cp: PublicPieceView[]) => (
-    <View style={styles.editorialWrap}>{cp.map((p) => renderTile(p, "full"))}</View>
-  );
-
-  const renderCatalog = (cp: PublicPieceView[]) => {
-    const rows: PublicPieceView[][] = [];
-    for (let i = 0; i < cp.length; i += 2) rows.push(cp.slice(i, i + 2));
-    return (
-      <View style={styles.catalogWrap}>
-        {rows.map((row) => (
-          <View key={row[0].id} style={styles.catalogRow}>
-            {row.map((p) => (
-              <View key={p.id} style={styles.catalogCell}>
-                {renderCatalogTile(p)}
-              </View>
-            ))}
-            {row.length === 1 ? <View style={styles.catalogCell} /> : null}
-          </View>
-        ))}
-      </View>
-    );
-  };
-
-  const renderMasonry = (cp: PublicPieceView[]) => {
+  // The single GlazeVault signature layout: a calm, curated monograph flow.
+  // Portrait and square pieces flow in two columns, packed shortest-column-first
+  // so their (gently clamped) natural heights stagger into a quiet, organic
+  // rhythm — clarity of a catalog with the breath of an art book. Landscape work
+  // lifts out into full-width exhibition plates that punctuate the column flow.
+  // Nothing is cropped, spacing stays generous, and the asymmetry stays subtle.
+  const renderPieces = (collectionPieces: PublicPieceView[]) => {
     type Block =
-      | { kind: "full"; key: string; piece: PublicPieceView }
+      | { kind: "plate"; key: string; piece: PublicPieceView }
       | { kind: "cols"; key: string; left: PublicPieceView[]; right: PublicPieceView[] };
     const blocks: Block[] = [];
     let bucket: PublicPieceView[] = [];
     const flush = () => {
       if (!bucket.length) return;
-      // Greedy shortest-column packing: estimated tile height is 1/ratio per unit
-      // of column width, so taller (portrait) pieces add more height and the
-      // next piece drops into whichever column is currently shorter — the source
-      // of the staggered, organic rhythm.
+      // Estimated tile height is 1/ratio per unit of column width, so taller
+      // pieces add more height and the next piece drops into whichever column is
+      // currently shorter — the source of the gentle, staggered rhythm.
       let lh = 0;
       let rh = 0;
       const left: PublicPieceView[] = [];
       const right: PublicPieceView[] = [];
       for (const p of bucket) {
-        const ratio = orientations[p.imageUri] ?? 0.8;
-        const h = 1 / (ratio || 0.8);
+        // Estimate with the SAME clamped ratio the half tile renders at so the
+        // shortest-column choice matches actual on-screen heights.
+        const natural = orientations[p.imageUri] ?? 0.82;
+        const clamped = Math.min(Math.max(natural, 0.72), 1.05);
+        const h = 1 / clamped;
         if (lh <= rh) {
           left.push(p);
           lh += h;
@@ -221,35 +173,29 @@ export default function PublicSiteScreen() {
       blocks.push({ kind: "cols", key: `cols-${bucket[0].id}`, left, right });
       bucket = [];
     };
-    for (const p of cp) {
+    for (const p of collectionPieces) {
       if (isLandscapeRatio(orientations[p.imageUri])) {
         flush();
-        blocks.push({ kind: "full", key: `full-${p.id}`, piece: p });
+        blocks.push({ kind: "plate", key: `plate-${p.id}`, piece: p });
       } else {
         bucket.push(p);
       }
     }
     flush();
     return (
-      <View style={styles.masonryWrap}>
+      <View style={styles.galleryWrap}>
         {blocks.map((b) =>
-          b.kind === "full" ? (
+          b.kind === "plate" ? (
             <View key={b.key}>{renderTile(b.piece, "full")}</View>
           ) : (
-            <View key={b.key} style={styles.masonryRow}>
-              <View style={styles.masonryCol}>{b.left.map((p) => renderTile(p, "half"))}</View>
-              <View style={styles.masonryCol}>{b.right.map((p) => renderTile(p, "half"))}</View>
+            <View key={b.key} style={styles.galleryRow}>
+              <View style={styles.galleryCol}>{b.left.map((p) => renderTile(p, "half"))}</View>
+              <View style={styles.galleryCol}>{b.right.map((p) => renderTile(p, "half"))}</View>
             </View>
           ),
         )}
       </View>
     );
-  };
-
-  const renderPieces = (collectionPieces: PublicPieceView[]) => {
-    if (layout === "editorial") return renderEditorial(collectionPieces);
-    if (layout === "masonry") return renderMasonry(collectionPieces);
-    return renderCatalog(collectionPieces);
   };
 
   return (
@@ -610,25 +556,12 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     opacity: 0.65,
   },
-  // Catalog: an even museum grid of identical 4:5 matted frames, two columns.
-  catalogWrap: { gap: 22, marginTop: 18 },
-  catalogRow: { flexDirection: "row", gap: 14 },
-  catalogCell: { flex: 1 },
-  catalogFrame: {
-    width: "100%",
-    aspectRatio: 4 / 5,
-    borderRadius: 10,
-    overflow: "hidden",
-    borderWidth: 1,
-    backgroundColor: "rgba(120,110,100,0.05)",
-  },
-  // Masonry: two independent columns packed by height so tiles stagger; landscape
-  // pieces break out full-width between column blocks.
-  masonryWrap: { gap: 16, marginTop: 18 },
-  masonryRow: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
-  masonryCol: { flex: 1, gap: 22 },
-  // Editorial layout: every piece stacked full-width.
-  editorialWrap: { gap: 20, marginTop: 14 },
+  // Signature gallery: two calm columns packed by height so tiles stagger gently;
+  // landscape pieces lift out into full-width exhibition plates. Generous,
+  // intentional spacing keeps the rhythm quiet rather than chaotic.
+  galleryWrap: { gap: 34, marginTop: 20 },
+  galleryRow: { flexDirection: "row", gap: 16, alignItems: "flex-start" },
+  galleryCol: { flex: 1, gap: 34 },
   tilePlaceholder: { alignItems: "center", justifyContent: "center" },
   empty: { alignItems: "center", paddingTop: 12, gap: 10 },
   emptyCircle: {

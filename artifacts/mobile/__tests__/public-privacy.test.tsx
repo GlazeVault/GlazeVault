@@ -173,7 +173,7 @@ jest.mock("@/context/ProfileContext", () => ({
       instagram: "",
       website: "",
       avatarUri: "",
-      publicSite: { homepageLayout: "grid", contactEmail: "", etsy: "", shopify: "" },
+      publicSite: { contactEmail: "", etsy: "", shopify: "" },
     },
   }),
   PUBLIC_SITE_DOMAIN: "glazevault.art",

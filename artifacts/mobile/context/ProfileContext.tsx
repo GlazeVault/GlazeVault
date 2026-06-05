@@ -7,11 +7,8 @@ import {
   saveProfile as saveProfileRemote,
 } from "@/services/dataService";
 
-export type HomepageLayout = "grid" | "editorial" | "masonry";
-
 export interface PublicSiteSettings {
   enabled: boolean;
-  homepageLayout: HomepageLayout;
   contactEmail: string;
   etsy: string;
   shopify: string;
@@ -19,17 +16,10 @@ export interface PublicSiteSettings {
 
 export const DEFAULT_PUBLIC_SITE: PublicSiteSettings = {
   enabled: false,
-  homepageLayout: "grid",
   contactEmail: "",
   etsy: "",
   shopify: "",
 };
-
-export const HOMEPAGE_LAYOUTS: { key: HomepageLayout; label: string; hint: string }[] = [
-  { key: "grid", label: "Catalog", hint: "Even, uniform archival grid" },
-  { key: "editorial", label: "Editorial", hint: "Large stacked features" },
-  { key: "masonry", label: "Masonry", hint: "Organic, staggered art-book flow" },
-];
 
 export interface ArtistProfile {
   name: string;
@@ -66,7 +56,6 @@ function normalizeProfile(raw: Partial<ArtistProfile>): ArtistProfile {
   const rawSite = (raw.publicSite ?? {}) as Partial<PublicSiteSettings>;
   const publicSite: PublicSiteSettings = {
     enabled: rawSite.enabled ?? DEFAULT_PUBLIC_SITE.enabled,
-    homepageLayout: rawSite.homepageLayout ?? DEFAULT_PUBLIC_SITE.homepageLayout,
     contactEmail: rawSite.contactEmail ?? DEFAULT_PUBLIC_SITE.contactEmail,
     etsy: rawSite.etsy ?? DEFAULT_PUBLIC_SITE.etsy,
     shopify: rawSite.shopify ?? DEFAULT_PUBLIC_SITE.shopify,
