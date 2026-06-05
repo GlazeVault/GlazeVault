@@ -22,7 +22,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
 import { ImportedText, pickAndExtractText, UnsupportedFileError } from "@/constants/importText";
-import { getPortfolioCollectionPieces, isCollectionPublic } from "@/constants/privacy";
+import {
+  getPortfolioCollectionPieces,
+  isCollectionPublic,
+  resolveGatedCover,
+} from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useAuth } from "@/context/AuthContext";
 import { useCollections } from "@/context/CollectionsContext";
@@ -524,8 +528,9 @@ export default function ProfileScreen() {
             <View style={styles.featuredList}>
               {featuredCollections.map((c) => {
                 const cp = getPortfolioCollectionPieces(c, pieces);
-                const coverUri =
-                  c.coverImageUri || cp.find((p) => p.imageUri)?.imageUri;
+                // Featured-gated cover: an artist cover set to an unfeatured/
+                // private piece must not represent the portfolio card.
+                const coverUri = resolveGatedCover(c, cp, pieces).coverUri;
                 return (
                   <Pressable
                     key={c.id}

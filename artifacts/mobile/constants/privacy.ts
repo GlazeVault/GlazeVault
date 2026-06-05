@@ -329,6 +329,62 @@ export function getPortfolioCollectionPieces<P extends PieceLike>(
 }
 
 /**
+ * Resolves the cover image (and the piece it should link to, if any) for a
+ * collection on a GATED surface — the curated Portfolio or a public collection.
+ *
+ * The leak this closes: a cover image can be picked FROM an in-collection piece,
+ * so an artist may set a collection's cover to a piece that is NOT curated for
+ * the surface (a public-but-unfeatured piece, or a private/archived one). Naively
+ * honoring `coverImageUri` would then surface that uncurated piece's artwork on a
+ * Portfolio/public view even though the piece is correctly filtered out of the
+ * grid — making it look like the piece is in the Portfolio. The cover must be
+ * gated by the SAME rule as the surface it sits on.
+ *
+ * The caller passes the already-gated `eligible` set for THAT surface (featured
+ * pieces for the Portfolio, publicly-visible pieces for a public collection) and
+ * the widest piece list it can see as `available`. The rule:
+ *
+ *  - A cover that matches an `eligible` piece is kept and made tappable to it.
+ *  - A dedicated uploaded cover (matches no piece, and is not a piece-storage
+ *    image) is kept — it represents the collection, not a piece — but stays
+ *    non-tappable.
+ *  - A cover pointing at an uncurated piece (present in `available` but not
+ *    `eligible`, or a piece-storage image not visible to this surface, e.g. a
+ *    private piece on a remote public view) is DROPPED and replaced by the first
+ *    eligible piece's image, so an uncurated piece can never represent the surface.
+ *
+ * Because each surface supplies its own `eligible` set, Portfolio covers and
+ * public-collection covers are filtered independently.
+ */
+export function resolveGatedCover<P extends PieceLike & { id: string }>(
+  collection: { coverImageUri?: string },
+  eligible: P[],
+  available: P[]
+): { coverUri: string | null; coverPieceId: string | null } {
+  const fallback = eligible.find((p) => !!p.imageUri) ?? null;
+  const cover = (collection.coverImageUri ?? "").trim();
+  if (cover) {
+    const eligibleMatch = eligible.find((p) => p.imageUri === cover);
+    if (eligibleMatch) {
+      return { coverUri: cover, coverPieceId: eligibleMatch.id };
+    }
+    const isKnownPiece = available.some((p) => p.imageUri === cover);
+    // A cover that matches no known piece AND is not a piece-storage image is a
+    // dedicated uploaded cover — safe. `pieces/` is the storage namespace for
+    // piece photos; covers upload to `collections/` (see uploadImage). Match the
+    // segment in both the remote URL form (`.../pieces/…`) and the native
+    // relative form (`pieces/…`, no leading slash). This net catches a private
+    // piece used as a cover on a remote public view, where the private piece is
+    // absent from `available` and so would otherwise slip past.
+    const isPieceImage = /(?:^|\/)pieces\//.test(cover);
+    if (!isKnownPiece && !isPieceImage) {
+      return { coverUri: cover, coverPieceId: null };
+    }
+  }
+  return { coverUri: fallback?.imageUri ?? null, coverPieceId: fallback?.id ?? null };
+}
+
+/**
  * The set of pieces the PUBLIC fullscreen viewer may swipe through, given the
  * piece the visitor opened and the collection context they came from (`fromId`).
  *

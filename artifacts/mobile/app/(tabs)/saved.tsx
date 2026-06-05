@@ -9,6 +9,7 @@ import {
   getPublicCollectionPieces,
   isCollectionPublic,
   isPubliclyVisiblePiece,
+  resolveGatedCover,
   toPublicPiece,
 } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
@@ -155,10 +156,14 @@ export default function SavedScreen() {
           <View style={styles.section}>
             <SectionTitle label="Collections" />
             {savedCollections.map((c) => {
-              const cover =
-                c.coverImageUri ||
-                getPublicCollectionPieces(c, pieces).find((p) => p.imageUri)?.imageUri ||
-                null;
+              // Public-collection thumbnail: gate the cover on publicly-visible
+              // pieces (separate from the featured Portfolio gate), so a cover
+              // set to a private/archived piece never shows here.
+              const cover = resolveGatedCover(
+                c,
+                getPublicCollectionPieces(c, pieces),
+                pieces,
+              ).coverUri;
               return (
                 <Pressable
                   key={`collection-${c.id}`}

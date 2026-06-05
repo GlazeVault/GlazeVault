@@ -16,6 +16,13 @@ On web (preview iframe), ImagePicker returns a `blob:` URI. `fetch(blob:)` FAILS
 **Fix pattern (must use for every web image picker):** call `launchImageLibraryAsync({ base64: Platform.OS === "web" })` and build a `data:` URI from `asset.base64` directly — never fetch the blob. Native still uses `persistPieceImage`.
 Cover upload also persists immediately via `updateCollection` (not deferred to Save). `uploadImage` skips http(s) URIs, so a later Save never re-uploads. `readImageBytes`/`uploadImage` both accept `data:` URIs.
 
+## Gated cover resolution (anti-leak)
+
+A cover can be picked FROM an in-collection piece, so on PUBLIC/PORTFOLIO surfaces the cover must pass the SAME gate as the grid, or an uncurated piece's artwork leaks onto the Portfolio (looks featured even though grids exclude it). Use `resolveGatedCover(collection, eligible, available)` in `constants/privacy.ts` for every gated cover; the four owner-org surfaces (`collection/[id].tsx` detail header, `(tabs)/collections.tsx` card) stay ungated — owner sees all.
+- Each surface passes its OWN `eligible` set → portfolio vs public-collection covers filtered SEPARATELY: public-site portfolio + profile preview pass featured (`getPortfolioCollectionPieces`); `saved.tsx` public-collection thumbnail passes publicly-visible (`getPublicCollectionPieces`).
+- Rule: cover matching an eligible piece is kept + tappable; a dedicated uploaded cover (matches no piece AND not a piece-storage image) is kept, non-tappable; a cover pointing at an uncurated piece is DROPPED to the first eligible piece image.
+- **Why the storage-namespace net:** on a REMOTE public view a private piece used as cover is absent from `available`, so it'd masquerade as an "uploaded" cover. Piece photos live in the `pieces/` namespace, covers in `collections/`; detect via `/(?:^|\/)pieces\//` to catch BOTH the remote URL form (`.../pieces/…`) and the native relative form (`pieces/…`, no leading slash).
+
 ## Public-site cover & grid layout
 - Public site must dedup the cover artwork from the grid (mirror collection detail): `gridPieces = coverUri ? cp.filter(p => p.imageUri !== coverUri) : cp`, render grid only when non-empty. Without this the cover repeats immediately below.
 - The grid below the cover is now the single signature monograph flow (see glazevault-public-layouts.md) — the old per-collection Catalog/Masonry/Editorial modes and `HomepageLayout` are GONE; do not look for `renderCatalog`/`homepageLayout`.

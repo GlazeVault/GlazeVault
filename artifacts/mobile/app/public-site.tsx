@@ -20,6 +20,7 @@ import {
   buildPublicMetaLine,
   getPortfolioCollectionPieces,
   isCollectionPublic,
+  resolveGatedCover,
   toPublicPiece,
   type PublicPieceView,
 } from "@/constants/privacy";
@@ -166,11 +167,12 @@ export default function PublicSiteScreen({
     .filter((c) => !onlyCollectionId || c.id === onlyCollectionId)
     .map((c) => {
       const cp = collectionPiecesFor(c, pieces).map(toPublicPiece);
-      // Prefer the artist-chosen cover. Otherwise fall back to a piece that has
-      // a photo.
-      const fallback = cp.find((p) => p.imageUri) ?? null;
-      const coverUri = c.coverImageUri || fallback?.imageUri || null;
-      const coverPieceId = c.coverImageUri ? null : (fallback?.id ?? null);
+      // Resolve the cover through the SAME featured gate as the grid: an
+      // artist-chosen cover is honored only when it is a featured piece or a
+      // dedicated uploaded cover — a cover pointing at an unfeatured/private
+      // piece is dropped to a featured piece so it can never leak onto the
+      // Portfolio. `pieces` (this surface's widest view) is the detection set.
+      const { coverUri, coverPieceId } = resolveGatedCover(c, cp, pieces);
       // Never repeat the cover artwork in the grid directly beneath it.
       const gridPieces = coverUri ? cp.filter((p) => p.imageUri !== coverUri) : cp;
       return { collection: c, pieces: cp, coverUri, coverPieceId, gridPieces };

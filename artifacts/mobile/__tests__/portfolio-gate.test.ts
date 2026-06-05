@@ -9,8 +9,10 @@
 import {
   enforceVisibilityInvariant,
   getPortfolioCollectionPieces,
+  getPublicCollectionPieces,
   getPublicSwipePieces,
   isPortfolioPiece,
+  resolveGatedCover,
 } from "@/constants/privacy";
 
 type Piece = Parameters<typeof isPortfolioPiece>[0] & { id: string };
@@ -156,5 +158,108 @@ describe("getPublicSwipePieces", () => {
     const pieces = [opened, makePiece({ id: "b", collectionIds: ["c1"] })];
     const result = getPublicSwipePieces(opened, pieces, collections, "c1");
     expect(result.map((p) => p.id)).toEqual(["a"]);
+  });
+});
+
+describe("resolveGatedCover (portfolio surface — featured gate)", () => {
+  const featured = makePiece({ id: "f", imageUri: "/pieces/featured.jpg" });
+  const unfeatured = makePiece({
+    id: "u",
+    imageUri: "/pieces/unfeatured.jpg",
+    featuredInPortfolio: false,
+  });
+  const eligible = getPortfolioCollectionPieces({ id: "c1" }, [featured, unfeatured]);
+  const available = [featured, unfeatured];
+
+  it("keeps a cover that is itself a featured piece and links to it", () => {
+    const out = resolveGatedCover(
+      { coverImageUri: "/pieces/featured.jpg" },
+      eligible,
+      available,
+    );
+    expect(out).toEqual({ coverUri: "/pieces/featured.jpg", coverPieceId: "f" });
+  });
+
+  it("drops a cover set to an unfeatured piece, falling back to a featured one", () => {
+    const out = resolveGatedCover(
+      { coverImageUri: "/pieces/unfeatured.jpg" },
+      eligible,
+      available,
+    );
+    expect(out).toEqual({ coverUri: "/pieces/featured.jpg", coverPieceId: "f" });
+  });
+
+  it("honors a dedicated uploaded cover (not a piece image), non-tappable", () => {
+    const out = resolveGatedCover(
+      { coverImageUri: "https://x/collections/cover.jpg" },
+      eligible,
+      available,
+    );
+    expect(out).toEqual({
+      coverUri: "https://x/collections/cover.jpg",
+      coverPieceId: null,
+    });
+  });
+
+  it("drops a private piece used as a cover even when absent from the visible set", () => {
+    // On a remote public view the private piece is not in `available`, so the
+    // pieces/ namespace net must still reject it rather than treat it as upload.
+    const out = resolveGatedCover(
+      { coverImageUri: "https://x/pieces/private.jpg" },
+      eligible,
+      available,
+    );
+    expect(out).toEqual({ coverUri: "/pieces/featured.jpg", coverPieceId: "f" });
+  });
+
+  it("drops a native relative piece path (no leading slash) used as a cover", () => {
+    // Native persists piece photos as `pieces/<name>` with no leading slash; the
+    // namespace net must catch that form too, not only the remote `/pieces/` URL.
+    const out = resolveGatedCover(
+      { coverImageUri: "pieces/private.jpg" },
+      eligible,
+      available,
+    );
+    expect(out).toEqual({ coverUri: "/pieces/featured.jpg", coverPieceId: "f" });
+  });
+
+  it("falls back to a featured piece when no cover is set", () => {
+    const out = resolveGatedCover({}, eligible, available);
+    expect(out).toEqual({ coverUri: "/pieces/featured.jpg", coverPieceId: "f" });
+  });
+});
+
+describe("resolveGatedCover (public-collection surface — visibility gate)", () => {
+  // Filtered SEPARATELY from the portfolio: an unfeatured-but-public piece is
+  // eligible here even though it is not on the portfolio.
+  const publicUnfeatured = makePiece({
+    id: "pu",
+    imageUri: "/pieces/pu.jpg",
+    featuredInPortfolio: false,
+  });
+  const privatePiece = makePiece({
+    id: "pr",
+    imageUri: "/pieces/pr.jpg",
+    isPublic: false,
+  });
+  const available = [publicUnfeatured, privatePiece];
+  const eligible = getPublicCollectionPieces({ id: "c1" }, available);
+
+  it("keeps a cover set to a public (unfeatured) piece on the public thumbnail", () => {
+    const out = resolveGatedCover(
+      { coverImageUri: "/pieces/pu.jpg" },
+      eligible,
+      available,
+    );
+    expect(out).toEqual({ coverUri: "/pieces/pu.jpg", coverPieceId: "pu" });
+  });
+
+  it("drops a cover set to a private piece, falling back to a public one", () => {
+    const out = resolveGatedCover(
+      { coverImageUri: "/pieces/pr.jpg" },
+      eligible,
+      available,
+    );
+    expect(out).toEqual({ coverUri: "/pieces/pu.jpg", coverPieceId: "pu" });
   });
 });
