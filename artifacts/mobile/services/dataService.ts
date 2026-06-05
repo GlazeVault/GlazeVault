@@ -536,15 +536,17 @@ export async function loadPublicProfileBySlug(
   const client = requireClient();
   // Slug is derived from the display name (no persisted unique slug column yet),
   // so two enabled profiles could in principle normalize to the same slug.
-  // Order by creation so resolution is DETERMINISTIC — a given public link
-  // always lands on the same (earliest-registered) artist rather than whichever
-  // row the backend happened to return first.
-  const { data, error } = await client
-    .from("profiles")
-    .select("*")
-    .order("created_at", { ascending: true });
+  // The profiles table has NO `created_at` column, so we must NOT order by it
+  // server-side — doing so makes PostgREST return a 400 that bubbles up as a
+  // failed public fetch ("Not on view") for every anonymous visitor. Instead we
+  // fetch the (RLS-restricted) rows and sort DETERMINISTICALLY in memory by the
+  // stable `user_id`, so a given public link always lands on the same artist
+  // rather than whichever row the backend happened to return first.
+  const { data, error } = await client.from("profiles").select("*");
   if (error) throw error;
-  const rows = (data as ProfileRow[]) ?? [];
+  const rows = [...((data as ProfileRow[]) ?? [])].sort((a, b) =>
+    (a.user_id ?? "").localeCompare(b.user_id ?? ""),
+  );
   const match = rows.find(
     (r) =>
       !!r.user_id &&
