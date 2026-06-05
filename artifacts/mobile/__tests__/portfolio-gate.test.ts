@@ -9,7 +9,6 @@
 import {
   enforceVisibilityInvariant,
   getPortfolioCollectionPieces,
-  getPublicCollectionPieces,
   getPublicSwipePieces,
   isPortfolioPiece,
   resolveGatedCover,
@@ -229,9 +228,12 @@ describe("resolveGatedCover (portfolio surface — featured gate)", () => {
   });
 });
 
-describe("resolveGatedCover (public-collection surface — visibility gate)", () => {
-  // Filtered SEPARATELY from the portfolio: an unfeatured-but-public piece is
-  // eligible here even though it is not on the portfolio.
+describe("resolveGatedCover (saved / public-collection surface — featured gate)", () => {
+  // The saved-exhibition thumbnail uses the SAME featured Portfolio gate as the
+  // public site, so a cover pointing at a non-featured (or private) piece is
+  // dropped to a featured one rather than pulling the uncurated piece in as the
+  // public collection's cover.
+  const featured = makePiece({ id: "f", imageUri: "/pieces/featured.jpg" });
   const publicUnfeatured = makePiece({
     id: "pu",
     imageUri: "/pieces/pu.jpg",
@@ -242,24 +244,24 @@ describe("resolveGatedCover (public-collection surface — visibility gate)", ()
     imageUri: "/pieces/pr.jpg",
     isPublic: false,
   });
-  const available = [publicUnfeatured, privatePiece];
-  const eligible = getPublicCollectionPieces({ id: "c1" }, available);
+  const available = [featured, publicUnfeatured, privatePiece];
+  const eligible = getPortfolioCollectionPieces({ id: "c1" }, available);
 
-  it("keeps a cover set to a public (unfeatured) piece on the public thumbnail", () => {
+  it("drops a cover set to a public-but-unfeatured piece, falling back to a featured one", () => {
     const out = resolveGatedCover(
       { coverImageUri: "/pieces/pu.jpg" },
       eligible,
       available,
     );
-    expect(out).toEqual({ coverUri: "/pieces/pu.jpg", coverPieceId: "pu" });
+    expect(out).toEqual({ coverUri: "/pieces/featured.jpg", coverPieceId: "f" });
   });
 
-  it("drops a cover set to a private piece, falling back to a public one", () => {
+  it("drops a cover set to a private piece, falling back to a featured one", () => {
     const out = resolveGatedCover(
       { coverImageUri: "/pieces/pr.jpg" },
       eligible,
       available,
     );
-    expect(out).toEqual({ coverUri: "/pieces/pu.jpg", coverPieceId: "pu" });
+    expect(out).toEqual({ coverUri: "/pieces/featured.jpg", coverPieceId: "f" });
   });
 });

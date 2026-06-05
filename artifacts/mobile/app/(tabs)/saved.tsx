@@ -6,7 +6,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-n
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  getPublicCollectionPieces,
+  getPortfolioCollectionPieces,
   isCollectionPublic,
   isPubliclyVisiblePiece,
   resolveGatedCover,
@@ -156,12 +156,15 @@ export default function SavedScreen() {
           <View style={styles.section}>
             <SectionTitle label="Collections" />
             {savedCollections.map((c) => {
-              // Public-collection thumbnail: gate the cover on publicly-visible
-              // pieces (separate from the featured Portfolio gate), so a cover
-              // set to a private/archived piece never shows here.
+              // Saved-exhibition thumbnail: gate the cover on the SAME featured
+              // Portfolio rule as the public site and profile preview. A cover
+              // pointing at a non-featured (or private/archived) piece is dropped
+              // to a featured piece, so an uncurated piece can never be pulled in
+              // as a public collection's cover here — only a featured piece or a
+              // dedicated uploaded cover represents the exhibition.
               const cover = resolveGatedCover(
                 c,
-                getPublicCollectionPieces(c, pieces),
+                getPortfolioCollectionPieces(c, pieces),
                 pieces,
               ).coverUri;
               return (
