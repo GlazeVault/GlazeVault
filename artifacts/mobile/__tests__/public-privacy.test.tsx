@@ -16,7 +16,13 @@
 import { render } from "@testing-library/react-native";
 import React from "react";
 
-import { buildPublicMetaLine, buildShareContent, toPublicPiece } from "@/constants/privacy";
+import {
+  buildAttributionHeadline,
+  buildLinkShareContent,
+  buildPublicMetaLine,
+  buildShareContent,
+  toPublicPiece,
+} from "@/constants/privacy";
 import type { Collection } from "@/context/CollectionsContext";
 import type { PotteryPiece } from "@/context/PotteryContext";
 
@@ -410,7 +416,7 @@ describe("sharing a piece exposes only the fixed allowed fields", () => {
   it("buildShareContent carries title + clay·dimensions·year + link, never owner-only data", () => {
     // Drive the REAL builder used by ShareSheet with a piece whose every field
     // (public AND owner-only) carries a unique sentinel.
-    const content = buildShareContent(makePiece("p1"), SHARE_URL);
+    const content = buildShareContent(makePiece("p1"), SHARE_URL, "Sang-Jeong Lee");
     const serialized = JSON.stringify(content);
 
     // Every allowed public field is present in the share content...
@@ -422,6 +428,11 @@ describe("sharing a piece exposes only the fixed allowed fields", () => {
     expect(content.message).toContain(SHARE_URL);
     expect(content.url).toBe(SHARE_URL);
     expect(content.title).toBe(PUBLIC_SENTINELS.title);
+    // ...and the attribution headline carries the artist + GlazeVault.
+    expect(content.headline).toBe(
+      `${PUBLIC_SENTINELS.title} — Sang-Jeong Lee on GlazeVault`,
+    );
+    expect(content.message).toContain("on GlazeVault");
 
     // ...and no owner-only field leaks into ANY part of the payload.
     for (const [field, value] of Object.entries(OWNER_ONLY_SENTINELS)) {
@@ -439,6 +450,45 @@ describe("sharing a piece exposes only the fixed allowed fields", () => {
     // (not a pre-projected piece) still drops every studio field.
     const content = buildShareContent(makePiece("p2"), SHARE_URL);
     assertNoOwnerOnly(content, "the share content");
+  });
+
+  // Attribution: sharing always points back to the ORIGINAL artist — a shared
+  // piece/collection/portfolio reads "… on GlazeVault" and names the artist, so
+  // it feels like recommending an exhibition, never reposting.
+  it("preserves artist attribution across piece, collection and portfolio shares", () => {
+    // Piece: "{Title} — {Artist} on GlazeVault".
+    const piece = buildShareContent(makePiece("p3"), SHARE_URL, "Sang-Jeong Lee");
+    expect(piece.headline).toBe(
+      `${PUBLIC_SENTINELS.title} — Sang-Jeong Lee on GlazeVault`,
+    );
+
+    // Collection (mini-exhibition): same attribution shape.
+    const collection = buildLinkShareContent(
+      "Memory of Clay",
+      SHARE_URL,
+      "A ceramic exhibition",
+      "Sang-Jeong Lee",
+    );
+    expect(collection.headline).toBe("Memory of Clay — Sang-Jeong Lee on GlazeVault");
+    expect(collection.message).toContain(SHARE_URL);
+
+    // Portfolio: the title IS the artist, so it collapses to "{Artist} on GlazeVault"
+    // rather than repeating the name.
+    const portfolio = buildLinkShareContent(
+      "Sang-Jeong Lee",
+      SHARE_URL,
+      "A ceramic portfolio",
+      "Sang-Jeong Lee",
+    );
+    expect(portfolio.headline).toBe("Sang-Jeong Lee on GlazeVault");
+
+    // Helper directly: no artist → no dangling "—".
+    expect(buildAttributionHeadline("Memory of Clay")).toBe(
+      "Memory of Clay on GlazeVault",
+    );
+    expect(buildAttributionHeadline("Memory of Clay", "Sang-Jeong Lee")).toBe(
+      "Memory of Clay — Sang-Jeong Lee on GlazeVault",
+    );
   });
 });
 

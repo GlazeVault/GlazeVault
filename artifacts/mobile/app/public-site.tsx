@@ -188,14 +188,16 @@ export default function PublicSiteScreen({
     : "";
   const shareContent = onlyCollectionId
     ? buildLinkShareContent(
-        heroCollectionTitle ? `${heroCollectionTitle} — Exhibition` : "Exhibition",
+        heroCollectionTitle || "Exhibition",
         collectionShareUrl(profile.name, onlyCollectionId),
         "A ceramic exhibition",
+        profile.name,
       )
     : buildLinkShareContent(
-        profile.name ? `${profile.name} — Portfolio` : "Portfolio",
+        profile.name || "Portfolio",
         portfolioShareUrl(profile.name),
         "A ceramic portfolio",
+        profile.name,
       );
 
   // A quiet, editorial caption beneath each piece: serif title + a single

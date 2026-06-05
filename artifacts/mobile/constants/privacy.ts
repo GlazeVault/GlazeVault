@@ -128,9 +128,37 @@ export function buildPublicMetaLine(piece: PublicMetaPiece): string {
 
 /** The text/payload produced when a piece is shared (copy-link, social, etc.). */
 export interface ShareContent {
+  /** Plain display title (piece/collection/artist name) — shown in the sheet. */
   title: string;
+  /**
+   * Attribution headline that travels with the share, e.g.
+   * "Memory of Clay — Sang-Jeong Lee on GlazeVault". Used as the native share
+   * subject/title and the first line of the message so the recipient always
+   * sees what the work is, whose archive it belongs to, and that it lives on
+   * GlazeVault — sharing is recommending an exhibition, never reposting.
+   */
+  headline: string;
   message: string;
   url: string;
+}
+
+/**
+ * Builds the attribution headline shared alongside a public link. Always
+ * preserves the original artist — "{Title} — {Artist} on GlazeVault" — so a
+ * shared piece/collection points back to whose archive it came from. When the
+ * title already IS the artist (a portfolio) or no artist is given, it collapses
+ * to "{Title} on GlazeVault" rather than repeating the name.
+ */
+export function buildAttributionHeadline(
+  title: string,
+  artistName?: string,
+): string {
+  const t = (title ?? "").trim() || "GlazeVault";
+  const a = (artistName ?? "").trim();
+  if (a && a.toLowerCase() !== t.toLowerCase()) {
+    return `${t} — ${a} on GlazeVault`;
+  }
+  return `${t} on GlazeVault`;
 }
 
 /**
@@ -151,15 +179,17 @@ export interface ShareContent {
 export function buildShareContent(
   piece: ProjectablePiece,
   shareUrl: string,
+  artistName?: string,
 ): ShareContent {
   const pub = toPublicPiece(piece);
   const title = (pub.title ?? "").trim() || "Untitled piece";
+  const headline = buildAttributionHeadline(title, artistName);
   const meta = buildPublicMetaLine(pub);
-  const message = [title, meta, (shareUrl ?? "").trim()]
+  const message = [headline, meta, (shareUrl ?? "").trim()]
     .map((v) => (v ?? "").trim())
     .filter(Boolean)
     .join("\n");
-  return { title, message, url: (shareUrl ?? "").trim() };
+  return { title, headline, message, url: (shareUrl ?? "").trim() };
 }
 
 /**
@@ -173,14 +203,16 @@ export function buildLinkShareContent(
   title: string,
   shareUrl: string,
   subtitle?: string,
+  artistName?: string,
 ): ShareContent {
   const cleanTitle = (title ?? "").trim() || "GlazeVault";
+  const headline = buildAttributionHeadline(cleanTitle, artistName);
   const url = (shareUrl ?? "").trim();
-  const message = [cleanTitle, (subtitle ?? "").trim(), url]
+  const message = [headline, (subtitle ?? "").trim(), url]
     .map((v) => v.trim())
     .filter(Boolean)
     .join("\n");
-  return { title: cleanTitle, message, url };
+  return { title: cleanTitle, headline, message, url };
 }
 
 // Minimal structural shapes the helpers need. Declared here (rather than

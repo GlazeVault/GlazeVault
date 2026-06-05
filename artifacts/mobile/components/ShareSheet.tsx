@@ -39,11 +39,14 @@ export function ShareSheet({ visible, onClose, content }: ShareSheetProps) {
       // carries the link), so the URL travels on both platforms.
       await Share.share(
         {
-          title: content.title,
+          // The attribution headline ("Title — Artist on GlazeVault") travels as
+          // the share title/subject and leads the message, so the recipient is
+          // recommended an exhibition with its original artist preserved.
+          title: content.headline,
           message: content.message,
           url: content.url,
         },
-        { subject: content.title },
+        { subject: content.headline },
       );
     } catch (e) {
       console.warn("Failed to open share sheet", e);

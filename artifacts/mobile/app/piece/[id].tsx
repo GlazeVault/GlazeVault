@@ -180,7 +180,7 @@ export default function PieceDetailScreen() {
         title: pub.title,
         materials: buildPublicMetaLine(pub),
         collection: publicCollectionName(p),
-        share: buildShareContent(pub, pieceShareUrl(profile.name, p.id)),
+        share: buildShareContent(pub, pieceShareUrl(profile.name, p.id), profile.name),
       };
     });
     pieceStartIndex = Math.max(
@@ -206,7 +206,7 @@ export default function PieceDetailScreen() {
       // When present, buildShareContent still projects through the public
       // allowlist, so even the owner's share carries no studio field.
       const share = isPubliclyVisiblePiece(p)
-        ? buildShareContent(p, pieceShareUrl(profile.name, p.id))
+        ? buildShareContent(p, pieceShareUrl(profile.name, p.id), profile.name)
         : undefined;
       ownerImagesOf(p).forEach((uri) => {
         items.push({ uri, title: p.title, materials, collection, share });
@@ -505,7 +505,7 @@ export default function PieceDetailScreen() {
         <ShareSheet
           visible={shareVisible}
           onClose={() => setShareVisible(false)}
-          content={buildShareContent(publicView, pieceShareUrl(profile.name, piece.id))}
+          content={buildShareContent(publicView, pieceShareUrl(profile.name, piece.id), profile.name)}
         />
 
         <ImageViewer
@@ -1044,7 +1044,7 @@ export default function PieceDetailScreen() {
         <ShareSheet
           visible={shareVisible}
           onClose={() => setShareVisible(false)}
-          content={buildShareContent(piece, pieceShareUrl(profile.name, piece.id))}
+          content={buildShareContent(piece, pieceShareUrl(profile.name, piece.id), profile.name)}
         />
       ) : null}
 

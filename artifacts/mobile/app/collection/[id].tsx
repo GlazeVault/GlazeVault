@@ -642,6 +642,7 @@ export default function CollectionDetailScreen() {
             collection.title,
             collectionShareUrl(profile.name, collection.id),
             profile.name ? `A collection by ${profile.name}` : "A ceramic collection",
+            profile.name,
           )}
         />
       ) : null}
