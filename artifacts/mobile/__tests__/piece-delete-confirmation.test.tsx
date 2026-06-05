@@ -53,6 +53,7 @@ let mockRouterParams: Record<string, string> = { id: "p1" };
 const mockBack = jest.fn();
 const mockDeletePiece = jest.fn();
 const mockRemovePieceFromCollection = jest.fn();
+const mockUpdatePiece = jest.fn();
 const mockConfirm = jest.fn((..._args: unknown[]) => Promise.resolve(mockConfirmResult));
 
 jest.mock("@/lib/confirm", () => ({
@@ -96,7 +97,7 @@ jest.mock("@/components/DraggablePhotoStrip", () => ({
 jest.mock("@/context/PotteryContext", () => ({
   usePottery: () => ({
     pieces: mockPieces,
-    updatePiece: jest.fn(),
+    updatePiece: mockUpdatePiece,
     toggleFavorite: jest.fn(),
     deletePiece: mockDeletePiece,
     addPieceToCollection: jest.fn(),
@@ -164,9 +165,11 @@ describe("piece detail destructive footer", () => {
     mockBack.mockClear();
     mockDeletePiece.mockClear();
     mockRemovePieceFromCollection.mockClear();
+    mockUpdatePiece.mockClear();
     mockConfirm.mockClear();
     mockConfirmResult = true;
     mockRouterParams = { id: "p1" };
+    mockPieces[0] = PIECE;
   });
 
   describe("delete piece (no collection context)", () => {
@@ -244,6 +247,57 @@ describe("piece detail destructive footer", () => {
       expect(mockDeletePiece).toHaveBeenCalledWith("p1");
       expect(mockRemovePieceFromCollection).not.toHaveBeenCalled();
       expect(mockBack).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("remove from portfolio (with `from=portfolio` context, featured)", () => {
+    beforeEach(() => {
+      mockRouterParams = { id: "p1", from: "portfolio" };
+      mockPieces[0] = { ...PIECE, featuredInPortfolio: true };
+    });
+
+    it("confirming turns off featured only and navigates back", async () => {
+      const PieceDetailScreen = require("@/app/piece/[id]").default;
+      const { getByText } = render(<PieceDetailScreen />);
+
+      await fireEvent.press(getByText("Remove from Portfolio"));
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(confirmTitle()).toBe("Remove from Portfolio");
+      expect(mockUpdatePiece).toHaveBeenCalledWith("p1", {
+        featuredInPortfolio: false,
+      });
+      expect(mockDeletePiece).not.toHaveBeenCalled();
+      expect(mockRemovePieceFromCollection).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not offer 'Remove from this Collection' in the portfolio context", () => {
+      const PieceDetailScreen = require("@/app/piece/[id]").default;
+      const { queryByText } = render(<PieceDetailScreen />);
+
+      expect(queryByText("Remove from this Collection")).toBeNull();
+      expect(queryByText("Delete Piece")).not.toBeNull();
+    });
+
+    it("hides 'Remove from Portfolio' when the piece is not featured", () => {
+      mockPieces[0] = { ...PIECE, featuredInPortfolio: false };
+      const PieceDetailScreen = require("@/app/piece/[id]").default;
+      const { queryByText } = render(<PieceDetailScreen />);
+
+      expect(queryByText("Remove from Portfolio")).toBeNull();
+    });
+  });
+
+  describe("archive context (no `from`)", () => {
+    it("shows neither contextual removal action, only Delete Piece", () => {
+      const PieceDetailScreen = require("@/app/piece/[id]").default;
+      const { queryByText } = render(<PieceDetailScreen />);
+
+      expect(queryByText("Remove from this Collection")).toBeNull();
+      expect(queryByText("Remove from Portfolio")).toBeNull();
+      expect(queryByText("Delete Piece")).not.toBeNull();
     });
   });
 });

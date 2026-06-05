@@ -67,6 +67,15 @@ export default function PieceDetailScreen() {
     immersive?: string;
   }>();
   const { id, from } = params;
+  // `from` is a context token set by whatever opened this screen:
+  //   - a collection id          → opened from that Collection
+  //   - the literal "portfolio"  → opened from the Portfolio / Featured context
+  //   - absent                   → opened from the Archive
+  // Collection-scoped logic (swipe set, caption, unlink) must treat the
+  // "portfolio" sentinel as "no collection", so derive a clean collection id
+  // and a portfolio flag the footer uses to pick the right contextual action.
+  const fromPortfolio = from === "portfolio";
+  const fromCollectionId = from && !fromPortfolio ? from : undefined;
   // When mounted under a `/[slug]/piece/[id]` route a PublicArtistProvider is
   // present, supplying ANOTHER artist's public archive. That makes this a public
   // view (owner controls hidden) and the data comes from the remote provider;
@@ -134,9 +143,11 @@ export default function PieceDetailScreen() {
       // exhibition; otherwise it spans portfolio pieces sharing any public
       // collection. The gate (isPortfolioPiece + isCollectionPublic) lives in
       // the selector, so a private/archived/unfeatured piece is never reachable.
-      return getPublicSwipePieces(piece, pieces, collections, from);
+      return getPublicSwipePieces(piece, pieces, collections, fromCollectionId);
     }
-    const scoped = from ? pieces.filter((p) => p.collectionIds.includes(from)) : pieces;
+    const scoped = fromCollectionId
+      ? pieces.filter((p) => p.collectionIds.includes(fromCollectionId))
+      : pieces;
     return scoped.some((p) => p.id === piece.id) ? scoped : [piece];
   })();
   // Collection name shown in the viewer caption. When opened from a collection we
@@ -144,8 +155,8 @@ export default function PieceDetailScreen() {
   // viewer only ever names a PUBLIC collection, so a private collection's name
   // never reaches a non-owner surface.
   const ownerCollectionName = (p: (typeof pieces)[number]): string => {
-    const target = from
-      ? collections.find((c) => c.id === from)
+    const target = fromCollectionId
+      ? collections.find((c) => c.id === fromCollectionId)
       : p.collectionIds
           .map((cid) => collections.find((c) => c.id === cid))
           .find(Boolean);
@@ -156,8 +167,8 @@ export default function PieceDetailScreen() {
     // piece belongs to it) so the caption matches the exhibition being browsed;
     // otherwise fall back to the piece's first public collection.
     const fromCollection =
-      from && p.collectionIds.includes(from)
-        ? collections.find((c) => c.id === from && isCollectionPublic(c))
+      fromCollectionId && p.collectionIds.includes(fromCollectionId)
+        ? collections.find((c) => c.id === fromCollectionId && isCollectionPublic(c))
         : undefined;
     if (fromCollection) return fromCollection.title;
     const target = p.collectionIds
@@ -283,7 +294,7 @@ export default function PieceDetailScreen() {
   // from its LAST collection auto-unfeatures it — a featured piece must live in a
   // collection — which is handled inside removePieceFromCollection.)
   const handleRemoveFromCollection = async () => {
-    if (!from) return;
+    if (!fromCollectionId) return;
     const confirmed = await confirm({
       title: "Remove from this Collection",
       message: `Remove "${piece.title}" from this collection? It will stay safely in your archive.`,
@@ -291,7 +302,23 @@ export default function PieceDetailScreen() {
     });
     if (!confirmed) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await removePieceFromCollection(from, piece.id);
+    await removePieceFromCollection(fromCollectionId, piece.id);
+    router.back();
+  };
+
+  // Remove from Portfolio = turn OFF featured only. The piece stays in the
+  // archive, stays in its collections, and its Public/private status is
+  // unchanged. Shown only when opened from the portfolio context.
+  const handleRemoveFromPortfolio = async () => {
+    if (!piece.featuredInPortfolio) return;
+    const confirmed = await confirm({
+      title: "Remove from Portfolio",
+      message: `Remove "${piece.title}" from your portfolio? It stays public and in your collections.`,
+      confirmText: "Remove",
+    });
+    if (!confirmed) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await updatePiece(piece.id, { featuredInPortfolio: false });
     router.back();
   };
 
@@ -1050,7 +1077,7 @@ export default function PieceDetailScreen() {
               </Text>
             </Pressable>
 
-            {from ? (
+            {fromCollectionId ? (
               <Pressable
                 style={({ pressed }) => [
                   styles.archiveLink,
@@ -1061,6 +1088,19 @@ export default function PieceDetailScreen() {
                 <Feather name="minus-circle" size={13} color={colors.mutedForeground} />
                 <Text style={[styles.archiveLinkText, { color: colors.mutedForeground }]}>
                   Remove from this Collection
+                </Text>
+              </Pressable>
+            ) : fromPortfolio && piece.featuredInPortfolio ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.archiveLink,
+                  { opacity: pressed ? 0.5 : 0.85 },
+                ]}
+                onPress={handleRemoveFromPortfolio}
+              >
+                <Feather name="star" size={13} color={colors.mutedForeground} />
+                <Text style={[styles.archiveLinkText, { color: colors.mutedForeground }]}>
+                  Remove from Portfolio
                 </Text>
               </Pressable>
             ) : null}
