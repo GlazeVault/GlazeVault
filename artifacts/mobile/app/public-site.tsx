@@ -1,8 +1,17 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -34,6 +43,10 @@ export default function PublicSiteScreen() {
   const { pieces } = usePottery();
   const { collections } = useCollections();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const { height: winHeight } = useWindowDimensions();
+  // A tall, cinematic portrait band sized off the viewport so it feels immersive
+  // without ever dominating the whole screen — clamped to a calm editorial range.
+  const portraitHeight = Math.max(440, Math.min(winHeight * 0.62, 640));
 
   const site = profile.publicSite;
 
@@ -207,26 +220,48 @@ export default function PublicSiteScreen() {
           { paddingTop: topPad + 64, paddingBottom: insets.bottom + 48 },
         ]}
       >
-        {/* Masthead */}
-        <Text style={[styles.eyebrow, { color: colors.emerald }]}>Portfolio</Text>
-        <View style={styles.masthead}>
+        {/* Editorial artist portrait — entering the artist's world before the work.
+            A large, full-bleed studio portrait that dissolves into the page via a
+            soft gradient, with the name and address breathing in the quiet below. */}
+        <View
+          style={[
+            styles.portraitWrap,
+            { height: portraitHeight, marginTop: -(topPad + 64), backgroundColor: colors.secondary },
+          ]}
+        >
           {profile.avatarUri ? (
-            <Image source={resolveImageSource(profile.avatarUri)} style={styles.avatar} contentFit="cover" />
+            <Image
+              source={resolveImageSource(profile.avatarUri)}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={280}
+              cachePolicy="memory-disk"
+            />
           ) : (
-            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.secondary }]}>
+            <View style={[StyleSheet.absoluteFill, styles.portraitPlaceholder]}>
               {initial ? (
-                <Text style={[styles.avatarInitial, { color: colors.foreground }]}>{initial}</Text>
+                <Text style={[styles.portraitInitial, { color: colors.mutedForeground }]}>{initial}</Text>
               ) : (
-                <Feather name="user" size={24} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
+                <Feather name="user" size={44} color={colors.mutedForeground} style={{ opacity: 0.3 }} />
               )}
             </View>
           )}
-          <Text style={[styles.name, { color: colors.foreground }]}>
-            {profile.name || "Your Studio"}
-          </Text>
-          <Text style={[styles.url, { color: colors.mutedForeground }]}>
-            {PUBLIC_SITE_DOMAIN}/{publicSiteSlug(profile.name)}
-          </Text>
+          {/* Soft fade so the portrait melts into the page rather than ending hard */}
+          <LinearGradient
+            pointerEvents="none"
+            colors={["transparent", "transparent", colors.background]}
+            locations={[0, 0.5, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.portraitCaption}>
+            <Text style={[styles.heroEyebrow, { color: colors.emerald }]}>Portfolio</Text>
+            <Text style={[styles.heroName, { color: colors.foreground }]}>
+              {profile.name || "Your Studio"}
+            </Text>
+            <Text style={[styles.heroUrl, { color: colors.mutedForeground }]}>
+              {PUBLIC_SITE_DOMAIN}/{publicSiteSlug(profile.name)}
+            </Text>
+          </View>
         </View>
 
         {profile.bio.trim() ? (
@@ -414,33 +449,37 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   previewPillText: { fontSize: 11, fontFamily: "Poppins_500Medium", letterSpacing: 0.4 },
-  eyebrow: {
+  portraitWrap: {
+    marginHorizontal: -28,
+    marginBottom: 34,
+    justifyContent: "flex-end",
+    overflow: "hidden",
+  },
+  portraitPlaceholder: { alignItems: "center", justifyContent: "center" },
+  portraitInitial: { fontSize: 88, fontFamily: "PlayfairDisplay_400Regular", opacity: 0.5 },
+  portraitCaption: {
+    paddingHorizontal: 28,
+    paddingBottom: 6,
+  },
+  heroEyebrow: {
     fontSize: 11,
     fontFamily: "Poppins_500Medium",
     letterSpacing: 2.5,
     textTransform: "uppercase",
-    marginBottom: 18,
-    textAlign: "center",
+    marginBottom: 14,
   },
-  masthead: { alignItems: "center", marginBottom: 22 },
-  avatar: { width: 92, height: 92, borderRadius: 46, marginBottom: 16 },
-  avatarPlaceholder: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  avatarInitial: { fontSize: 36, fontFamily: "PlayfairDisplay_400Regular" },
-  name: {
-    fontSize: 30,
+  heroName: {
+    fontSize: 40,
     fontFamily: "PlayfairDisplay_400Regular",
-    letterSpacing: 0.4,
-    lineHeight: 38,
-    textAlign: "center",
+    letterSpacing: 0.3,
+    lineHeight: 46,
   },
-  url: { fontSize: 12, fontFamily: "Poppins_300Light", letterSpacing: 0.3, marginTop: 6 },
+  heroUrl: {
+    fontSize: 12,
+    fontFamily: "Poppins_300Light",
+    letterSpacing: 0.3,
+    marginTop: 10,
+  },
   bioWrap: { marginBottom: 22 },
   bio: {
     fontSize: 15,

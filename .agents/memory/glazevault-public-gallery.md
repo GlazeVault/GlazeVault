@@ -22,7 +22,7 @@ The fullscreen `ImageViewer` swipe set on the piece-detail page is scoped differ
 
 **Why:** swiping is a back-door that can leak otherwise-hidden work AND a place
 where curation can break — once the public portfolio became featured-only
-(Task #37 / `getPortfolioCollectionPieces`), the swipe set had to match it, so the
+(via `getPortfolioCollectionPieces`), the swipe set had to match it, so the
 gate moved from `isPubliclyVisiblePiece` to the stricter `isPortfolioPiece`.
 Scoping by `collectionId` alone is NOT enough (a public collection can contain
 private/unfeatured pieces). `showPhotos` is NO LONGER a display gate (see below).
@@ -110,10 +110,25 @@ catalog feel. Do not move the intro back above the hero.
 
 **How to apply:** there is still NO standalone "Selected Works" piece feed
 (a regression test in __tests__/public-privacy.test.tsx asserts this). BUT the
-public homepage IS now curated/featured-only at the COLLECTION level (Task #37):
+public homepage IS now curated/featured-only at the COLLECTION level:
 each public collection shows only its `getPortfolioCollectionPieces` (gated by
 `isPortfolioPiece`), and a public collection with zero featured pieces is dropped
 entirely. So `isPortfolioPiece` is NOT owner-only anymore — it gates every public
 portfolio surface (collection grid, profile preview, swipe set). Do not reintroduce
 a flat cross-collection portfolio feed, and do not "downgrade" public surfaces back
 to `isPubliclyVisiblePiece` (that would expose public-but-unfeatured pieces).
+
+## Public-site editorial portrait hero (top of public portfolio)
+The public site opens with a large, full-bleed studio PORTRAIT hero (replaced the
+small circular avatar masthead): `portraitWrap` cancels the scroll's horizontal
+padding (`marginHorizontal:-28`) and pulls up under the floating buttons
+(`marginTop:-(topPad+64)`); height is viewport-driven
+(`max(440, min(winHeight*0.62, 640))`). The avatar Image fills via
+`StyleSheet.absoluteFill` + `contentFit="cover"`; a `LinearGradient`
+(`transparent→transparent→colors.background`, locations `[0,0.5,1]`) dissolves it
+into the page; caption (eyebrow "Portfolio" + serif name + URL) sits in the fade.
+**Why:** the brief was "artist monograph / gallery publication, not a profile
+header" — enter the artist's world before the work. **How to apply:** reuses the
+existing `profile.avatarUri` (no new portrait field/DB column); the gradient end
+color MUST equal `colors.background` or the melt shows a seam. Don't reintroduce
+the circular avatar.
