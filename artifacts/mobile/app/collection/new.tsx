@@ -20,13 +20,14 @@ import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
+import { confirm } from "@/lib/confirm";
 import { notice } from "@/lib/notice";
 
 export default function NewCollectionScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { addCollection, getCollection, updateCollection } = useCollections();
-  const { addPieceToCollection } = usePottery();
+  const { addPieceToCollection, getPiece, updatePiece } = usePottery();
   const { editId, attachPieceId } = useLocalSearchParams<{
     editId?: string;
     attachPieceId?: string;
@@ -99,11 +100,22 @@ export default function NewCollectionScreen() {
         visibility,
         coverImageUri: coverImageUri || undefined,
       });
-      // When opened from the post-save prompt, file the new piece into this
-      // freshly created collection. This is organization only — it does NOT
-      // publish or feature the piece.
+      // When opened with a piece to attach, file it into this freshly created
+      // collection. Collections are public-facing, so a private piece prompts to
+      // be made public first (no silent publish); declining skips the attach.
       if (attachPieceId) {
-        await addPieceToCollection(created.id, attachPieceId);
+        const target = getPiece(attachPieceId);
+        let proceed = true;
+        if (target && !target.isPublic) {
+          proceed = await confirm({
+            title: "Make this piece public?",
+            message:
+              "Collections are public-facing. Adding this piece will make it public so it can appear in your shared collections.",
+            confirmText: "Make Public",
+          });
+          if (proceed) await updatePiece(attachPieceId, { isPublic: true });
+        }
+        if (proceed) await addPieceToCollection(created.id, attachPieceId);
       }
     }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

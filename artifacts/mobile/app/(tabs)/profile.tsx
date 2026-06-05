@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { persistPieceImage } from "@/constants/imageStorage";
 import { ImportedText, pickAndExtractText, UnsupportedFileError } from "@/constants/importText";
-import { getFeaturedCollectionPieces, isCollectionPublic } from "@/constants/privacy";
+import { getPortfolioCollectionPieces, isCollectionPublic } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import {
@@ -68,7 +68,7 @@ export default function ProfileScreen() {
   // see: public collections that contain at least one FEATURED piece. A public
   // collection with nothing featured is dropped, exactly like the live site.
   const featuredCollections = collections.filter(
-    (c) => isCollectionPublic(c) && getFeaturedCollectionPieces(c, pieces).length > 0,
+    (c) => isCollectionPublic(c) && getPortfolioCollectionPieces(c, pieces).length > 0,
   );
   const site = profile.publicSite;
 
@@ -464,7 +464,7 @@ export default function ProfileScreen() {
           ) : (
             <View style={styles.featuredList}>
               {featuredCollections.map((c) => {
-                const cp = getFeaturedCollectionPieces(c, pieces);
+                const cp = getPortfolioCollectionPieces(c, pieces);
                 const coverUri =
                   c.coverImageUri || cp.find((p) => p.imageUri)?.imageUri;
                 return (

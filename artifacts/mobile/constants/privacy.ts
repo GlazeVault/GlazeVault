@@ -137,9 +137,22 @@ type CollectionLike = { id: string; visibility?: "public" | "private" };
  * surface still re-checks the relevant flag here so gating never depends on UI.
  */
 
-/** A piece on the curated Portfolio: featured, has a photo, not archived. */
+/**
+ * A piece on the curated Portfolio. Featuring is GATED: a piece can only belong
+ * to the portfolio when it is featured AND public AND filed in at least one
+ * collection (the portfolio is grouped by public collection), with a photo and
+ * not archived. This is the SINGLE source of truth for portfolio membership —
+ * every surface (badge, public site, swipe set) reads it, so a piece can never
+ * appear featured without meeting every condition.
+ */
 export function isPortfolioPiece(piece: PieceLike): boolean {
-  return !!piece.featuredInPortfolio && !!piece.imageUri && !piece.archived;
+  return (
+    !!piece.featuredInPortfolio &&
+    !!piece.isPublic &&
+    !piece.archived &&
+    !!piece.imageUri &&
+    (piece.collectionIds?.length ?? 0) > 0
+  );
 }
 
 /** A piece discoverable on any public, non-owner surface: public, photo, not archived. */
@@ -178,26 +191,16 @@ export function getPublicCollectionPieces<P extends PieceLike>(
 }
 
 /**
- * A piece that belongs on the curated public Portfolio: publicly visible AND
- * hand-picked via the "Feature in Portfolio" star. This is the single gate that
- * decides what a visitor sees on the portfolio — combine the public-visibility
- * and featured checks so the rule never depends on UI state.
+ * The curated portfolio pieces of a collection: members that pass the full
+ * portfolio gate (isPortfolioPiece — featured + public + collected + photo +
+ * not archived). A public collection with none of these yields an empty list,
+ * and its caller drops it from the portfolio entirely.
  */
-export function isFeaturedPublicPiece(piece: PieceLike): boolean {
-  return isPubliclyVisiblePiece(piece) && !!piece.featuredInPortfolio;
-}
-
-/**
- * The curated portfolio pieces of a collection: members that are BOTH publicly
- * visible and featured. This is the source of truth for what renders on the
- * public portfolio — a public collection with no featured pieces yields an
- * empty list (and is dropped from the portfolio by its caller).
- */
-export function getFeaturedCollectionPieces<P extends PieceLike>(
+export function getPortfolioCollectionPieces<P extends PieceLike>(
   collection: { id: string },
   pieces: P[]
 ): P[] {
   return pieces.filter(
-    (p) => (p.collectionIds ?? []).includes(collection.id) && isFeaturedPublicPiece(p)
+    (p) => (p.collectionIds ?? []).includes(collection.id) && isPortfolioPiece(p)
   );
 }

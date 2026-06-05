@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -20,7 +21,7 @@ import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
-import { chooseAction, notice } from "@/lib/notice";
+import { notice } from "@/lib/notice";
 
 function ChipSelector({
   options,
@@ -81,10 +82,35 @@ export default function AddScreen() {
   const [firingEnvironment, setFiringEnvironment] = useState("");
   const [dimensions, setDimensions] = useState("");
   const [year, setYear] = useState(String(new Date().getFullYear()));
-  const [collectionId, setCollectionId] = useState<string | undefined>(undefined);
+  const [isPublic, setIsPublic] = useState(false);
+  const [collectionIds, setCollectionIds] = useState<string[]>([]);
+  const [featured, setFeatured] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  // Progressive disclosure: a piece is Private by default; only a Public piece
+  // can be filed into collections, and only a collected public piece can be
+  // featured. Backing out of a step clears the steps it gates.
+  const togglePublic = () => {
+    setIsPublic((v) => {
+      const next = !v;
+      if (!next) {
+        setCollectionIds([]);
+        setFeatured(false);
+      }
+      return next;
+    });
+  };
+  const toggleCollection = (collectionId: string) => {
+    setCollectionIds((prev) => {
+      const next = prev.includes(collectionId)
+        ? prev.filter((c) => c !== collectionId)
+        : [...prev, collectionId];
+      if (next.length === 0) setFeatured(false);
+      return next;
+    });
+  };
 
   const handleSave = async () => {
     if (images.length === 0) {
@@ -107,33 +133,31 @@ export default function AddScreen() {
       return;
     }
     const storedCover = storedImages[coverIndex] ?? storedImages[0];
-    const created = await addPiece({ title: title.trim(), notes: notes.trim(), clay, glaze: glaze.trim(), firing: firingEnvironment, cone: cone.trim(), firingEnvironment, dimensions: dimensions.trim(), year: year.trim(), imageUri: storedCover, images: storedImages, collectionIds: collectionId ? [collectionId] : [] });
+    // The piece carries the choices made through the stepped flow. The portfolio
+    // gate is re-applied here so featuredInPortfolio can never be saved true for a
+    // piece that isn't both public and collected.
+    const canFeature = isPublic && collectionIds.length > 0;
+    await addPiece({
+      title: title.trim(),
+      notes: notes.trim(),
+      clay,
+      glaze: glaze.trim(),
+      firing: firingEnvironment,
+      cone: cone.trim(),
+      firingEnvironment,
+      dimensions: dimensions.trim(),
+      year: year.trim(),
+      imageUri: storedCover,
+      images: storedImages,
+      isPublic,
+      collectionIds: isPublic ? collectionIds : [],
+      featuredInPortfolio: canFeature && featured,
+    });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const wasUncollected = !collectionId;
-    setImages([]); setCoverIndex(0); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear())); setCollectionId(undefined);
+    setImages([]); setCoverIndex(0); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear()));
+    setIsPublic(false); setCollectionIds([]); setFeatured(false);
     setSaving(false);
     router.replace("/");
-    // Collections are purely organizational now (a piece's portfolio/public state
-    // is set on the piece itself). When the piece isn't in one yet, gently offer
-    // to file it into a series — Later is always fine.
-    if (wasUncollected) {
-      chooseAction(
-        "Add this piece to a Collection?",
-        "Collections help you organize your work into series and projects. You can always do this later.",
-        [
-          {
-            text: "Choose a Collection",
-            onPress: () => router.push({ pathname: "/piece/[id]", params: { id: created.id } }),
-          },
-          {
-            text: "Create New",
-            onPress: () =>
-              router.push({ pathname: "/collection/new", params: { attachPieceId: created.id } }),
-          },
-          { text: "Later", style: "cancel" },
-        ]
-      );
-    }
   };
 
   const Field = ({ value, onChange, placeholder, multiline = false }: {
@@ -211,49 +235,102 @@ export default function AddScreen() {
         <Label text="Notes" />
         <Field value={notes} onChange={setNotes} placeholder="Glaze recipe, firing notes, story…" multiline />
 
-        {collections.length > 0 && (
+        {/* Stepped disclosure: Private by default → Public unlocks Collections →
+            a collected public piece can be Featured in the Portfolio. */}
+        <Label text="Visibility" />
+        <Pressable
+          style={[
+            styles.toggleRow,
+            {
+              backgroundColor: isPublic ? "rgba(107,127,163,0.1)" : colors.secondary,
+              borderColor: isPublic ? "rgba(107,127,163,0.3)" : "rgba(120,110,100,0.16)",
+            },
+          ]}
+          onPress={togglePublic}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: isPublic }}
+          accessibilityLabel="Public"
+        >
+          <Feather name={isPublic ? "globe" : "lock"} size={14} color={isPublic ? colors.cobalt : colors.mutedForeground} />
+          <View style={styles.toggleLabels}>
+            <Text style={[styles.toggleTitle, { color: isPublic ? colors.cobalt : colors.foreground }]}>
+              {isPublic ? "Public" : "Private"}
+            </Text>
+            <Text style={[styles.toggleSub, { color: colors.mutedForeground }]}>
+              {isPublic ? "Viewable in your public collections and archive" : "Only you can see this piece"}
+            </Text>
+          </View>
+          <View style={[styles.visToggle, { backgroundColor: isPublic ? colors.cobalt : "rgba(120,110,100,0.18)" }]}>
+            <View style={[styles.visToggleThumb, { transform: [{ translateX: isPublic ? 18 : 2 }] }]} />
+          </View>
+        </Pressable>
+
+        {isPublic && (
           <>
-            <Label text="Collection" />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.chipRow}>
-                <Pressable
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: !collectionId ? colors.cobalt : "transparent",
-                      borderColor: !collectionId ? colors.cobalt : colors.border,
-                      borderRadius: 24,
-                    },
-                  ]}
-                  onPress={() => setCollectionId(undefined)}
-                >
-                  <Text style={[styles.chipText, { color: !collectionId ? "#FFFFFF" : colors.mutedForeground }]}>
-                    None
-                  </Text>
-                </Pressable>
-                {collections.map((col) => {
-                  const selected = collectionId === col.id;
-                  return (
-                    <Pressable
-                      key={col.id}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor: selected ? colors.cobalt : "transparent",
-                          borderColor: selected ? colors.cobalt : colors.border,
-                          borderRadius: 24,
-                        },
-                      ]}
-                      onPress={() => setCollectionId(selected ? undefined : col.id)}
-                    >
-                      <Text style={[styles.chipText, { color: selected ? "#FFFFFF" : colors.mutedForeground }]}>
-                        {col.title}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+            <Label text="Collections" />
+            {collections.length === 0 ? (
+              <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>
+                Create a collection from the Collections tab to group and feature this piece.
+              </Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.chipRow}>
+                  {collections.map((col) => {
+                    const selected = collectionIds.includes(col.id);
+                    return (
+                      <Pressable
+                        key={col.id}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: selected ? colors.cobalt : "transparent",
+                            borderColor: selected ? colors.cobalt : colors.border,
+                            borderRadius: 24,
+                          },
+                        ]}
+                        onPress={() => toggleCollection(col.id)}
+                      >
+                        <Text style={[styles.chipText, { color: selected ? "#FFFFFF" : colors.mutedForeground }]}>
+                          {col.title}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            )}
+          </>
+        )}
+
+        {isPublic && collectionIds.length > 0 && (
+          <>
+            <Label text="Portfolio" />
+            <Pressable
+              style={[
+                styles.toggleRow,
+                {
+                  backgroundColor: featured ? "rgba(107,139,122,0.1)" : colors.secondary,
+                  borderColor: featured ? "rgba(107,139,122,0.3)" : "rgba(120,110,100,0.16)",
+                },
+              ]}
+              onPress={() => setFeatured((v) => !v)}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: featured }}
+              accessibilityLabel="Feature in Portfolio"
+            >
+              <Feather name="star" size={14} color={featured ? colors.emerald : colors.mutedForeground} />
+              <View style={styles.toggleLabels}>
+                <Text style={[styles.toggleTitle, { color: featured ? colors.emerald : colors.foreground }]}>
+                  Feature in Portfolio
+                </Text>
+                <Text style={[styles.toggleSub, { color: colors.mutedForeground }]}>
+                  {featured ? "Hand-picked for your curated portfolio" : "Show this piece among your selected works"}
+                </Text>
               </View>
-            </ScrollView>
+              <View style={[styles.visToggle, { backgroundColor: featured ? colors.emerald : "rgba(120,110,100,0.18)" }]}>
+                <View style={[styles.visToggleThumb, { transform: [{ translateX: featured ? 18 : 2 }] }]} />
+              </View>
+            </Pressable>
           </>
         )}
 
@@ -305,4 +382,11 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, fontFamily: "Poppins_400Regular", letterSpacing: 0.2 },
   saveBtn: { paddingVertical: 18, alignItems: "center", marginTop: 36 },
   saveBtnText: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 1.5, textTransform: "uppercase" },
+  toggleRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 0.75, marginBottom: 4 },
+  toggleLabels: { flex: 1, gap: 2 },
+  toggleTitle: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
+  toggleSub: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
+  visToggle: { width: 42, height: 24, borderRadius: 12, justifyContent: "center" },
+  visToggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#FFFFFF" },
+  stepHint: { fontSize: 12, fontFamily: "Poppins_300Light", lineHeight: 18, paddingVertical: 4 },
 });

@@ -359,9 +359,15 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
       await persist(
         piecesRef.current.map((p) => {
           if (p.id === pieceId && p.collectionIds.includes(collectionId)) {
+            const collectionIds = p.collectionIds.filter((id) => id !== collectionId);
             changed = {
               ...p,
-              collectionIds: p.collectionIds.filter((id) => id !== collectionId),
+              collectionIds,
+              // A piece can only be featured from within a collection. Removing it
+              // from its last collection auto-unfeatures it, so the portfolio
+              // never holds an orphan featured piece.
+              featuredInPortfolio:
+                collectionIds.length === 0 ? false : p.featuredInPortfolio,
             };
             return changed;
           }

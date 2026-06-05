@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   buildPublicMetaLine,
-  getFeaturedCollectionPieces,
+  getPortfolioCollectionPieces,
   isCollectionPublic,
   toPublicPiece,
   type PublicPieceView,
@@ -48,7 +48,7 @@ export default function PublicSiteScreen() {
   const publicCollections = collections
     .filter(isCollectionPublic)
     .map((c) => {
-      const cp = getFeaturedCollectionPieces(c, pieces).map(toPublicPiece);
+      const cp = getPortfolioCollectionPieces(c, pieces).map(toPublicPiece);
       // Prefer the artist-chosen cover. Otherwise fall back to a piece that has
       // a photo.
       const fallback = cp.find((p) => p.imageUri) ?? null;

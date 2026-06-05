@@ -3,11 +3,11 @@
  * updatePiece *only* with the right archived flag, gated by the cross-platform
  * confirm() helper.
  *
- * The bug this guards: on web Alert.alert is a no-op, so the "Archive Piece"
+ * The bug this guards: on web Alert.alert is a no-op, so the "Retire Piece"
  * confirmation could silently never reach updatePiece. confirm() is mocked to a
  * controllable boolean so each test drives the confirmed vs. cancelled branch:
  *
- *   - not archived → footer reads "Archive piece" → confirm "Archive Piece" →
+ *   - not archived → footer reads "Retire piece" → confirm "Retire Piece" →
  *                    updatePiece(id, { archived: true })
  *   - cancelled    → updatePiece is never called
  *   - archived     → footer reads "Restore piece" → applies immediately
@@ -140,11 +140,11 @@ describe("piece detail archive toggle", () => {
       const PieceDetailScreen = require("@/app/piece/[id]").default;
       const { getByText } = render(<PieceDetailScreen />);
 
-      await fireEvent.press(getByText("Archive piece"));
+      await fireEvent.press(getByText("Retire piece"));
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(confirmTitle()).toBe("Archive Piece");
+      expect(confirmTitle()).toBe("Retire Piece");
       expect(mockUpdatePiece).toHaveBeenCalledWith("p1", { archived: true });
     });
 
@@ -153,11 +153,11 @@ describe("piece detail archive toggle", () => {
       const PieceDetailScreen = require("@/app/piece/[id]").default;
       const { getByText } = render(<PieceDetailScreen />);
 
-      await fireEvent.press(getByText("Archive piece"));
+      await fireEvent.press(getByText("Retire piece"));
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(confirmTitle()).toBe("Archive Piece");
+      expect(confirmTitle()).toBe("Retire Piece");
       expect(mockUpdatePiece).not.toHaveBeenCalled();
     });
   });

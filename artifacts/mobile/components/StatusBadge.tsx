@@ -10,7 +10,7 @@ import { useColors } from "@/hooks/useColors";
  * One quiet, icon-first status indicator for a piece, shared by every owner
  * surface (Archive grid, Collection grid) so the badge language reads
  * identically everywhere:
- *   archive  → Archived
+ *   archive  → Retired
  *   ☆ star   → Featured in Portfolio
  *   🌐 globe → Public
  *   🔒 lock  → Private
@@ -33,7 +33,7 @@ export function PieceStatusBadge({
   if (piece.archived) {
     icon = "archive";
     color = "#8A7B6C";
-    label = "Archived";
+    label = "Retired";
   } else if (isPortfolioPiece(piece)) {
     icon = "star";
     color = colors.emerald;

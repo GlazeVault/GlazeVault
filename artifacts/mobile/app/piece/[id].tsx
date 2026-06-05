@@ -22,11 +22,11 @@ import {
   buildPublicMetaLine,
   buildShareContent,
   isCollectionPublic,
-  isFeaturedPublicPiece,
   isPortfolioPiece,
   isPubliclyVisiblePiece,
   toPublicPiece,
 } from "@/constants/privacy";
+import { notice } from "@/lib/notice";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
@@ -115,10 +115,10 @@ export default function PieceDetailScreen() {
   // collection we stay within that collection; otherwise the whole archive.
   const galleryPieces = (() => {
     if (isPublicView) {
-      // Public gallery: swipe only across FEATURED, publicly visible pieces that
-      // share a PUBLIC collection with this one — i.e. exactly the pieces shown
-      // on the portfolio. Never reach a private/archived/unfeatured piece — that
-      // gate lives in isFeaturedPublicPiece + isCollectionPublic.
+      // Public gallery: swipe only across PORTFOLIO pieces (featured + public +
+      // collected) that share a PUBLIC collection with this one — i.e. exactly
+      // the pieces shown on the portfolio. Never reach a private/archived/
+      // unfeatured piece — that gate lives in isPortfolioPiece + isCollectionPublic.
       if (piece.collectionIds.length === 0) return [piece];
       const sharedPublicIds = piece.collectionIds.filter((cid) =>
         collections.some((c) => c.id === cid && isCollectionPublic(c)),
@@ -127,7 +127,7 @@ export default function PieceDetailScreen() {
       const siblings = pieces.filter(
         (p) =>
           p.collectionIds.some((cid) => sharedPublicIds.includes(cid)) &&
-          isFeaturedPublicPiece(p),
+          isPortfolioPiece(p),
       );
       return siblings.some((p) => p.id === piece.id) ? siblings : [piece];
     }
@@ -280,13 +280,25 @@ export default function PieceDetailScreen() {
     router.back();
   };
 
-  // Toggle membership of a single collection. Adding a piece to a collection is
-  // pure organization — it never auto-publishes or features the piece.
+  // Toggle membership of a single collection. Collections are public-facing, so
+  // adding a PRIVATE piece prompts to make it public first (no silent publish);
+  // declining aborts the add. Removing is always immediate.
   const handleToggleCollection = async (collectionId: string) => {
+    const isMember = piece.collectionIds.includes(collectionId);
+    if (!isMember && !piece.isPublic) {
+      const makePublic = await confirm({
+        title: "Make this piece public?",
+        message:
+          "Collections are public-facing. Adding this piece will make it public so it can appear in your shared collections.",
+        confirmText: "Make Public",
+      });
+      if (!makePublic) return;
+      await updatePiece(piece.id, { isPublic: true });
+    }
     setUpdatingCollection(true);
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      if (piece.collectionIds.includes(collectionId)) {
+      if (isMember) {
         await removePieceFromCollection(collectionId, piece.id);
       } else {
         await addPieceToCollection(collectionId, piece.id);
@@ -303,12 +315,24 @@ export default function PieceDetailScreen() {
   const isPublic = isPubliclyVisiblePiece(piece);
 
   const handleToggleFeature = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (piece.featuredInPortfolio) {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await updatePiece(piece.id, { featuredInPortfolio: false });
-    } else {
-      await updatePiece(piece.id, { featuredInPortfolio: true, isPublic: true });
+      return;
     }
+    // Gate: a piece can only be featured once it lives in at least one
+    // collection — the portfolio is grouped by public collection. Featuring also
+    // publishes the piece (Portfolio ⊆ Public).
+    if (piece.collectionIds.length === 0) {
+      notice({
+        title: "Add to a collection first",
+        message:
+          "Pieces are featured within a collection. Add this piece to a collection, then feature it.",
+      });
+      return;
+    }
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await updatePiece(piece.id, { featuredInPortfolio: true, isPublic: true });
   };
 
   const handleTogglePublic = async () => {
@@ -321,13 +345,13 @@ export default function PieceDetailScreen() {
   };
 
   const handleToggleArchive = async () => {
-    // Archiving hides a piece from the public site, so confirm it; restoring is
+    // Retiring hides a piece from the public site, so confirm it; restoring is
     // non-destructive and applies immediately.
     if (!piece.archived) {
       const confirmed = await confirm({
-        title: "Archive Piece",
-        message: `Archive "${piece.title}"? It will be hidden from your public portfolio but stays in your archive.`,
-        confirmText: "Archive",
+        title: "Retire Piece",
+        message: `Retire "${piece.title}"? It will be hidden from your public portfolio but stays in your archive.`,
+        confirmText: "Retire",
         destructive: true,
       });
       if (!confirmed) return;
@@ -556,7 +580,7 @@ export default function PieceDetailScreen() {
               <Feather name="archive" size={14} color={colors.mutedForeground} />
               <View style={styles.visibilityLabels}>
                 <Text style={[styles.visibilityTitle, { color: colors.foreground }]}>
-                  Archived
+                  Retired
                 </Text>
                 <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
                   Hidden from your portfolio and public site, but kept here
@@ -598,9 +622,11 @@ export default function PieceDetailScreen() {
                   <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
                     {!piece.imageUri
                       ? "Add a photo to feature this piece"
-                      : isFeatured
-                        ? "Hand-picked for your curated portfolio"
-                        : "Show this piece among your selected works"}
+                      : piece.collectionIds.length === 0
+                        ? "Add this piece to a collection to feature it"
+                        : isFeatured
+                          ? "Hand-picked for your curated portfolio"
+                          : "Show this piece among your selected works"}
                   </Text>
                 </View>
                 <View
@@ -808,7 +834,7 @@ export default function PieceDetailScreen() {
                 color={colors.mutedForeground}
               />
               <Text style={[styles.archiveLinkText, { color: colors.mutedForeground }]}>
-                {piece.archived ? "Restore piece" : "Archive piece"}
+                {piece.archived ? "Restore piece" : "Retire piece"}
               </Text>
             </Pressable>
 

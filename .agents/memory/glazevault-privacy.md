@@ -11,21 +11,24 @@ Collection (organization) and Portfolio (curation) are SEPARATE concerns.
 - **Portfolio** = a curated set chosen per-PIECE via `piece.featuredInPortfolio`.
 - Adding/removing a piece to/from a collection is PURE organization — it must NEVER change `isPublic`/`featuredInPortfolio`.
 
-## Piece flags + coupling (the invariant)
-`piece` has `featuredInPortfolio`, `isPublic`, `archived`. The toggles are kept coupled so **Portfolio ⊆ Public**:
-- Enable Feature → `{ featuredInPortfolio: true, isPublic: true }`.
+## Piece flags + GATE + coupling (the invariant)
+`piece` has `featuredInPortfolio`, `isPublic`, `collectionIds[]`, `archived`. Featuring is GATED — a piece is featurable ONLY IF `isPublic && collectionIds.length>0`. The toggles are kept coupled so **Portfolio ⊆ Public ⊆ collected**:
+- Enable Feature → requires ≥1 collection (else a `notice`, abort); on success `{ featuredInPortfolio: true, isPublic: true }`.
 - Disable Public → `{ isPublic: false, featuredInPortfolio: false }`.
-**Why:** a featured piece must always be publicly viewable; un-publishing must not leave a dangling featured-but-private piece. **How to apply:** any new surface that writes these two flags must preserve this coupling.
+- Remove from LAST collection (`collectionIds` becomes empty) → auto-unfeature. Centralized in `PotteryContext.removePieceFromCollection` so every caller inherits it.
+- Adding a PRIVATE piece to a collection → `confirm()` make-public first (no silent publish); decline aborts the add. Applies to piece detail add-branch AND `collection/new.tsx` attach.
+**Why:** a featured piece must always be publicly viewable AND grouped under a collection (Portfolio is rendered grouped by public collection); un-publishing or de-collecting must not leave a dangling featured piece. **How to apply:** any new surface that writes these flags must preserve the gate + coupling; enforcement is UI-path based (no central addPiece/updatePiece normalization), but render-time `isPortfolioPiece` gating prevents exposure of any legacy orphan-featured rows.
 
-`archived` excludes a piece from Portfolio AND every public surface, but keeps the data (no deletion). Minimal archive/restore action only; no separate browsing section.
+`archived` excludes a piece from Portfolio AND every public surface, but keeps the data (no deletion). UI label is **"Retire"/"Retired"** (the data field stays `archived`). Minimal retire/restore action only; no separate browsing section.
 
 ## Helper signatures (all single-arg, PIECE/COLLECTION only)
 In `constants/privacy.ts`:
-- `isPortfolioPiece(piece)` — featured + has image + not archived.
+- `isPortfolioPiece(piece)` — the SINGLE gate: `featuredInPortfolio && isPublic && !archived && !!imageUri && collectionIds.length>0`. Read by badge, public-site, profile preview, and the public swipe set.
+- `getPortfolioCollectionPieces(collection, pieces)` — members where `collectionIds.includes(collection.id) && isPortfolioPiece`.
 - `isPubliclyVisiblePiece(piece)` — public + has image + not archived. SINGLE source of truth for public gating (listings AND `/piece/[id]?public=1` preview).
 - `isCollectionPublic(collection)` — `collection.visibility === "public"`.
 - `getCollectionPieces(collection, pieces)` / `getPublicCollectionPieces(collection, pieces)` / `getPortfolioPieces(pieces)`.
-Do NOT reintroduce the old two-arg `isPubliclyVisiblePiece(piece, collections)` or any collection-driven publishing helper (`isCollectionInPortfolio`, `featuredOnSite`).
+Do NOT reintroduce the removed `isFeaturedPublicPiece` / `getFeaturedCollectionPieces`, the old two-arg `isPubliclyVisiblePiece(piece, collections)`, or any collection-driven publishing helper (`isCollectionInPortfolio`, `featuredOnSite`).
 
 ## Persistence (NO Supabase DDL — sandbox can't run it)
 - Piece flags `{collectionIds, featuredInPortfolio, isPublic, archived}` are stashed in the EXISTING `pieces.public_data_settings` jsonb column; `collection_id` keeps the first id for back-compat/fallback read. See `glazevault-supabase.md`.
