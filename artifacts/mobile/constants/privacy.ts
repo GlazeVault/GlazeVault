@@ -271,6 +271,24 @@ export function isCollectionPublic(collection: CollectionLike): boolean {
 }
 
 /**
+ * Enforces the Portfolio ⊆ Public invariant on a piece's stored flags: a piece
+ * can never be featured while it is private. A private piece is invisible to the
+ * public site, so a lingering `featuredInPortfolio: true` on a private piece is a
+ * confusing, illegal state. Applied centrally in the data layer (on load and on
+ * every update) so the invariant holds no matter the source — a toggle, the
+ * editor, archive, or a legacy/remote row — rather than depending on every call
+ * site to remember it. Returns a corrected copy only when needed.
+ */
+export function enforceVisibilityInvariant<
+  T extends { isPublic?: boolean; featuredInPortfolio?: boolean },
+>(piece: T): T {
+  if (!piece.isPublic && piece.featuredInPortfolio) {
+    return { ...piece, featuredInPortfolio: false };
+  }
+  return piece;
+}
+
+/**
  * Every piece that belongs to a collection (owner view). Membership is the
  * multi-collection `collectionIds` array. Archived pieces are NOT filtered here —
  * the owner still sees their full archive; public surfaces do the gating.

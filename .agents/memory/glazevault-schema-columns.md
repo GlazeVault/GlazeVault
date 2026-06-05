@@ -14,12 +14,20 @@ the same thing as DB columns.
 - `pieces.collection_ids text[]` — multi-collection membership.
 - `pieces.featured_in_portfolio`, `pieces.is_public`, `pieces.archived` — curation/discovery booleans.
   These replaced the repurposed JSON blob; they back `constants/privacy.ts` gating.
+- `pieces.image_urls text[]` — ordered multi-photo set (cover `image_url` is always a member).
 - `pieces.show_glaze_details`, `pieces.show_studio_notes` (boolean, default false) — per-piece
   public opt-ins for the glaze bucket / notes bucket (see glazevault-privacy.md). Added idempotently
-  in schema.sql. `savePiece` is RESILIENT: if these columns are missing on the live DB the upsert
-  fails (PGRST204 / 42703 naming the column), and it retries once WITHOUT them, warns, and the flags
-  then live only in the local cache until schema.sql is applied. So a fresh column may not be on the
-  live DB yet even though the app uses it.
+  in schema.sql.
+
+`savePiece` is RESILIENT via `OPTIONAL_PIECE_COLUMNS` = [`image_urls`, `show_glaze_details`,
+`show_studio_notes`]: if any are missing on the live DB the upsert fails (PGRST204 / 42703 naming the
+column), and a strip-and-retry LOOP drops EXACTLY the named column(s) (one per attempt) and retries,
+so the core piece — cover `image_url`, `is_public`, `featured_in_portfolio`, `collection_ids`,
+`user_id` — still saves and the write reaches Supabase (public link works); dropped values live only
+in the local cache until schema.sql is applied. **As of 2026-06-05 the live DB was missing
+`image_urls`** (only `show_*` were covered before, so EVERY save threw PGRST204 and stayed cache-only —
+that was the root cause of "saved on device but couldn't reach the cloud"). Core columns are
+deliberately NOT optional — their absence is a real error that must surface.
 
 **Retired (dropped from live DB + create-table; backfill+drop kept idempotent in schema.sql):**
 - `pieces.public_data_settings` (jsonb) — the old repurposed meta blob. Backfilled into the

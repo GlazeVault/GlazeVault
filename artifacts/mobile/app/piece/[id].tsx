@@ -403,7 +403,10 @@ export default function PieceDetailScreen() {
 
   // Owner Share button: gate on a live remote row, then open the sheet.
   const handleOpenShare = async () => {
-    if (await ensureShareable()) setShareVisible(true);
+    if (await ensureShareable()) {
+      console.log("[glazevault] share link", pieceShareUrl(profile.name, piece.id));
+      setShareVisible(true);
+    }
   };
 
   const handleToggleArchive = async () => {

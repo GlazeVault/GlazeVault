@@ -96,10 +96,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
+      console.log("[auth] initial session", data.session ? data.session.user.id : "none");
       setSession(data.session);
       setLoading(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      console.log("[auth] state change", event, next ? next.user.id : "none");
       setSession(next);
       setLoading(false);
     });

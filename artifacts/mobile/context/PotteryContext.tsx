@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { coalesceImages } from "@/constants/imageStorage";
+import { enforceVisibilityInvariant } from "@/constants/privacy";
 import { useAuth } from "@/context/AuthContext";
 import { isSupabaseConfigured } from "@/services/supabase";
 import {
@@ -163,7 +164,7 @@ function normalizePiece(
   const reconciled = coalesceImages(base.imageUri, base.images);
   base.imageUri = reconciled.imageUri;
   base.images = reconciled.images;
-  return base;
+  return enforceVisibilityInvariant(base);
 }
 
 export function PotteryProvider({ children }: { children: React.ReactNode }) {
@@ -206,28 +207,44 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   // of handing out a dead public link.
   const pushPieceRemote = useCallback(
     async (piece: PotteryPiece): Promise<boolean> => {
-      console.log("Saving piece images:", piece.id, piece.imageUri);
       const uid = userIdRef.current;
       if (!isSupabaseConfigured || !uid) return true;
-      try {
-        const saved = await savePieceRemote(piece, uid);
-        const imagesChanged =
-          saved.images.length !== piece.images.length ||
-          saved.images.some((uri, i) => uri !== piece.images[i]);
-        if (saved.imageUri !== piece.imageUri || imagesChanged) {
-          await persist(
-            piecesRef.current.map((p) =>
-              p.id === saved.id
-                ? { ...p, imageUri: saved.imageUri, images: saved.images }
-                : p
-            )
-          );
+      // Retry a transient cloud failure once before giving up — a brief network
+      // blip should not strand a piece in the local-only cache (which is what
+      // makes a freshly-published public link 404). This retries only the
+      // in-flight write; it is NOT a background sync queue.
+      const MAX_ATTEMPTS = 2;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          const saved = await savePieceRemote(piece, uid);
+          const imagesChanged =
+            saved.images.length !== piece.images.length ||
+            saved.images.some((uri, i) => uri !== piece.images[i]);
+          if (saved.imageUri !== piece.imageUri || imagesChanged) {
+            await persist(
+              piecesRef.current.map((p) =>
+                p.id === saved.id
+                  ? { ...p, imageUri: saved.imageUri, images: saved.images }
+                  : p
+              )
+            );
+          }
+          console.log("[glazevault] savePiece ok", piece.id);
+          return true;
+        } catch (e) {
+          if (attempt < MAX_ATTEMPTS) {
+            console.warn(
+              `[glazevault] savePiece attempt ${attempt} failed, retrying`,
+              e
+            );
+            await new Promise((resolve) => setTimeout(resolve, 600));
+            continue;
+          }
+          console.warn("[supabase] savePiece failed (kept in local cache)", e);
+          return false;
         }
-        return true;
-      } catch (e) {
-        console.warn("[supabase] savePiece failed (kept in local cache)", e);
-        return false;
       }
+      return false;
     },
     [persist]
   );
@@ -409,9 +426,20 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
             merged.firingEnvironment = firingEnvironment;
             merged.firing = firingEnvironment;
           }
+          // Going private must also drop the featured flag (see invariant above).
+          merged = enforceVisibilityInvariant(merged);
           return merged;
         })
       );
+      if (
+        merged &&
+        (updates.isPublic !== undefined || updates.featuredInPortfolio !== undefined)
+      ) {
+        console.log("[glazevault] updatePiece visibility", id, {
+          isPublic: merged.isPublic,
+          featuredInPortfolio: merged.featuredInPortfolio,
+        });
+      }
       return merged ? await pushPieceRemote(merged) : true;
     },
     [persist, pushPieceRemote]

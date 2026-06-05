@@ -7,6 +7,7 @@
  * this test guards the rule directly rather than per-surface.
  */
 import {
+  enforceVisibilityInvariant,
   getPortfolioCollectionPieces,
   getPublicSwipePieces,
   isPortfolioPiece,
@@ -49,6 +50,34 @@ describe("isPortfolioPiece gate", () => {
 
   it("rejects a piece without a photo", () => {
     expect(isPortfolioPiece(makePiece({ imageUri: undefined }))).toBe(false);
+  });
+});
+
+describe("enforceVisibilityInvariant", () => {
+  it("drops the featured flag on a private piece (Portfolio ⊆ Public)", () => {
+    expect(
+      enforceVisibilityInvariant({ isPublic: false, featuredInPortfolio: true })
+    ).toEqual({ isPublic: false, featuredInPortfolio: false });
+  });
+
+  it("leaves a featured public piece untouched", () => {
+    const piece = { isPublic: true, featuredInPortfolio: true };
+    expect(enforceVisibilityInvariant(piece)).toBe(piece);
+  });
+
+  it("leaves an unfeatured private piece untouched", () => {
+    const piece = { isPublic: false, featuredInPortfolio: false };
+    expect(enforceVisibilityInvariant(piece)).toBe(piece);
+  });
+
+  it("preserves the other fields when correcting", () => {
+    const piece = { id: "p1", isPublic: false, featuredInPortfolio: true, title: "Bowl" };
+    expect(enforceVisibilityInvariant(piece)).toEqual({
+      id: "p1",
+      isPublic: false,
+      featuredInPortfolio: false,
+      title: "Bowl",
+    });
   });
 });
 

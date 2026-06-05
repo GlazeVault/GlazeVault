@@ -170,6 +170,18 @@ function isMissingColumnError(
   return columns.some((c) => message.includes(c));
 }
 
+// Columns added by later schema.sql migrations that a deployed database may not
+// have yet. `savePiece` strips any that are reported missing (one per upsert
+// attempt) so the core piece still persists; the dropped values stay in the
+// local cache until supabase/schema.sql is applied. Core columns (image_url,
+// is_public, featured_in_portfolio, collection_ids, user_id) are NOT listed —
+// their absence is a real error that must surface.
+const OPTIONAL_PIECE_COLUMNS: (keyof PieceRow)[] = [
+  "image_urls",
+  "show_glaze_details",
+  "show_studio_notes",
+];
+
 function pieceToRow(p: PotteryPiece, userId: string): PieceRow {
   return {
     id: p.id,
@@ -268,27 +280,37 @@ export async function savePiece(
     imageUri: uploadedCover,
     images: uploadedImages,
   };
-  // Persist. The per-piece public-exposure flags (show_glaze_details /
-  // show_studio_notes) are newer columns; if a database predates the migration
-  // the upsert fails with a missing-column error. We retry once without those
-  // keys so saving never breaks — the flags then live only in the local cache
-  // until supabase/schema.sql is applied.
+  // Persist. Some columns are newer than the deployed schema may be
+  // (OPTIONAL_PIECE_COLUMNS); the strip-and-retry loop below keeps saving working
+  // on a database that predates a migration — see its comment for details.
   const row = pieceToRow(toSave, userId);
-  let { error } = await client.from("pieces").upsert(row);
-  if (error && isMissingColumnError(error, ["show_glaze_details", "show_studio_notes"])) {
-    // Degraded mode: the database predates the migration. We retry without the
-    // two flag columns so the rest of the piece still saves, but warn loudly —
-    // the flags now live ONLY in the local cache and a remote-wins reload will
-    // revert them to false. Applying supabase/schema.sql clears this path.
+  const attempt = { ...row };
+  let { error } = await client.from("pieces").upsert(attempt);
+  // Degraded mode: a database that predates a column migration rejects the
+  // upsert with a missing-column error (PGRST204 / 42703) naming ONE column at a
+  // time. We strip exactly the column named, then retry — looping so multiple
+  // missing columns are handled, and only dropping what is actually absent (a DB
+  // that has `show_*` but lacks `image_urls` keeps its flags). The piece's core
+  // fields — including the cover `image_url`, `is_public`, and
+  // `featured_in_portfolio` — still save, so the write reaches Supabase and the
+  // public link works; the dropped columns live only in the local cache until
+  // supabase/schema.sql is applied.
+  const dropped: (keyof PieceRow)[] = [];
+  while (error) {
+    const missing = OPTIONAL_PIECE_COLUMNS.find(
+      (c) => !dropped.includes(c) && isMissingColumnError(error, [c]),
+    );
+    if (!missing) break;
+    delete (attempt as Partial<PieceRow>)[missing];
+    dropped.push(missing);
+    ({ error } = await client.from("pieces").upsert(attempt));
+  }
+  if (dropped.length) {
     console.warn(
-      "[supabase] pieces table is missing show_glaze_details/show_studio_notes; " +
-        "saved without per-piece public-visibility flags. Apply supabase/schema.sql " +
+      `[supabase] pieces table is missing column(s) ${dropped.join(", ")}; ` +
+        "saved without them (kept in local cache only). Apply supabase/schema.sql " +
         "to persist them.",
     );
-    const legacyRow = { ...row };
-    delete (legacyRow as Partial<PieceRow>).show_glaze_details;
-    delete (legacyRow as Partial<PieceRow>).show_studio_notes;
-    ({ error } = await client.from("pieces").upsert(legacyRow));
   }
   if (error) throw error;
   return toSave;

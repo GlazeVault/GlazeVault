@@ -582,7 +582,10 @@ export default function PublicSiteScreen({
           {site.enabled ? (
             <Pressable
               style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
-              onPress={() => setShareVisible(true)}
+              onPress={() => {
+                console.log("[glazevault] share link", shareContent.url);
+                setShareVisible(true);
+              }}
             >
               <Feather name="share-2" size={16} color="#8A7B6C" />
             </Pressable>

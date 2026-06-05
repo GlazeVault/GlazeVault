@@ -1,0 +1,81 @@
+Fix GlazeVault public sharing, portfolio visibility, and cloud sync logic.
+
+Current issues found during mobile testing:
+
+1. Public link issue
+- A piece has Public ON, but shared public link shows:
+  “Not on view — This page is private or no longer part of a public exhibition.”
+
+2. Cloud sync issue
+- App shows:
+  “Couldn't publish. This piece was saved on this device but couldn't reach the cloud...”
+- Need to ensure the piece is actually saved and updated in Supabase.
+
+3. Visibility logic issue
+- A piece can be Private while still Featured in Portfolio.
+- This is confusing and should not be allowed.
+
+Please fix all related logic without changing visual design.
+
+Requirements:
+
+A. Cloud sync
+1. Verify Supabase client works on real iPhone / Expo environment.
+2. Verify authenticated users can:
+   - create pieces
+   - update pieces
+   - toggle `is_public`
+   - toggle `featured_in_portfolio`
+3. Verify writes actually reach Supabase.
+4. Add console logging for:
+   - auth state
+   - savePiece()
+   - updatePiece()
+   - publishPiece()
+   - share link generation
+5. Verify env variables:
+   - SUPABASE_URL
+   - SUPABASE_ANON_KEY
+6. Add retry handling for temporary cloud failures.
+7. Make local draft state sync back to cloud after reconnecting.
+
+B. Public sharing
+1. Verify `is_public` is saved correctly.
+2. Public route must fetch public pieces without login.
+3. RLS policies should allow public read access only for:
+   - pieces where `is_public = true`
+   - collections where `is_public = true`
+4. Share button must copy the correct live URL.
+5. Public preview and public shared page must use the same visibility logic.
+6. Public ON → shared link visible publicly.
+7. Public OFF → shared link hidden.
+8. Keep glaze recipes and private studio notes hidden from public view.
+
+C. Portfolio logic
+1. Private pieces can NEVER appear in:
+   - public portfolio
+   - public collections
+   - public profile
+   - featured works
+2. If a piece is switched to Private:
+   - automatically disable `featured_in_portfolio`
+   - remove from all public surfaces
+3. `featured_in_portfolio` should only be available when `is_public = true`.
+4. If user tries to feature a private piece:
+   - disable the toggle
+   OR show subtle explanatory text.
+5. Public visibility hierarchy should be:
+   - Private = only owner can see
+   - Public = can appear in public collection/archive
+   - Featured = highlighted in portfolio, only if Public
+
+D. Public portfolio site
+1. Profile shows:
+   `glazevault.art/sang-jeong-lee`
+2. Ensure that route actually opens public portfolio without login.
+3. If custom domain is not connected yet, use current Replit public URL as fallback.
+4. Public collections should display correctly.
+5. Only public pieces should display.
+
+Do not redesign UI.
+Focus only on backend, Supabase, visibility, sharing, and sync reliability.
