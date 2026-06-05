@@ -1,5 +1,3 @@
-import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -7,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { PieceStatusBadge } from "@/components/StatusBadge";
 import { resolveImageSource } from "@/constants/seedImages";
-import { PotteryPiece, usePottery } from "@/context/PotteryContext";
+import { PotteryPiece } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
 interface PotteryCardProps {
@@ -37,7 +35,6 @@ export function PotteryCard({
   initialAspectRatio,
 }: PotteryCardProps) {
   const colors = useColors();
-  const { toggleFavorite } = usePottery();
 
   // Preserve each pot's natural silhouette. Start at the editorial 4:5 ratio as a
   // graceful placeholder while the image measures, then relax to the image's true
@@ -47,11 +44,6 @@ export function PotteryCard({
   const [aspectRatio, setAspectRatio] = useState(
     preserveAspectRatio && initialAspectRatio ? initialAspectRatio : 4 / 5,
   );
-
-  const handleFavorite = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await toggleFavorite(piece.id);
-  };
 
   // Owner archive metadata is drawn from the piece's own data and is shown only
   // on private owner surfaces. Order: clay body · glaze name · cone · firing
@@ -117,18 +109,6 @@ export function PotteryCard({
         />
       </View>
 
-      <Pressable
-        style={[styles.favoriteBtn]}
-        onPress={handleFavorite}
-        hitSlop={10}
-      >
-        <Feather
-          name="heart"
-          size={16}
-          color={piece.isFavorite ? colors.primary : colors.mutedForeground}
-        />
-      </Pressable>
-
       {showVisibility ? <PieceStatusBadge piece={piece} /> : null}
 
       <View style={styles.info}>
@@ -156,17 +136,6 @@ const styles = StyleSheet.create({
     aspectRatio: 4 / 5,
     borderRadius: 24,
     overflow: "hidden",
-  },
-  favoriteBtn: {
-    position: "absolute",
-    top: 14,
-    right: 14,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(253,250,245,0.82)",
-    alignItems: "center",
-    justifyContent: "center",
   },
   info: {
     paddingTop: 14,

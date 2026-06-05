@@ -67,7 +67,6 @@ export default function PieceDetailScreen() {
   const {
     pieces,
     updatePiece,
-    toggleFavorite,
     deletePiece,
     addPieceToCollection,
     removePieceFromCollection,
@@ -244,11 +243,6 @@ export default function PieceDetailScreen() {
     // Cover identity is preserved by URI, so order can shuffle freely while the
     // same photo stays the cover.
     await updatePiece(piece.id, { imageUri: piece.imageUri, images: next });
-  };
-
-  const handleFavorite = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await toggleFavorite(piece.id);
   };
 
   const handleDelete = async () => {
@@ -521,16 +515,6 @@ export default function PieceDetailScreen() {
           <Feather name="arrow-left" size={18} color="#8A7B6C" />
         </Pressable>
         <View style={styles.topRight}>
-          <Pressable
-            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
-            onPress={handleFavorite}
-          >
-            <Feather
-              name="heart"
-              size={18}
-              color={piece.isFavorite ? colors.primary : colors.mutedForeground}
-            />
-          </Pressable>
           <Pressable
             style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
             onPress={() => setShareVisible(true)}

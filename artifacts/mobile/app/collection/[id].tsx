@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
@@ -94,7 +93,6 @@ function GalleryTile({
   fromCollectionId: string;
   colors: TileColors;
 }) {
-  const { toggleFavorite } = usePottery();
   const scale = useSharedValue(1);
 
   const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -104,11 +102,6 @@ function GalleryTile({
   // Keep the gallery quiet: show just the essentials (material · cone). The
   // full firing details live on the piece detail page.
   const meta = [piece.clay, piece.cone].filter(Boolean).join("  ·  ");
-
-  const handleFavorite = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await toggleFavorite(piece.id);
-  };
 
   return (
     <AnimatedPressable
@@ -136,13 +129,6 @@ function GalleryTile({
           recyclingKey={piece.id}
         />
         <PieceStatusBadge piece={piece} />
-        <Pressable style={styles.tileFav} onPress={handleFavorite} hitSlop={10}>
-          <Feather
-            name="heart"
-            size={14}
-            color={piece.isFavorite ? colors.primary : colors.mutedForeground}
-          />
-        </Pressable>
       </View>
       <View style={styles.tileInfo}>
         <Text
@@ -1006,17 +992,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "rgba(120,110,100,0.06)",
-  },
-  tileFav: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(253,250,245,0.82)",
   },
   tileInfo: { paddingTop: 12, paddingHorizontal: 2, gap: 5 },
   tileTitleLg: {
