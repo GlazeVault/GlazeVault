@@ -23,6 +23,8 @@ export interface Collection {
 
 interface CollectionsContextType {
   collections: Collection[];
+  /** True once the initial cache + Supabase load has settled. */
+  hydrated: boolean;
   addCollection: (
     c: Omit<Collection, "id" | "createdAt" | "visibility"> & {
       visibility?: "public" | "private";
@@ -38,6 +40,7 @@ const STORAGE_KEY = "@glazevault_collections_v1";
 
 export function CollectionsProvider({ children }: { children: React.ReactNode }) {
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [hydrated, setHydrated] = useState(false);
   // Mirror of the latest collections so rapid successive writes merge against
   // fresh state instead of a stale render closure (prevents toggles/edits from
   // clobbering each other).
@@ -148,6 +151,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
           console.warn("[supabase] loadCollections failed, using local cache", e);
         }
       }
+      setHydrated(true);
     })();
   }, [persist, pushCollectionRemote]);
 
@@ -200,7 +204,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
 
   return (
     <CollectionsContext.Provider
-      value={{ collections, addCollection, updateCollection, deleteCollection, getCollection }}
+      value={{ collections, hydrated, addCollection, updateCollection, deleteCollection, getCollection }}
     >
       {children}
     </CollectionsContext.Provider>

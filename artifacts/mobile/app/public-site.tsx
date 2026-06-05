@@ -18,6 +18,7 @@ import {
   buildLinkShareContent,
   buildPublicMetaLine,
   getPortfolioCollectionPieces,
+  getPublicCollectionPieces,
   isCollectionPublic,
   toPublicPiece,
   type PublicPieceView,
@@ -27,6 +28,7 @@ import { ShareSheet } from "@/components/ShareSheet";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import {
+  collectionShareUrl,
   portfolioShareUrl,
   PUBLIC_SITE_DOMAIN,
   publicSiteSlug,
@@ -39,7 +41,10 @@ import {
   useImageOrientations,
 } from "@/hooks/useImageOrientations";
 
-export default function PublicSiteScreen() {
+export default function PublicSiteScreen({
+  live = false,
+  onlyCollectionId,
+}: { live?: boolean; onlyCollectionId?: string } = {}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
@@ -59,10 +64,18 @@ export default function PublicSiteScreen() {
   // artist has consciously featured appear (focus). A public collection with no
   // featured pieces is dropped entirely; with nothing featured the portfolio
   // reads intentionally empty.
+  // The portfolio shows public collections × their FEATURED pieces (curated).
+  // A single collection page (`onlyCollectionId`) instead scopes to that one
+  // collection and shows ALL its publicly-visible pieces, since the visitor came
+  // specifically to see that exhibition.
+  const collectionPiecesFor = onlyCollectionId
+    ? getPublicCollectionPieces
+    : getPortfolioCollectionPieces;
   const publicCollections = collections
     .filter(isCollectionPublic)
+    .filter((c) => !onlyCollectionId || c.id === onlyCollectionId)
     .map((c) => {
-      const cp = getPortfolioCollectionPieces(c, pieces).map(toPublicPiece);
+      const cp = collectionPiecesFor(c, pieces).map(toPublicPiece);
       // Prefer the artist-chosen cover. Otherwise fall back to a piece that has
       // a photo.
       const fallback = cp.find((p) => p.imageUri) ?? null;
@@ -91,6 +104,25 @@ export default function PublicSiteScreen() {
   if (site.shopify.trim()) links.push({ icon: "shopping-cart", label: site.shopify.trim() });
 
   const initial = profile.name.trim().charAt(0).toUpperCase();
+
+  // The share payload follows what the page actually is: a single-collection
+  // page shares that collection (a mini-exhibition); otherwise the whole
+  // portfolio. Both build on the env-driven public base URL so the link
+  // resolves to the live host.
+  const heroCollectionTitle = onlyCollectionId
+    ? (publicCollections[0]?.collection.title ?? "")
+    : "";
+  const shareContent = onlyCollectionId
+    ? buildLinkShareContent(
+        heroCollectionTitle ? `${heroCollectionTitle} — Exhibition` : "Exhibition",
+        collectionShareUrl(profile.name, onlyCollectionId),
+        "A ceramic exhibition",
+      )
+    : buildLinkShareContent(
+        profile.name ? `${profile.name} — Portfolio` : "Portfolio",
+        portfolioShareUrl(profile.name),
+        "A ceramic portfolio",
+      );
 
   // A quiet, editorial caption beneath each piece: serif title + a single
   // whispered metadata line built via the shared buildPublicMetaLine helper, so
@@ -258,7 +290,9 @@ export default function PublicSiteScreen() {
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.portraitCaption}>
-            <Text style={[styles.heroEyebrow, { color: colors.emerald }]}>Portfolio</Text>
+            <Text style={[styles.heroEyebrow, { color: colors.emerald }]}>
+              {onlyCollectionId ? "Exhibition" : "Portfolio"}
+            </Text>
             <Text style={[styles.heroName, { color: colors.foreground }]}>
               {profile.name || "Your Studio"}
             </Text>
@@ -404,14 +438,21 @@ export default function PublicSiteScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Floating back + share */}
+      {/* Floating back + share. In the owner's in-app PREVIEW we show a back
+          button and a "Preview" pill; on the LIVE public page a visitor has no
+          back stack and it isn't a preview, so those are dropped and only the
+          share affordance remains. */}
       <View style={[styles.topBar, { top: topPad + 10 }]}>
-        <Pressable
-          style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
-          onPress={() => router.back()}
-        >
-          <Feather name="arrow-left" size={18} color="#8A7B6C" />
-        </Pressable>
+        {live ? (
+          <View />
+        ) : (
+          <Pressable
+            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
+            onPress={() => router.back()}
+          >
+            <Feather name="arrow-left" size={18} color="#8A7B6C" />
+          </Pressable>
+        )}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           {site.enabled ? (
             <Pressable
@@ -421,10 +462,12 @@ export default function PublicSiteScreen() {
               <Feather name="share-2" size={16} color="#8A7B6C" />
             </Pressable>
           ) : null}
-          <View style={[styles.previewPill, { backgroundColor: "rgba(107,139,122,0.14)" }]}>
-            <Feather name="eye" size={11} color={colors.emerald} />
-            <Text style={[styles.previewPillText, { color: colors.emerald }]}>Preview</Text>
-          </View>
+          {live ? null : (
+            <View style={[styles.previewPill, { backgroundColor: "rgba(107,139,122,0.14)" }]}>
+              <Feather name="eye" size={11} color={colors.emerald} />
+              <Text style={[styles.previewPillText, { color: colors.emerald }]}>Preview</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -434,11 +477,7 @@ export default function PublicSiteScreen() {
         <ShareSheet
           visible={shareVisible}
           onClose={() => setShareVisible(false)}
-          content={buildLinkShareContent(
-            profile.name ? `${profile.name} — Portfolio` : "Portfolio",
-            portfolioShareUrl(profile.name),
-            "A ceramic portfolio",
-          )}
+          content={shareContent}
         />
       ) : null}
     </View>

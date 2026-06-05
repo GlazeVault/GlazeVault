@@ -42,6 +42,8 @@ const DEFAULT_PROFILE: ArtistProfile = {
 
 interface ProfileContextType {
   profile: ArtistProfile;
+  /** True once the initial cache + Supabase load has settled. */
+  hydrated: boolean;
   updateProfile: (updates: Partial<ArtistProfile>) => Promise<void>;
   updatePublicSite: (updates: Partial<PublicSiteSettings>) => Promise<void>;
 }
@@ -65,6 +67,7 @@ function normalizeProfile(raw: Partial<ArtistProfile>): ArtistProfile {
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<ArtistProfile>(DEFAULT_PROFILE);
+  const [hydrated, setHydrated] = useState(false);
   // Mirror of the latest profile so concurrent updates merge against fresh
   // state instead of a stale render closure (prevents rapid toggle/selector
   // saves from clobbering each other).
@@ -133,6 +136,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           console.warn("[supabase] loadProfile failed, using local cache", e);
         }
       }
+      setHydrated(true);
     })();
   }, [hasContent]);
 
@@ -163,7 +167,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <ProfileContext.Provider value={{ profile, updateProfile, updatePublicSite }}>
+    <ProfileContext.Provider value={{ profile, hydrated, updateProfile, updatePublicSite }}>
       {children}
     </ProfileContext.Provider>
   );
@@ -191,13 +195,35 @@ export function publicSiteSlug(name: string): string {
 export const PUBLIC_SITE_DOMAIN = "glazevault.art";
 
 /**
+ * Resolves the live origin the public web pages are actually served from, so a
+ * shared link RESOLVES today instead of pointing at a domain that isn't wired
+ * up yet. The public exhibition pages live as web routes inside this same app,
+ * so the running host already serves them. Order of precedence:
+ *   1. EXPO_PUBLIC_PUBLIC_SITE_URL — explicit override. Set this to
+ *      `https://glazevault.art` once that custom domain is connected at deploy.
+ *   2. EXPO_PUBLIC_DOMAIN — the Replit dev/prod host the app runs on (already
+ *      set in the expo workflow), so links work immediately.
+ *   3. The canonical brand domain as a last resort.
+ */
+function resolvePublicOrigin(): string {
+  const explicit = process.env.EXPO_PUBLIC_PUBLIC_SITE_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const domain = process.env.EXPO_PUBLIC_DOMAIN?.trim();
+  if (domain) {
+    const host = domain.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    if (host) return `https://${host}`;
+  }
+  return `https://${PUBLIC_SITE_DOMAIN}`;
+}
+
+/**
  * Canonical, fully-qualified base URL for an artist's public site. Every public
  * share link (portfolio, collection, piece) is built from this single root so a
  * copied or natively-shared link is always well-formed (https, no trailing
- * slash) and stays stable even before the public web pages ship.
+ * slash) and points at a host that actually serves the public pages.
  */
 export function publicBaseUrl(name: string): string {
-  return `https://${PUBLIC_SITE_DOMAIN}/${publicSiteSlug(name)}`;
+  return `${resolvePublicOrigin()}/${publicSiteSlug(name)}`;
 }
 
 /** Public link to the artist's portfolio (the public-site root). */

@@ -82,6 +82,11 @@ export default function RootLayout() {
                         name="public-site"
                         options={{ presentation: "card" }}
                       />
+                      {/* Live public web exhibition routes (served by the expo
+                          web build at the artist's slug). */}
+                      <Stack.Screen name="[slug]/index" />
+                      <Stack.Screen name="[slug]/piece/[id]" />
+                      <Stack.Screen name="[slug]/collection/[id]" />
                     </Stack>
                     <ToastHost />
                     <ActionSheetHost />

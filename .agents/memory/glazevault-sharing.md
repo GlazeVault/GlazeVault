@@ -20,8 +20,8 @@ Sharing = "sending someone to a quiet exhibition", never a social broadcast.
 
 **Why:** archive-first product promise — a private studio archive can't accidentally emit a working public link. Affordance-only gating still leaves a built URL in props/state; the architect flagged this, so we also conditionally mount the sheet.
 
-## Deferred (intentional)
-Public web exhibition pages + OG preview cards are NOT built yet — links point at `glazevault.art` which doesn't resolve yet. This was a deliberate scope cut ("in-app first").
+## Public web exhibition pages (built)
+Share links now resolve as real web routes served BY THE EXPO WEB APP itself — see `glazevault-public-web.md`. OG preview/social cards are still deferred.
 
 ## Tests
 Any test that renders piece/collection/profile/public-site must mock `@/context/ProfileContext` INCLUDING the URL helpers (`publicBaseUrl`, `portfolioShareUrl`, `collectionShareUrl`, `pieceShareUrl`) or the screen throws "x is not a function" at render.

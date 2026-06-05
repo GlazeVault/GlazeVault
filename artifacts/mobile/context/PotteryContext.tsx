@@ -46,6 +46,8 @@ export interface PotteryPiece {
 
 interface PotteryContextType {
   pieces: PotteryPiece[];
+  /** True once the initial cache + Supabase load has settled. */
+  hydrated: boolean;
   addPiece: (
     piece: Omit<
       PotteryPiece,
@@ -156,6 +158,7 @@ function normalizePiece(
 
 export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const [pieces, setPieces] = useState<PotteryPiece[]>([]);
+  const [hydrated, setHydrated] = useState(false);
   const piecesRef = useRef<PotteryPiece[]>([]);
   // Serializes AsyncStorage writes so rapid successive saves commit in order and
   // an older snapshot can never overwrite a newer one.
@@ -277,6 +280,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
           console.warn("[supabase] loadPieces failed, using local cache", e);
         }
       }
+      setHydrated(true);
     })();
   }, [persist, pushPieceRemote]);
 
@@ -425,7 +429,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const getPiece = useCallback((id: string) => piecesRef.current.find((p) => p.id === id), []);
 
   return (
-    <PotteryContext.Provider value={{ pieces, addPiece, updatePiece, deletePiece, addPieceToCollection, removePieceFromCollection, toggleFavorite, getPiece }}>
+    <PotteryContext.Provider value={{ pieces, hydrated, addPiece, updatePiece, deletePiece, addPieceToCollection, removePieceFromCollection, toggleFavorite, getPiece }}>
       {children}
     </PotteryContext.Provider>
   );
