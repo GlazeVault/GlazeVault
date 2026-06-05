@@ -584,6 +584,50 @@ describe("the public gate refuses non-visible pieces entirely", () => {
       expect(tree).not.toContain(img);
     }
   });
+
+  it("public-site portfolio excludes a PUBLIC-but-unfeatured sibling", () => {
+    // The curated Portfolio is featured-only: a piece that is fully public and
+    // photo-bearing but NOT featured must never surface on the portfolio. p1 is
+    // featured (default); p2 is public + collected but unfeatured. Only p1's
+    // title and photo may appear, and the count must read "1 piece".
+    mockCollections = [mockCollection];
+    mockPieces = [
+      makePiece("p1", { title: "ZZFEATUREDTILE" }),
+      makePiece("p2", { title: "ZZUNFEATUREDTILE", featuredInPortfolio: false }),
+    ];
+    const PublicSiteScreen = require("@/app/public-site").default;
+    const { toJSON } = render(<PublicSiteScreen />);
+    const tree = JSON.stringify(toJSON() ?? null);
+
+    // The featured piece is on the page; the unfeatured public sibling is not.
+    expect(tree).toContain("ZZFEATUREDTILE");
+    expect(tree).toContain("pieces/p1.jpg");
+    expect(tree).toContain("1 piece");
+    expect(tree).not.toContain("ZZUNFEATUREDTILE");
+    expect(tree).not.toContain("pieces/p2.jpg");
+  });
+
+  it("public-site omits a PUBLIC collection that has zero featured pieces", () => {
+    // A collection may be public yet contain nothing featured. With an empty
+    // curated set the whole collection is dropped (public-site filters out
+    // entries whose portfolio pieces are []), so neither its title nor any of
+    // its pieces may render anywhere on the page.
+    mockCollections = [{ ...mockCollection, title: "ZZEMPTYCOLLECTION" }];
+    mockPieces = [
+      makePiece("p1", { title: "ZZUNFEATUREDA", featuredInPortfolio: false }),
+      makePiece("p2", { title: "ZZUNFEATUREDB", featuredInPortfolio: false }),
+    ];
+    const PublicSiteScreen = require("@/app/public-site").default;
+    const { toJSON } = render(<PublicSiteScreen />);
+    const tree = JSON.stringify(toJSON() ?? null);
+
+    // The collection itself is gone, and none of its unfeatured pieces leaked.
+    expect(tree).not.toContain("ZZEMPTYCOLLECTION");
+    expect(tree).not.toContain("ZZUNFEATUREDA");
+    expect(tree).not.toContain("ZZUNFEATUREDB");
+    expect(tree).not.toContain("pieces/p1.jpg");
+    expect(tree).not.toContain("pieces/p2.jpg");
+  });
 });
 
 describe("the collection-level gate hides an entire private collection", () => {
