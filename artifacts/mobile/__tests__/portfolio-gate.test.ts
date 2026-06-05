@@ -8,6 +8,7 @@
  */
 import {
   getPortfolioCollectionPieces,
+  getPublicSwipePieces,
   isPortfolioPiece,
 } from "@/constants/privacy";
 
@@ -66,5 +67,65 @@ describe("getPortfolioCollectionPieces", () => {
   it("yields an empty list for a collection with nothing featured", () => {
     const pieces = [makePiece({ id: "a", featuredInPortfolio: false })];
     expect(getPortfolioCollectionPieces({ id: "c1" }, pieces)).toEqual([]);
+  });
+});
+
+describe("getPublicSwipePieces", () => {
+  const collections = [
+    { id: "c1", visibility: "public" as const },
+    { id: "c2", visibility: "public" as const },
+    { id: "cp", visibility: "private" as const },
+  ];
+
+  it("scopes the swipe set to the collection the visitor came from", () => {
+    const opened = makePiece({ id: "a", collectionIds: ["c1", "c2"] });
+    const pieces = [
+      opened,
+      makePiece({ id: "b", collectionIds: ["c1"] }),
+      makePiece({ id: "c", collectionIds: ["c2"] }),
+    ];
+    const result = getPublicSwipePieces(opened, pieces, collections, "c1");
+    expect(result.map((p) => p.id).sort()).toEqual(["a", "b"]);
+  });
+
+  it("excludes public-but-unfeatured siblings within the scoped collection", () => {
+    const opened = makePiece({ id: "a", collectionIds: ["c1"] });
+    const pieces = [
+      opened,
+      makePiece({ id: "unfeatured", collectionIds: ["c1"], featuredInPortfolio: false }),
+      makePiece({ id: "private", collectionIds: ["c1"], isPublic: false }),
+      makePiece({ id: "archived", collectionIds: ["c1"], archived: true }),
+    ];
+    const result = getPublicSwipePieces(opened, pieces, collections, "c1");
+    expect(result.map((p) => p.id)).toEqual(["a"]);
+  });
+
+  it("falls back to shared public collections when no from is given", () => {
+    const opened = makePiece({ id: "a", collectionIds: ["c1", "c2"] });
+    const pieces = [
+      opened,
+      makePiece({ id: "b", collectionIds: ["c1"] }),
+      makePiece({ id: "c", collectionIds: ["c2"] }),
+    ];
+    const result = getPublicSwipePieces(opened, pieces, collections, undefined);
+    expect(result.map((p) => p.id).sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("ignores a from that is a private collection and falls back", () => {
+    const opened = makePiece({ id: "a", collectionIds: ["c1", "cp"] });
+    const pieces = [
+      opened,
+      makePiece({ id: "b", collectionIds: ["c1"] }),
+      makePiece({ id: "secret", collectionIds: ["cp"] }),
+    ];
+    const result = getPublicSwipePieces(opened, pieces, collections, "cp");
+    expect(result.map((p) => p.id).sort()).toEqual(["a", "b"]);
+  });
+
+  it("swipes alone when the opened piece is not itself a portfolio piece", () => {
+    const opened = makePiece({ id: "a", collectionIds: ["c1"], featuredInPortfolio: false });
+    const pieces = [opened, makePiece({ id: "b", collectionIds: ["c1"] })];
+    const result = getPublicSwipePieces(opened, pieces, collections, "c1");
+    expect(result.map((p) => p.id)).toEqual(["a"]);
   });
 });

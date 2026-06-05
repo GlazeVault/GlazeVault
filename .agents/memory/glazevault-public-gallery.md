@@ -7,24 +7,33 @@ description: How the fullscreen swipe gallery is scoped on the public vs owner p
 
 The fullscreen `ImageViewer` swipe set on the piece-detail page is scoped differently for public vs owner views.
 
-- **Public view** (`?public=1`): the gallery must include ONLY siblings that are
-  `isPubliclyVisiblePiece(p, collections)` **AND** have an image (`!!p.imageUri`),
-  restricted to the same `collectionId`. A piece with no collection = `[piece]` only.
-  Viewer captions must honor each piece's own `publicDataSettings` (`showTitle`,
-  `showClayBody`, `showGlazeName`) — not the owner's raw fields.
+- **Public view** (`?public=1`): the swipe set is built by the single shared
+  selector `getPublicSwipePieces(piece, pieces, collections, from)`. It is scoped
+  to the `from` collection the visitor entered from WHEN that collection is public
+  (so swiping stays inside the exhibition they were browsing); otherwise it spans
+  portfolio pieces sharing ANY public collection with the opened piece. Either way
+  every sibling is gated by `isPortfolioPiece` (featured + public + collected +
+  photo + not archived), so a private/archived/UNFEATURED piece is never reachable.
+  A piece outside the curated portfolio swipes alone (`[piece]`). All public-site
+  entry points (tile, cover, "View Exhibition" immersive) pass `from=<collectionId>`.
+  Viewer captions honor each piece's own `publicDataSettings` and name the `from`
+  collection when present.
 - **Owner view**: scope by the `from` collection param if present, else the whole archive.
 
-**Why:** swiping is a back-door that can leak otherwise-hidden work. Scoping by
-`collectionId` alone is NOT enough — a public collection can contain private pieces;
-those are excluded by `isPubliclyVisiblePiece`. `showPhotos` is NO LONGER a display
-gate (see below) — a public piece always shows its photo — so the swipe set keys off
-`imageUri` presence, not `showPhotos`.
+**Why:** swiping is a back-door that can leak otherwise-hidden work AND a place
+where curation can break — once the public portfolio became featured-only
+(Task #37 / `getPortfolioCollectionPieces`), the swipe set had to match it, so the
+gate moved from `isPubliclyVisiblePiece` to the stricter `isPortfolioPiece`.
+Scoping by `collectionId` alone is NOT enough (a public collection can contain
+private/unfeatured pieces). `showPhotos` is NO LONGER a display gate (see below).
 
 **How to apply:** any future change to the public detail gallery (or new public
-surfaces that swipe across pieces) must filter through `isPubliclyVisiblePiece`
-(+ `imageUri`), never bare `collectionId` equality. The public hero is itself a
-`Pressable` that opens the viewer, and `ImageViewer` is rendered inside the public
-return branch (it is a separate render path from the owner branch).
+surfaces that swipe across pieces) must go through `getPublicSwipePieces` /
+`isPortfolioPiece`, never bare `collectionId` equality or `isPubliclyVisiblePiece`.
+The selector is pure and unit-tested in `__tests__/portfolio-gate.test.ts` (scoping,
+unfeatured exclusion, private-`from` fallback, multi-collection). The public hero is
+itself a `Pressable` that opens the viewer; `ImageViewer` renders inside the public
+return branch (separate render path from the owner branch).
 
 ## showPhotos is DEPRECATED as a display gate (public pieces always show their photo)
 A public piece with a valid `imageUri` but `publicDataSettings.showPhotos=false`
@@ -71,8 +80,9 @@ shows the owner's full data (with private badges) and must NOT be gated by
 The public-site portfolio tiles (`renderTile` in public-site.tsx) render a caption
 BENEATH each image — serif title (PlayfairDisplay) + the same `clay · dimensions ·
 year` line built via the shared `buildPublicMetaLine` helper (see the toggle-driven
-section above) — across all three layouts (catalog/editorial/masonry). The earlier
-"silent cards" pass removed all text; this restored minimal artwork identity.
+section above). There is now ONE signature layout (no catalog/editorial/masonry
+modes — see glazevault-public-layouts.md). The earlier "silent cards" pass removed
+all text; this restored minimal artwork identity.
 
 **Why:** image-only cards read as too anonymous/atmospheric; a quiet exhibition-
 catalog caption gives archival presence without a database/card-UI feel.
@@ -98,9 +108,12 @@ carry the storytelling. The description sits BELOW the hero (not above) so the
 viewer emotionally enters through the image first, then reads — an exhibition-
 catalog feel. Do not move the intro back above the hero.
 
-**How to apply:** `featuredInPortfolio` / `isPortfolioPiece` is now ONLY an owner-side
-concept — the featured badge (components/PotteryCard.tsx) and the Feature-in-Portfolio
-toggle (app/piece/[id].tsx). It does NOT drive any public homepage section. The
-`getPortfolioPieces` selector was deleted (was only feeding the removed feed); do not
-reintroduce a public portfolio-piece feed. A regression test in
-__tests__/public-privacy.test.tsx asserts the public site renders no "Selected Works".
+**How to apply:** there is still NO standalone "Selected Works" piece feed
+(a regression test in __tests__/public-privacy.test.tsx asserts this). BUT the
+public homepage IS now curated/featured-only at the COLLECTION level (Task #37):
+each public collection shows only its `getPortfolioCollectionPieces` (gated by
+`isPortfolioPiece`), and a public collection with zero featured pieces is dropped
+entirely. So `isPortfolioPiece` is NOT owner-only anymore — it gates every public
+portfolio surface (collection grid, profile preview, swipe set). Do not reintroduce
+a flat cross-collection portfolio feed, and do not "downgrade" public surfaces back
+to `isPubliclyVisiblePiece` (that would expose public-but-unfeatured pieces).

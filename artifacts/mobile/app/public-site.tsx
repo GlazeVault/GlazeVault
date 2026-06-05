@@ -104,7 +104,7 @@ export default function PublicSiteScreen() {
   // gently clamped to a calm band so heights vary subtly rather than chaotically;
   // full-width plates ("full") preserve their true wide ratio for an exhibition
   // moment.
-  const renderTile = (piece: PublicPieceView, span: "full" | "half") => {
+  const renderTile = (piece: PublicPieceView, span: "full" | "half", collectionId: string) => {
     const natural = orientations[piece.imageUri] ?? (span === "full" ? 1.5 : 0.82);
     const ratio =
       span === "half" ? Math.min(Math.max(natural, 0.72), 1.05) : Math.max(natural, 1.2);
@@ -112,7 +112,7 @@ export default function PublicSiteScreen() {
       <Pressable
         key={piece.id}
         style={({ pressed }) => [styles.tileCol, { opacity: pressed ? 0.85 : 1 }]}
-        onPress={() => router.push(`/piece/${piece.id}?public=1`)}
+        onPress={() => router.push(`/piece/${piece.id}?public=1&from=${collectionId}`)}
       >
         <View style={[styles.tileImage, { aspectRatio: ratio }]}>
           {piece.imageUri ? (
@@ -141,7 +141,7 @@ export default function PublicSiteScreen() {
   // rhythm — clarity of a catalog with the breath of an art book. Landscape work
   // lifts out into full-width exhibition plates that punctuate the column flow.
   // Nothing is cropped, spacing stays generous, and the asymmetry stays subtle.
-  const renderPieces = (collectionPieces: PublicPieceView[]) => {
+  const renderPieces = (collectionPieces: PublicPieceView[], collectionId: string) => {
     type Block =
       | { kind: "plate"; key: string; piece: PublicPieceView }
       | { kind: "cols"; key: string; left: PublicPieceView[]; right: PublicPieceView[] };
@@ -186,11 +186,11 @@ export default function PublicSiteScreen() {
       <View style={styles.galleryWrap}>
         {blocks.map((b) =>
           b.kind === "plate" ? (
-            <View key={b.key}>{renderTile(b.piece, "full")}</View>
+            <View key={b.key}>{renderTile(b.piece, "full", collectionId)}</View>
           ) : (
             <View key={b.key} style={styles.galleryRow}>
-              <View style={styles.galleryCol}>{b.left.map((p) => renderTile(p, "half"))}</View>
-              <View style={styles.galleryCol}>{b.right.map((p) => renderTile(p, "half"))}</View>
+              <View style={styles.galleryCol}>{b.left.map((p) => renderTile(p, "half", collectionId))}</View>
+              <View style={styles.galleryCol}>{b.right.map((p) => renderTile(p, "half", collectionId))}</View>
             </View>
           ),
         )}
@@ -307,7 +307,9 @@ export default function PublicSiteScreen() {
                 <Pressable
                   style={({ pressed }) => [styles.coverWrap, { opacity: pressed ? 0.9 : 1 }]}
                   onPress={() =>
-                    coverPieceId ? router.push(`/piece/${coverPieceId}?public=1`) : undefined
+                    coverPieceId
+                      ? router.push(`/piece/${coverPieceId}?public=1&from=${collection.id}`)
+                      : undefined
                   }
                   disabled={!coverPieceId}
                 >
@@ -334,7 +336,9 @@ export default function PublicSiteScreen() {
                       opacity: pressed ? 0.65 : 1,
                     },
                   ]}
-                  onPress={() => router.push(`/piece/${cp[0].id}?public=1&immersive=1`)}
+                  onPress={() =>
+                    router.push(`/piece/${cp[0].id}?public=1&immersive=1&from=${collection.id}`)
+                  }
                   accessibilityRole="button"
                   accessibilityLabel={`View ${collection.title} as an immersive exhibition`}
                 >
@@ -355,7 +359,7 @@ export default function PublicSiteScreen() {
                   containerStyle={styles.introWrap}
                 />
               ) : null}
-              {gridPieces.length > 0 ? renderPieces(gridPieces) : null}
+              {gridPieces.length > 0 ? renderPieces(gridPieces, collection.id) : null}
             </View>
           ))
         ) : null}

@@ -204,3 +204,43 @@ export function getPortfolioCollectionPieces<P extends PieceLike>(
     (p) => (p.collectionIds ?? []).includes(collection.id) && isPortfolioPiece(p)
   );
 }
+
+/**
+ * The set of pieces the PUBLIC fullscreen viewer may swipe through, given the
+ * piece the visitor opened and the collection context they came from (`fromId`).
+ *
+ * When `fromId` names a PUBLIC collection, the swipe set is scoped to exactly
+ * that collection's portfolio pieces — so swiping stays consistent with the
+ * collection section the visitor was browsing, never wandering into another
+ * collection's work. Without a valid public `fromId` it falls back to portfolio
+ * pieces sharing ANY public collection with the opened piece. Either way the set
+ * is gated by `isPortfolioPiece` (featured + public + collected + photo + not
+ * archived), so a private/archived/unfeatured piece is never reachable, and a
+ * piece outside the curated portfolio always swipes alone.
+ */
+export function getPublicSwipePieces<P extends PieceLike & { id: string }>(
+  piece: P,
+  pieces: P[],
+  collections: CollectionLike[],
+  fromId?: string | null
+): P[] {
+  const scopeId =
+    fromId && collections.some((c) => c.id === fromId && isCollectionPublic(c))
+      ? fromId
+      : null;
+  const scopedSiblings = (ids: string[]): P[] =>
+    pieces.filter(
+      (p) =>
+        (p.collectionIds ?? []).some((cid) => ids.includes(cid)) && isPortfolioPiece(p)
+    );
+  if (scopeId) {
+    const siblings = scopedSiblings([scopeId]);
+    return siblings.some((p) => p.id === piece.id) ? siblings : [piece];
+  }
+  const sharedPublicIds = (piece.collectionIds ?? []).filter((cid) =>
+    collections.some((c) => c.id === cid && isCollectionPublic(c))
+  );
+  if (sharedPublicIds.length === 0) return [piece];
+  const siblings = scopedSiblings(sharedPublicIds);
+  return siblings.some((p) => p.id === piece.id) ? siblings : [piece];
+}

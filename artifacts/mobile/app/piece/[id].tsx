@@ -21,6 +21,7 @@ import { ShareSheet } from "@/components/ShareSheet";
 import {
   buildPublicMetaLine,
   buildShareContent,
+  getPublicSwipePieces,
   isCollectionPublic,
   isPortfolioPiece,
   isPubliclyVisiblePiece,
@@ -115,21 +116,12 @@ export default function PieceDetailScreen() {
   // collection we stay within that collection; otherwise the whole archive.
   const galleryPieces = (() => {
     if (isPublicView) {
-      // Public gallery: swipe only across PORTFOLIO pieces (featured + public +
-      // collected) that share a PUBLIC collection with this one — i.e. exactly
-      // the pieces shown on the portfolio. Never reach a private/archived/
-      // unfeatured piece — that gate lives in isPortfolioPiece + isCollectionPublic.
-      if (piece.collectionIds.length === 0) return [piece];
-      const sharedPublicIds = piece.collectionIds.filter((cid) =>
-        collections.some((c) => c.id === cid && isCollectionPublic(c)),
-      );
-      if (sharedPublicIds.length === 0) return [piece];
-      const siblings = pieces.filter(
-        (p) =>
-          p.collectionIds.some((cid) => sharedPublicIds.includes(cid)) &&
-          isPortfolioPiece(p),
-      );
-      return siblings.some((p) => p.id === piece.id) ? siblings : [piece];
+      // Public gallery: swipe is scoped to the collection the visitor entered
+      // from (`from`) when that collection is public, so it stays within that
+      // exhibition; otherwise it spans portfolio pieces sharing any public
+      // collection. The gate (isPortfolioPiece + isCollectionPublic) lives in
+      // the selector, so a private/archived/unfeatured piece is never reachable.
+      return getPublicSwipePieces(piece, pieces, collections, from);
     }
     const scoped = from ? pieces.filter((p) => p.collectionIds.includes(from)) : pieces;
     return scoped.some((p) => p.id === piece.id) ? scoped : [piece];
@@ -147,6 +139,14 @@ export default function PieceDetailScreen() {
     return target?.title ?? "";
   };
   const publicCollectionName = (p: (typeof pieces)[number]): string => {
+    // Prefer the collection the visitor entered from (when it is public and the
+    // piece belongs to it) so the caption matches the exhibition being browsed;
+    // otherwise fall back to the piece's first public collection.
+    const fromCollection =
+      from && p.collectionIds.includes(from)
+        ? collections.find((c) => c.id === from && isCollectionPublic(c))
+        : undefined;
+    if (fromCollection) return fromCollection.title;
     const target = p.collectionIds
       .map((cid) => collections.find((c) => c.id === cid))
       .find((c): c is NonNullable<typeof c> => !!c && isCollectionPublic(c));
