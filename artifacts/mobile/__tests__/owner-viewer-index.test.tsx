@@ -69,6 +69,8 @@ function makePiece(id: string, cover: string, images: string[]): PotteryPiece {
     featuredInPortfolio: false,
     isPublic: false,
     archived: false,
+    showGlazeDetails: false,
+    showStudioNotes: false,
   };
 }
 

@@ -14,6 +14,7 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AdvancedPublicVisibility } from "@/components/AdvancedPublicVisibility";
 import { PhotoSetEditor } from "@/components/PhotoSetEditor";
 import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
@@ -85,6 +86,10 @@ export default function AddScreen() {
   const [isPublic, setIsPublic] = useState(false);
   const [collectionIds, setCollectionIds] = useState<string[]>([]);
   const [featured, setFeatured] = useState(false);
+  // Per-piece public field exposure, both OFF by default. Only meaningful when
+  // the piece is Public; reset whenever the piece goes back to Private.
+  const [showGlazeDetails, setShowGlazeDetails] = useState(false);
+  const [showStudioNotes, setShowStudioNotes] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -98,6 +103,8 @@ export default function AddScreen() {
       if (!next) {
         setCollectionIds([]);
         setFeatured(false);
+        setShowGlazeDetails(false);
+        setShowStudioNotes(false);
       }
       return next;
     });
@@ -158,10 +165,15 @@ export default function AddScreen() {
       isPublic,
       collectionIds: isPublic ? collectionIds : [],
       featuredInPortfolio: canFeature && featured,
+      // Field-exposure flags only apply to a public piece; force off otherwise
+      // so a private piece can never carry an opted-in flag.
+      showGlazeDetails: isPublic ? showGlazeDetails : false,
+      showStudioNotes: isPublic ? showStudioNotes : false,
     });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setImages([]); setCoverIndex(0); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear()));
     setIsPublic(false); setCollectionIds([]); setFeatured(false);
+    setShowGlazeDetails(false); setShowStudioNotes(false);
     setSaving(false);
     router.replace("/");
   };
@@ -270,6 +282,15 @@ export default function AddScreen() {
             <View style={[styles.visToggleThumb, { transform: [{ translateX: isPublic ? 18 : 2 }] }]} />
           </View>
         </Pressable>
+
+        {isPublic && (
+          <AdvancedPublicVisibility
+            showGlazeDetails={showGlazeDetails}
+            showStudioNotes={showStudioNotes}
+            onToggleGlaze={() => setShowGlazeDetails((v) => !v)}
+            onToggleNotes={() => setShowStudioNotes((v) => !v)}
+          />
+        )}
 
         {isPublic && (
           <>

@@ -33,7 +33,12 @@ create table if not exists public.pieces (
   collection_ids        text[]  not null default '{}',
   featured_in_portfolio boolean not null default false,
   is_public             boolean not null default false,
-  archived              boolean not null default false
+  archived              boolean not null default false,
+  -- Per-piece public field exposure. Both OFF by default: a public piece keeps
+  -- its glaze details (glaze/cone/firing_environment) and notes private until
+  -- the artist opts each in. Enforced in constants/privacy.ts → toPublicPiece.
+  show_glaze_details    boolean not null default false,
+  show_studio_notes     boolean not null default false
 );
 
 -- Idempotent migrations for existing databases (create table above only runs on
@@ -96,6 +101,14 @@ alter table public.pieces drop column if exists collection_id;
 -- Retire the long-dead per-piece publishing column. The app never read or wrote
 -- `pieces.visibility`; piece public/private state now lives in `is_public`.
 alter table public.pieces drop column if exists visibility;
+
+-- ── Per-piece public field exposure ──────────────────────────────────────────
+-- Separate opt-in flags so a Public piece can still keep its glaze details and
+-- studio notes private. Both default false; existing rows stay private until the
+-- artist opts in. `dataService.savePiece` retries without these keys if a
+-- database predates this migration, so older schemas never break saving.
+alter table public.pieces add column if not exists show_glaze_details boolean not null default false;
+alter table public.pieces add column if not exists show_studio_notes  boolean not null default false;
 
 -- ── collections ─────────────────────────────────────────────────────────────
 create table if not exists public.collections (

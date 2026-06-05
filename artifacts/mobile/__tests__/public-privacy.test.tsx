@@ -61,6 +61,11 @@ function makePiece(id: string, overrides: Partial<PotteryPiece> = {}): PotteryPi
     featuredInPortfolio: true,
     isPublic: true,
     archived: false,
+    // Per-piece public field exposure defaults OFF, so by default a public piece
+    // still keeps its glaze details and notes private (the calm default the
+    // privacy guard below locks in). Individual tests opt in via overrides.
+    showGlazeDetails: false,
+    showStudioNotes: false,
     ...overrides,
   };
 }
@@ -431,6 +436,107 @@ describe("toPublicPiece is the structural allowlist boundary", () => {
         );
       }
     }
+  });
+});
+
+describe("opt-in glaze details and studio notes cross over ONLY when enabled", () => {
+  // These two per-piece flags are the ONLY way a glaze detail or studio note may
+  // reach a public surface. Both default OFF, so the default-off guard tests
+  // above (which assert NO owner-only field leaks) still hold; here we prove the
+  // opt-in path works and stays independent and gated.
+  beforeEach(() => {
+    mockRouterParams = {};
+    mockViewerProps.length = 0;
+    mockShareProps.length = 0;
+    mockCollections = [mockCollection];
+  });
+
+  it("toPublicPiece adds glaze/cone/firingEnvironment ONLY when showGlazeDetails is on", () => {
+    const off = toPublicPiece(makePiece("p1"));
+    expect("glaze" in off).toBe(false);
+    expect("cone" in off).toBe(false);
+    expect("firingEnvironment" in off).toBe(false);
+
+    const on = toPublicPiece(makePiece("p1", { showGlazeDetails: true }));
+    expect(on.glaze).toBe(OWNER_ONLY_SENTINELS.glaze);
+    expect(on.cone).toBe(OWNER_ONLY_SENTINELS.cone);
+    expect(on.firingEnvironment).toBe(OWNER_ONLY_SENTINELS.firingEnvironment);
+    // The two opt-ins are independent: notes is still omitted.
+    expect("notes" in on).toBe(false);
+  });
+
+  it("toPublicPiece adds notes ONLY when showStudioNotes is on", () => {
+    const off = toPublicPiece(makePiece("p1"));
+    expect("notes" in off).toBe(false);
+
+    const on = toPublicPiece(makePiece("p1", { showStudioNotes: true }));
+    expect(on.notes).toBe(OWNER_ONLY_SENTINELS.notes);
+    // glaze details stay omitted.
+    expect("glaze" in on).toBe(false);
+  });
+
+  it("toPublicPiece NEVER projects glaze/notes for a non-public piece even with both flags on", () => {
+    // Defense in depth at the boundary itself: the flags are meaningless until
+    // the piece is public, so the structural projection omits the keys entirely
+    // regardless of the toggles. A future caller that forgets the render-path
+    // gate still cannot leak a private field.
+    const projected = toPublicPiece(
+      makePiece("p1", { isPublic: false, showGlazeDetails: true, showStudioNotes: true }),
+    );
+    expect("glaze" in projected).toBe(false);
+    expect("cone" in projected).toBe(false);
+    expect("firingEnvironment" in projected).toBe(false);
+    expect("notes" in projected).toBe(false);
+    // The always-public identity fields are still projected as normal.
+    expect(projected.clay).toBe(PUBLIC_SENTINELS.clay);
+  });
+
+  it("public piece view renders glaze details AND studio notes when both flags are on", () => {
+    mockPieces = [makePiece("p1", { showGlazeDetails: true, showStudioNotes: true })];
+    mockRouterParams = { id: "p1", public: "1" };
+    const PieceDetailScreen = require("@/app/piece/[id]").default;
+    const { toJSON } = render(<PieceDetailScreen />);
+    const text = renderedText(toJSON() as JsonNode);
+
+    // The always-public fields are still present...
+    for (const value of Object.values(PUBLIC_SENTINELS)) expect(text).toContain(value);
+    // ...and the opted-in details now cross over, each with its label.
+    expect(text).toContain(OWNER_ONLY_SENTINELS.glaze);
+    expect(text).toContain(OWNER_ONLY_SENTINELS.cone);
+    expect(text).toContain(OWNER_ONLY_SENTINELS.firingEnvironment);
+    expect(text).toContain(OWNER_ONLY_SENTINELS.notes);
+    expect(text).toContain("Studio Notes");
+    // The duplicate `firing` field is never the one shown — only firingEnvironment.
+    expect(text).not.toContain(OWNER_ONLY_SENTINELS.firing);
+  });
+
+  it("public piece view shows glaze details but NOT notes when only glaze is enabled", () => {
+    mockPieces = [makePiece("p1", { showGlazeDetails: true, showStudioNotes: false })];
+    mockRouterParams = { id: "p1", public: "1" };
+    const PieceDetailScreen = require("@/app/piece/[id]").default;
+    const { toJSON } = render(<PieceDetailScreen />);
+    const text = renderedText(toJSON() as JsonNode);
+
+    expect(text).toContain(OWNER_ONLY_SENTINELS.glaze);
+    // Notes stay private on a public piece when their toggle is off.
+    expect(text).not.toContain(OWNER_ONLY_SENTINELS.notes);
+  });
+
+  it("a NON-public piece never crosses glaze/notes even with both flags on", () => {
+    // Defense in depth: the flags only matter once the piece is publicly visible.
+    // An un-public piece hits the public-view GATE and renders the private screen,
+    // so the opted-in details can never reach a viewer.
+    mockPieces = [
+      makePiece("p1", { isPublic: false, showGlazeDetails: true, showStudioNotes: true }),
+    ];
+    mockRouterParams = { id: "p1", public: "1" };
+    const PieceDetailScreen = require("@/app/piece/[id]").default;
+    const { toJSON } = render(<PieceDetailScreen />);
+    const text = renderedText(toJSON() as JsonNode);
+
+    expect(text).toContain("This piece is private");
+    expect(text).not.toContain(OWNER_ONLY_SENTINELS.glaze);
+    expect(text).not.toContain(OWNER_ONLY_SENTINELS.notes);
   });
 });
 

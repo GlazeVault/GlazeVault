@@ -36,6 +36,12 @@ export interface PotteryPiece {
   isPublic: boolean;
   // Soft-retired: kept in the owner's archive, hidden from every public surface.
   archived: boolean;
+  // Per-piece public field exposure. Both default false: when a piece is made
+  // Public its glaze details (glaze/cone/firing environment) and studio notes
+  // stay PRIVATE until the artist explicitly opts each in. Enforced at the
+  // privacy boundary (constants/privacy.ts → toPublicPiece).
+  showGlazeDetails: boolean;
+  showStudioNotes: boolean;
 }
 
 interface PotteryContextType {
@@ -51,11 +57,19 @@ interface PotteryContextType {
       | "featuredInPortfolio"
       | "isPublic"
       | "archived"
+      | "showGlazeDetails"
+      | "showStudioNotes"
     > &
       Partial<
         Pick<
           PotteryPiece,
-          "images" | "collectionIds" | "featuredInPortfolio" | "isPublic" | "archived"
+          | "images"
+          | "collectionIds"
+          | "featuredInPortfolio"
+          | "isPublic"
+          | "archived"
+          | "showGlazeDetails"
+          | "showStudioNotes"
         >
       >
   ) => Promise<PotteryPiece>;
@@ -121,6 +135,8 @@ function normalizePiece(
     featuredInPortfolio: false,
     isPublic: false,
     archived: false,
+    showGlazeDetails: false,
+    showStudioNotes: false,
     ...rest,
   } as PotteryPiece;
   // Migrate single `collectionId` → `collectionIds[]` when the array is absent.
@@ -276,11 +292,19 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
         | "featuredInPortfolio"
         | "isPublic"
         | "archived"
+        | "showGlazeDetails"
+        | "showStudioNotes"
       > &
         Partial<
           Pick<
             PotteryPiece,
-            "images" | "collectionIds" | "featuredInPortfolio" | "isPublic" | "archived"
+            | "images"
+            | "collectionIds"
+            | "featuredInPortfolio"
+            | "isPublic"
+            | "archived"
+            | "showGlazeDetails"
+            | "showStudioNotes"
           >
         >
     ) => {
@@ -292,6 +316,8 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
         featuredInPortfolio: false,
         isPublic: false,
         archived: false,
+        showGlazeDetails: false,
+        showStudioNotes: false,
         ...piece,
         imageUri,
         images,

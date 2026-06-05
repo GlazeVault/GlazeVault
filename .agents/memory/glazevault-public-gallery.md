@@ -16,8 +16,8 @@ The fullscreen `ImageViewer` swipe set on the piece-detail page is scoped differ
   photo + not archived), so a private/archived/UNFEATURED piece is never reachable.
   A piece outside the curated portfolio swipes alone (`[piece]`). All public-site
   entry points (tile, cover, "View Exhibition" immersive) pass `from=<collectionId>`.
-  Viewer captions honor each piece's own `publicDataSettings` and name the `from`
-  collection when present.
+  Viewer captions are built via `buildPublicMetaLine`/`toPublicPiece` (clay·dims·year
+  plus any opted-in glaze/notes) and name the `from` collection when present.
 - **Owner view**: scope by the `from` collection param if present, else the whole archive.
 
 **Why:** swiping is a back-door that can leak otherwise-hidden work AND a place
@@ -51,14 +51,15 @@ piece WITH an `imageUri` (`cp.find(p => p.imageUri)`), not the first with `showP
 ## Public metadata = clay · dimensions · year ONLY (curated gallery subset)
 The public meta line is built by the single shared helper `buildPublicMetaLine(piece)`
 in `constants/privacy.ts`. It joins, with "  ·  ", ONLY `clay · dimensions · year`,
-each still gated by its own `publicDataSettings` toggle (`showClayBody`/`showDimensions`/
-`showYear`) and dropped if empty (`.filter(Boolean)`), e.g. "Stoneware · 12 × 12 × 14 in
-· 2025". Technical/firing fields (glaze name + recipe, cone, firing environment, firing
-notes, price) are **never** shown on any public surface — they live only on the owner's
-private studio record (the owner `piece/[id]` InfoRows). EVERY public surface calls this
-one helper: the public detail line (`publicMeta` in piece/[id].tsx isPublicView), the
-fullscreen `ImageViewer` caption, and the public-site portfolio cards (`renderCaption`/
-`renderTile` in public-site.tsx).
+dropped if empty (`.filter(Boolean)`), e.g. "Stoneware · 12 × 12 × 14 in · 2025". There
+are NO per-field public toggles anymore — the old `publicDataSettings`/`showClayBody`
+model is RETIRED; the three core fields are ALWAYS shown for a public piece. Glaze
+details (glaze + cone + firingEnvironment) and studio notes are the ONLY public extras,
+each a per-piece opt-in (`showGlazeDetails`/`showStudioNotes`, default OFF) rendered as
+their own elements on the public piece view — NOT in this meta line (see
+glazevault-privacy.md). EVERY public surface calls this one helper: the public detail
+line (`publicMeta` in piece/[id].tsx isPublicView), the fullscreen `ImageViewer` caption,
+and the public-site portfolio cards (`renderCaption`/`renderTile` in public-site.tsx).
 
 **Why:** this requirement has PING-PONGED — curated subset → toggle-driven-all-fields →
 back to curated. The CURRENT and authoritative rule is the curated `clay·dim·year`
@@ -67,14 +68,13 @@ piece with only glaze/cone/firing populated (e.g. an old "Mug") will now show ju
 title publicly — that is INTENDED, not a bug. Do not "fix" it by re-adding technical
 fields to the public line.
 
-**How to apply:** to keep the toggle UI honest, `PUBLIC_DATA_FIELDS` (the per-piece
-public-toggle list rendered in piece/[id].tsx and edit/[id].tsx) is trimmed to only the
-publicly-displayable fields: Title, Photos, Studio Notes, Clay Body, Dimensions, Year.
-`PublicMetaPiece` and `showAllPublicDetails()` are kept in lockstep with this set; the
-full `PublicDataSettings` TYPE still carries every key (defaults) so dataService round-
-trips are unaffected. The owner `/collection/[id]` view is NOT a public surface — it
-shows the owner's full data (with private badges) and must NOT be gated by
-`publicDataSettings`.
+**How to apply:** the per-field public-toggle UI (`PUBLIC_DATA_FIELDS`,
+`showAllPublicDetails`, and the full `PublicDataSettings` blob/type) has been RETIRED
+along with the `public_data_settings` column. Public exposure is now: always-public core
+(title + clay·dim·year) PLUS the two independent per-piece opt-ins `showGlazeDetails`
+(glaze+cone+firingEnvironment) and `showStudioNotes` (notes), both typed boolean columns,
+default OFF, enforced solely by `toPublicPiece` (see glazevault-privacy.md). The owner
+`/collection/[id]` view is NOT a public surface — it shows the owner's full data.
 
 ## Public-site portfolio cards carry the same whispered caption
 The public-site portfolio tiles (`renderTile` in public-site.tsx) render a caption

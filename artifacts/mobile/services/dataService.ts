@@ -137,7 +137,33 @@ type PieceRow = {
   featured_in_portfolio: boolean | null;
   is_public: boolean | null;
   archived: boolean | null;
+  // Per-piece public field exposure. Newer columns; a database that predates the
+  // migration in supabase/schema.sql lacks them, so `savePiece` retries without
+  // them and `rowToPiece` default-coerces (`!!`). Default false everywhere.
+  show_glaze_details: boolean | null;
+  show_studio_notes: boolean | null;
 };
+
+/**
+ * True when a Supabase write failed because the table is missing one of the
+ * given columns (an older schema). PostgREST reports a missing column as
+ * PGRST204 and names it in the message; we also match the column names so the
+ * caller can safely retry without those keys.
+ */
+function isMissingColumnError(
+  error: { code?: string; message?: string } | null,
+  columns: string[],
+): boolean {
+  if (!error) return false;
+  // PostgREST's missing-column / schema-cache errors (PGRST204, and Postgres'
+  // 42703 "column does not exist") always name the offending column in the
+  // message. We require one of OUR columns to be named — regardless of code — so
+  // an unrelated schema-cache error never silently triggers the strip-and-retry
+  // fallback (and a future PostgREST error code is still handled if it names the
+  // column).
+  const message = error.message ?? "";
+  return columns.some((c) => message.includes(c));
+}
 
 function pieceToRow(p: PotteryPiece): PieceRow {
   return {
@@ -159,6 +185,8 @@ function pieceToRow(p: PotteryPiece): PieceRow {
     featured_in_portfolio: p.featuredInPortfolio,
     is_public: p.isPublic,
     archived: p.archived,
+    show_glaze_details: p.showGlazeDetails,
+    show_studio_notes: p.showStudioNotes,
   };
 }
 
@@ -188,6 +216,8 @@ function rowToPiece(r: PieceRow): PotteryPiece {
     featuredInPortfolio: !!r.featured_in_portfolio,
     isPublic: !!r.is_public,
     archived: !!r.archived,
+    showGlazeDetails: !!r.show_glaze_details,
+    showStudioNotes: !!r.show_studio_notes,
   };
 }
 
@@ -223,7 +253,28 @@ export async function savePiece(piece: PotteryPiece): Promise<PotteryPiece> {
     imageUri: uploadedCover,
     images: uploadedImages,
   };
-  const { error } = await client.from("pieces").upsert(pieceToRow(toSave));
+  // Persist. The per-piece public-exposure flags (show_glaze_details /
+  // show_studio_notes) are newer columns; if a database predates the migration
+  // the upsert fails with a missing-column error. We retry once without those
+  // keys so saving never breaks — the flags then live only in the local cache
+  // until supabase/schema.sql is applied.
+  const row = pieceToRow(toSave);
+  let { error } = await client.from("pieces").upsert(row);
+  if (error && isMissingColumnError(error, ["show_glaze_details", "show_studio_notes"])) {
+    // Degraded mode: the database predates the migration. We retry without the
+    // two flag columns so the rest of the piece still saves, but warn loudly —
+    // the flags now live ONLY in the local cache and a remote-wins reload will
+    // revert them to false. Applying supabase/schema.sql clears this path.
+    console.warn(
+      "[supabase] pieces table is missing show_glaze_details/show_studio_notes; " +
+        "saved without per-piece public-visibility flags. Apply supabase/schema.sql " +
+        "to persist them.",
+    );
+    const legacyRow = { ...row };
+    delete (legacyRow as Partial<PieceRow>).show_glaze_details;
+    delete (legacyRow as Partial<PieceRow>).show_studio_notes;
+    ({ error } = await client.from("pieces").upsert(legacyRow));
+  }
   if (error) throw error;
   return toSave;
 }

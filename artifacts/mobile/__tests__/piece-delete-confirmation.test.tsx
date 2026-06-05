@@ -39,6 +39,8 @@ const PIECE: PotteryPiece = {
   featuredInPortfolio: false,
   isPublic: false,
   archived: false,
+  showGlazeDetails: false,
+  showStudioNotes: false,
 };
 
 const mockPieces: PotteryPiece[] = [PIECE];

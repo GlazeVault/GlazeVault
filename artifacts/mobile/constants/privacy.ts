@@ -5,21 +5,29 @@ export interface PublicMetaPiece {
 }
 
 /**
- * The exhaustive allowlist of piece fields that may EVER cross onto a public,
- * non-owner surface — the portfolio, public collection pages, the public piece
- * view, fullscreen-viewer captions, shared links, and any future feed /
- * discover / search / exported surface.
+ * The allowlist of piece fields that may cross onto a public, non-owner surface
+ * — the portfolio, public collection pages, the public piece view,
+ * fullscreen-viewer captions, shared links, and any future feed / discover /
+ * search / exported surface.
  *
- * Everything else a piece carries is private studio knowledge and must never be
- * shown publicly: glaze recipes, firing schedules, kiln/process notes, clay-body
- * formulas, test results, cone / firing environment, pricing, collector notes,
- * unfinished experiments, and internal tags.
+ * Two tiers:
+ *  - ALWAYS public (when the piece itself is public): id, title, image, and the
+ *    artwork-identity meta — clay body, dimensions, year.
+ *  - OPT-IN per piece, OFF by default: glaze details (glaze / cone / firing
+ *    environment) gated by `showGlazeDetails`, and studio notes gated by
+ *    `showStudioNotes`. These keys are only PRESENT on the projection when the
+ *    artist enabled the matching toggle for that piece — they are added, never
+ *    defaulted, so an off-by-default piece literally has no key to read.
+ *
+ * Everything else a piece carries is private studio knowledge and never crosses
+ * over: glaze recipes beyond the named glaze, firing schedules, clay-body
+ * formulas, test results, pricing, collector notes, experiments, internal tags.
  *
  * `toPublicPiece` is the single boundary that enforces this. Public surfaces
  * must consume the `PublicPieceView` it returns — never the raw piece — so a
- * private field cannot leak even by accident, because the projected object
- * physically contains only these keys. To expose a NEW public field, add it
- * here AND to the privacy guard test — nowhere else.
+ * private field cannot leak even by accident: the projected object physically
+ * contains only the always-public keys plus whichever opt-in keys were enabled.
+ * To expose a NEW public field, add it here AND to the privacy guard test.
  */
 export interface PublicPieceView {
   id: string;
@@ -28,6 +36,12 @@ export interface PublicPieceView {
   clay: string;
   dimensions: string;
   year: string;
+  // Opt-in: present ONLY when the piece's `showGlazeDetails` is true.
+  glaze?: string;
+  cone?: string;
+  firingEnvironment?: string;
+  // Opt-in: present ONLY when the piece's `showStudioNotes` is true.
+  notes?: string;
 }
 
 /** Loose input shape so any owner piece (or partial) can be projected safely. */
@@ -38,16 +52,36 @@ type ProjectablePiece = {
   clay?: string;
   dimensions?: string;
   year?: string;
+  // Whether the piece is public at all. The opt-in glaze/notes keys are gated on
+  // this too (defense in depth), so a non-public piece can never project them
+  // even if its per-piece flags happen to be on.
+  isPublic?: boolean;
+  // Owner-only studio fields + the per-piece flags that gate their exposure.
+  glaze?: string;
+  cone?: string;
+  firing?: string;
+  firingEnvironment?: string;
+  notes?: string;
+  showGlazeDetails?: boolean;
+  showStudioNotes?: boolean;
 };
 
 /**
- * Strip a piece down to ONLY the public allowlist. This is the one place where
- * an owner record becomes safe to render publicly: the returned object carries
- * no glaze, firing, notes, pricing, tags, or any other studio field, so it is
- * structurally impossible for those to reach a public surface.
+ * Strip a piece down to the public allowlist. This is the one place where an
+ * owner record becomes safe to render publicly. The always-public identity
+ * fields are projected unconditionally; the opt-in glaze and notes keys are
+ * added ONLY when the piece is public AND enabled the matching toggle, so a
+ * piece that never opted in (or is not public) carries no glaze/cone/firing/notes
+ * key at all — it is structurally impossible for those to reach a public surface
+ * by default.
+ *
+ * The `isPublic` gate is deliberate defense in depth: every render path already
+ * refuses non-public pieces via `isPubliclyVisiblePiece`, but the boundary
+ * itself also refuses to project private fields for a non-public piece, so a
+ * future caller that forgets the render-path gate still cannot leak them.
  */
 export function toPublicPiece(piece: ProjectablePiece): PublicPieceView {
-  return {
+  const view: PublicPieceView = {
     id: piece.id,
     title: piece.title ?? "",
     imageUri: piece.imageUri ?? "",
@@ -55,18 +89,34 @@ export function toPublicPiece(piece: ProjectablePiece): PublicPieceView {
     dimensions: piece.dimensions ?? "",
     year: piece.year ?? "",
   };
+  // Opt-in fields only ever cross over for a piece that is itself public.
+  const isPublic = piece.isPublic ?? false;
+  // Glaze details cross over only when the piece is public AND the artist opted
+  // this piece in. Each key is added (never defaulted), so an off / non-public
+  // piece has no glaze/cone/firing key at all.
+  if (isPublic && piece.showGlazeDetails) {
+    view.glaze = piece.glaze ?? "";
+    view.cone = piece.cone ?? "";
+    view.firingEnvironment = piece.firingEnvironment ?? piece.firing ?? "";
+  }
+  // Studio notes cross over only when public AND opted in.
+  if (isPublic && piece.showStudioNotes) {
+    view.notes = piece.notes ?? "";
+  }
+  return view;
 }
 
 /**
  * Builds the single quiet metadata line shown on EVERY public surface
  * (portfolio cards, public collection display, piece detail, fullscreen viewer).
  *
- * The public gallery is a fixed, catalog-like format: every piece shows the
- * same three artwork-identity fields — clay body · dimensions · year. There are
- * no per-field toggles; technical/firing data (glaze, cone, firing environment,
- * recipe, firing notes) and private studio notes are never shown publicly and
- * live only on the owner's private record. Empty fields are dropped (no gaps),
- * and because every surface calls this one function the same string renders
+ * The public gallery's meta line is a fixed, catalog-like format: every piece
+ * shows the same three artwork-identity fields — clay body · dimensions · year.
+ * This line itself never carries technical/firing data or notes. The per-piece
+ * opt-in glaze details and studio notes (see `toPublicPiece`) render as their
+ * own elements on the public piece view, NOT in this line, so cards and
+ * captions stay calm and uniform. Empty fields are dropped (no gaps), and
+ * because every surface calls this one function the same string renders
  * identically across the app, e.g. "Stoneware · 12 × 12 × 14 in · 2025".
  */
 export function buildPublicMetaLine(piece: PublicMetaPiece): string {
@@ -86,15 +136,17 @@ export interface ShareContent {
 /**
  * Builds the content used when SHARING a piece. Sharing is just another public
  * surface — the moment a piece's details leave the app they reach whoever the
- * artist shares with — so the share payload may only ever carry the same fixed
- * public set as every other public surface: the piece title, the quiet
- * clay · dimensions · year meta line, and the public site link.
+ * artist shares with — so the share payload deliberately carries only the fixed
+ * minimal set: the piece title, the quiet clay · dimensions · year meta line,
+ * and the public site link. Even a piece that opted glaze details or studio
+ * notes into its public VIEW keeps them out of the share text; those details
+ * live on the public page behind the link, not in the shared blurb.
  *
- * The piece is projected through `toPublicPiece` FIRST, so glaze recipes, firing
- * schedules, cone / firing environment, studio notes, pricing and every other
- * owner-only field are physically dropped before the message is assembled and
- * cannot leak into a share even by accident. Empty fields are omitted so the
- * message has no blank lines.
+ * The piece is projected through `toPublicPiece` FIRST and only its title +
+ * meta line are read, so glaze, cone, firing environment, studio notes, pricing
+ * and every other field are dropped before the message is assembled and cannot
+ * leak into a share even by accident. Empty fields are omitted so the message
+ * has no blank lines.
  */
 export function buildShareContent(
   piece: ProjectablePiece,

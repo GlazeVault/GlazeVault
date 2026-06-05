@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AdvancedPublicVisibility } from "@/components/AdvancedPublicVisibility";
 import { DraggablePhotoStrip } from "@/components/DraggablePhotoStrip";
 import { confirm } from "@/lib/confirm";
 import { ImageViewer, type ViewerItem } from "@/components/ImageViewer";
@@ -338,7 +339,14 @@ export default function PieceDetailScreen() {
   const handleTogglePublic = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (piece.isPublic) {
-      await updatePiece(piece.id, { isPublic: false, featuredInPortfolio: false });
+      // Unpublishing also clears the per-piece field-exposure opt-ins so a piece
+      // that is later re-published starts private-by-default again.
+      await updatePiece(piece.id, {
+        isPublic: false,
+        featuredInPortfolio: false,
+        showGlazeDetails: false,
+        showStudioNotes: false,
+      });
     } else {
       await updatePiece(piece.id, { isPublic: true });
     }
@@ -459,6 +467,29 @@ export default function PieceDetailScreen() {
               <Text style={[styles.publicMeta, { color: colors.mutedForeground }]}>
                 {publicMeta}
               </Text>
+            ) : null}
+
+            {/* Opt-in glaze details — these keys exist on publicView ONLY when
+                the artist enabled "Show glaze details" for this piece, so an
+                opted-out piece renders nothing here. */}
+            {publicView.glaze || publicView.cone || publicView.firingEnvironment ? (
+              <View style={[styles.infoCard, { borderColor: "rgba(120, 110, 100, 0.14)", marginTop: 22 }]}>
+                <InfoRow label="Glaze" value={publicView.glaze ?? ""} accent={colors.emerald} />
+                <InfoRow label="Cone" value={publicView.cone ?? ""} accent={colors.primary} />
+                <InfoRow
+                  label="Firing Environment"
+                  value={publicView.firingEnvironment ?? ""}
+                  accent={colors.cobalt}
+                />
+              </View>
+            ) : null}
+
+            {/* Opt-in studio notes — present only when "Show studio notes" is on. */}
+            {publicView.notes ? (
+              <View style={[styles.notesSection, { marginTop: 26 }]}>
+                <Text style={[styles.notesLabel, { color: colors.mutedForeground }]}>Studio Notes</Text>
+                <Text style={[styles.notesText, { color: colors.foreground }]}>{publicView.notes}</Text>
+              </View>
             ) : null}
           </View>
         </ScrollView>
@@ -703,6 +734,19 @@ export default function PieceDetailScreen() {
                 Preview public view
               </Text>
             </Pressable>
+          ) : null}
+
+          {isPublic && !piece.archived ? (
+            <AdvancedPublicVisibility
+              showGlazeDetails={piece.showGlazeDetails}
+              showStudioNotes={piece.showStudioNotes}
+              onToggleGlaze={() =>
+                updatePiece(piece.id, { showGlazeDetails: !piece.showGlazeDetails })
+              }
+              onToggleNotes={() =>
+                updatePiece(piece.id, { showStudioNotes: !piece.showStudioNotes })
+              }
+            />
           ) : null}
 
           {/* Collection row */}

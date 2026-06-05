@@ -30,20 +30,25 @@ In `constants/privacy.ts`:
 - `getCollectionPieces(collection, pieces)` / `getPublicCollectionPieces(collection, pieces)` / `getPortfolioPieces(pieces)`.
 Do NOT reintroduce the removed `isFeaturedPublicPiece` / `getFeaturedCollectionPieces`, the old two-arg `isPubliclyVisiblePiece(piece, collections)`, or any collection-driven publishing helper (`isCollectionInPortfolio`, `featuredOnSite`).
 
-## Persistence (NO Supabase DDL — sandbox can't run it)
-- Piece flags `{collectionIds, featuredInPortfolio, isPublic, archived}` are stashed in the EXISTING `pieces.public_data_settings` jsonb column; `collection_id` keeps the first id for back-compat/fallback read. See `glazevault-supabase.md`.
-- Collection public/private uses the EXISTING `collections.visibility` text column; `featured_on_site` column is left unused (not dropped).
+## Persistence (typed columns now — see glazevault-schema-columns.md)
+- Piece curation flags `{collectionIds, featuredInPortfolio, isPublic, archived}` are TYPED columns (`collection_ids[]`, `featured_in_portfolio`, `is_public`, `archived`). The old `public_data_settings` blob is RETIRED. Do NOT reintroduce blob-stashing.
+- Collection public/private uses the EXISTING `collections.visibility` text column.
 - `normalizePiece` migrates legacy rows: `collectionId → [collectionId]`, and defaults `featuredInPortfolio/isPublic/archived` to FALSE.
 
 ## Migration is conservative → Portfolio starts EMPTY
 Existing pieces default to not-featured, not-public, not-archived. **Tell the user the Portfolio starts empty and they curate it.** **Why:** no accidental public exposure on upgrade.
 
-## Fixed public fields + structural projection boundary
-Public output is a FIXED allowlist: **id, title, imageUri, clay, dimensions, year** (meta line = clay·dimensions·year via `buildPublicMetaLine`). NEVER `notes`/glaze/cone/firing/firingEnvironment/price/tags on any public surface.
-- `toPublicPiece(piece)` in `constants/privacy.ts` is the SINGLE enforcement boundary: it returns a `PublicPieceView` containing ONLY the allowlist keys, so private fields cannot leak even by accident. Every public surface (public-site tiles, `/piece/[id]?public=1` detail + its fullscreen-viewer caption mapping) must consume `toPublicPiece(p)` and render only from it — never the raw piece.
-- **Why:** "protect studio knowledge by default" — type-only casts (`as PublicPiece[]`) don't strip runtime fields; a physical projection does. **How to apply:** to expose a NEW public field, add it to `PublicPieceView` + `toPublicPiece` + the privacy guard test (`__tests__/public-privacy.test.tsx`) — nowhere else. The guard test renders both public surfaces with per-field sentinels and also asserts `toPublicPiece` keys == allowlist; it FAILS if any owner-only sentinel appears.
-- cone/firing temp is owner-only by default (NOT shown publicly) even though it's a permissible public field — there is no per-field public toggle, so default-safe wins and the guard test locks cone as private.
-- ShareSheet is currently a stub (renders only the title); real share/export must also go through `toPublicPiece`.
+## Public fields = always-public core + TWO per-piece opt-ins (default OFF)
+Public output has two tiers, both enforced by the single boundary `toPublicPiece(piece)` in `constants/privacy.ts`:
+- **ALWAYS public** (when piece is public): id, title, imageUri, clay, dimensions, year. Meta line = clay·dimensions·year via `buildPublicMetaLine`.
+- **OPT-IN per piece, OFF by default** — two INDEPENDENT buckets gated by typed boolean flags `piece.showGlazeDetails` / `piece.showStudioNotes`:
+  - glaze bucket = `glaze + cone + firingEnvironment` (firingEnvironment falls back to `firing`).
+  - notes bucket = `notes`.
+  These keys are ADDED to the projection only when the flag is on (never defaulted), so an opted-out piece has NO key at all — structurally impossible to leak.
+- **GATED ON isPublic too (defense in depth):** `toPublicPiece` adds the opt-in keys only when `piece.isPublic && flag`, so a non-public piece never projects glaze/notes even if its flags are on. `ProjectablePiece` therefore carries `isPublic`. Render paths ALSO gate via `isPubliclyVisiblePiece`; both layers are intentional.
+- UI: a quiet collapsible "Advanced public visibility" (`components/AdvancedPublicVisibility.tsx`) shown only when main Public is ON, on BOTH `add.tsx` and `piece/[id].tsx`. Unpublishing resets both flags to false.
+- Share payload stays title + clay·dims·year ONLY — opted-in glaze/notes live on the public PAGE behind the link, never in the share text (`buildShareContent` reads only title+meta from the projection).
+- **How to apply:** to expose a NEW always-public field, add it to `PublicPieceView` + `toPublicPiece` + the guard test (`__tests__/public-privacy.test.tsx`). The guard test asserts default-off projection == the 6 core keys AND that owner-only sentinels never appear on either public surface unless the matching opt-in is on; it FAILS otherwise. **Why:** type casts don't strip runtime fields — a physical projection does.
 
 ## Public Site (generated gallery)
 - Curated Portfolio = `getPortfolioPieces(pieces)` (featured pieces). Optional public-collections section gated by `isCollectionPublic`.
