@@ -26,9 +26,9 @@ export const DEFAULT_PUBLIC_SITE: PublicSiteSettings = {
 };
 
 export const HOMEPAGE_LAYOUTS: { key: HomepageLayout; label: string; hint: string }[] = [
-  { key: "grid", label: "Catalog", hint: "Asymmetric art-book rhythm" },
+  { key: "grid", label: "Catalog", hint: "Even, uniform archival grid" },
   { key: "editorial", label: "Editorial", hint: "Large stacked features" },
-  { key: "masonry", label: "Masonry", hint: "Staggered two-column flow" },
+  { key: "masonry", label: "Masonry", hint: "Organic, staggered art-book flow" },
 ];
 
 export interface ArtistProfile {
