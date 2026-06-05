@@ -19,7 +19,6 @@ import {
   buildLinkShareContent,
   buildPublicMetaLine,
   getPortfolioCollectionPieces,
-  getPublicCollectionPieces,
   isCollectionPublic,
   toPublicPiece,
   type PublicPieceView,
@@ -156,13 +155,11 @@ export default function PublicSiteScreen({
   // artist has consciously featured appear (focus). A public collection with no
   // featured pieces is dropped entirely; with nothing featured the portfolio
   // reads intentionally empty.
-  // The portfolio shows public collections × their FEATURED pieces (curated).
-  // A single collection page (`onlyCollectionId`) instead scopes to that one
-  // collection and shows ALL its publicly-visible pieces, since the visitor came
-  // specifically to see that exhibition.
-  const collectionPiecesFor = onlyCollectionId
-    ? getPublicCollectionPieces
-    : getPortfolioCollectionPieces;
+  // This featured-only rule holds on EVERY public surface, including a single
+  // collection page (`onlyCollectionId`, the target of a shared collection link)
+  // — a focused view of a public collection must never expose unfeatured public
+  // works the artist did not curate into the exhibition.
+  const collectionPiecesFor = getPortfolioCollectionPieces;
   const publicCollections = collections
     .filter(isCollectionPublic)
     .filter((c) => !onlyCollectionId || c.id === onlyCollectionId)

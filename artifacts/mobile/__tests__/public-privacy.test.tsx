@@ -786,6 +786,27 @@ describe("the public gate refuses non-visible pieces entirely", () => {
     expect(tree).not.toContain("pieces/p2.jpg");
   });
 
+  it("single public collection page (onlyCollectionId) excludes a PUBLIC-but-unfeatured sibling", () => {
+    // A shared collection link renders the single-collection page via
+    // `onlyCollectionId`. The featured-only curation rule must hold there too —
+    // a fully public, photo-bearing, but UNfeatured sibling must never leak onto
+    // a shared exhibition page. p1 is featured (default); p2 is public + collected
+    // but unfeatured. Only p1 may appear.
+    mockCollections = [mockCollection];
+    mockPieces = [
+      makePiece("p1", { title: "ZZFEATUREDTILE" }),
+      makePiece("p2", { title: "ZZUNFEATUREDTILE", featuredInPortfolio: false }),
+    ];
+    const PublicSiteScreen = require("@/app/public-site").default;
+    const { toJSON } = render(<PublicSiteScreen onlyCollectionId="c1" />);
+    const tree = JSON.stringify(toJSON() ?? null);
+
+    expect(tree).toContain("ZZFEATUREDTILE");
+    expect(tree).toContain("pieces/p1.jpg");
+    expect(tree).not.toContain("ZZUNFEATUREDTILE");
+    expect(tree).not.toContain("pieces/p2.jpg");
+  });
+
   it("public-site omits a PUBLIC collection that has zero featured pieces", () => {
     // A collection may be public yet contain nothing featured. With an empty
     // curated set the whole collection is dropped (public-site filters out
