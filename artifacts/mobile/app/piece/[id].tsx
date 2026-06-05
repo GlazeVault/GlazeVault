@@ -262,11 +262,13 @@ export default function PieceDetailScreen() {
     await updatePiece(piece.id, { imageUri: piece.imageUri, images: next });
   };
 
+  // Delete = the only destructive action. It permanently removes the piece from
+  // the archive, every collection, the portfolio, and all public routes.
   const handleDelete = async () => {
     const confirmed = await confirm({
-      title: "Remove Piece",
-      message: `Remove "${piece.title}" from your archive?`,
-      confirmText: "Remove",
+      title: "Delete Piece",
+      message: "Delete this piece permanently? This cannot be undone.",
+      confirmText: "Delete",
       destructive: true,
     });
     if (!confirmed) return;
@@ -275,16 +277,17 @@ export default function PieceDetailScreen() {
     router.back();
   };
 
-  const handleContextRemove = async () => {
-    if (!from) {
-      await handleDelete();
-      return;
-    }
+  // Remove from this Collection = a pure unlink. It only detaches the piece from
+  // the collection the visitor entered from; the piece stays in the archive,
+  // keeps its photos, its other collections, and its Public status. (Removing it
+  // from its LAST collection auto-unfeatures it — a featured piece must live in a
+  // collection — which is handled inside removePieceFromCollection.)
+  const handleRemoveFromCollection = async () => {
+    if (!from) return;
     const confirmed = await confirm({
-      title: "Remove from Collection",
-      message: `Remove "${piece.title}" from this collection? It will stay in your archive.`,
+      title: "Remove from this Collection",
+      message: `Remove "${piece.title}" from this collection? It will stay safely in your archive.`,
       confirmText: "Remove",
-      destructive: true,
     });
     if (!confirmed) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -359,10 +362,21 @@ export default function PieceDetailScreen() {
   };
 
   const handleTogglePublic = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (piece.isPublic) {
-      // Unpublishing also clears the per-piece field-exposure opt-ins so a piece
-      // that is later re-published starts private-by-default again.
+      // Make Private — confirm the consequences first. This turns OFF public,
+      // auto-unfeatures (Portfolio ⊆ Public), and clears the per-piece
+      // field-exposure opt-ins so a piece later re-published starts
+      // private-by-default. The piece itself is never deleted — it stays in the
+      // owner's archive with all its photos and metadata.
+      const confirmed = await confirm({
+        title: "Make Private",
+        message:
+          "This piece will become private and be removed from:\n• Public Portfolio\n• Public Collections\n• Public Links\n\nThe piece will remain safely stored in your Archive.",
+        confirmText: "Make Private",
+        destructive: true,
+      });
+      if (!confirmed) return;
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await updatePiece(piece.id, {
         isPublic: false,
         featuredInPortfolio: false,
@@ -370,6 +384,7 @@ export default function PieceDetailScreen() {
         showStudioNotes: false,
       });
     } else {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       // Publishing must reach Supabase — the public site reads the server, not
       // the local cache. If the remote write fails the change is cache-only and
       // the public link would 404, so surface it instead of silently "publishing".
@@ -1035,15 +1050,30 @@ export default function PieceDetailScreen() {
               </Text>
             </Pressable>
 
+            {from ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.archiveLink,
+                  { opacity: pressed ? 0.5 : 0.85 },
+                ]}
+                onPress={handleRemoveFromCollection}
+              >
+                <Feather name="minus-circle" size={13} color={colors.mutedForeground} />
+                <Text style={[styles.archiveLinkText, { color: colors.mutedForeground }]}>
+                  Remove from this Collection
+                </Text>
+              </Pressable>
+            ) : null}
+
             <Pressable
               style={({ pressed }) => [
                 styles.deleteLink,
                 { opacity: pressed ? 0.5 : 0.7 },
               ]}
-              onPress={handleContextRemove}
+              onPress={handleDelete}
             >
               <Text style={[styles.deleteLinkText, { color: colors.mutedForeground }]}>
-                {from ? "Remove from collection" : "Delete piece"}
+                Delete Piece
               </Text>
             </Pressable>
           </View>

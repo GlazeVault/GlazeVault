@@ -7,11 +7,13 @@
  * cross-platform confirm() helper is mocked to a controllable boolean so each test
  * drives the confirmed vs. cancelled branch and asserts the side effects:
  *
- *   - no `from`  → footer reads "Delete piece" → confirm "Remove Piece" →
+ * Delete and Remove-from-Collection are now TWO distinct actions, not an
+ * either/or link:
+ *   - "Delete Piece" (always shown) → confirm "Delete Piece" →
  *                  deletePiece(id) + router.back()
- *   - `from`     → footer reads "Remove from collection" → confirm
- *                  "Remove from Collection" → removePieceFromCollection(from, id) +
- *                  router.back()
+ *   - "Remove from this Collection" (only with `from`) → confirm
+ *                  "Remove from this Collection" → removePieceFromCollection(from, id)
+ *                  + router.back(); it must NOT delete the piece.
  *
  * Factory-referenced outer vars are `mock`-prefixed per the jest hoisting rule.
  */
@@ -172,11 +174,11 @@ describe("piece detail destructive footer", () => {
       const PieceDetailScreen = require("@/app/piece/[id]").default;
       const { getByText } = render(<PieceDetailScreen />);
 
-      await fireEvent.press(getByText("Delete piece"));
+      await fireEvent.press(getByText("Delete Piece"));
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(confirmTitle()).toBe("Remove Piece");
+      expect(confirmTitle()).toBe("Delete Piece");
       expect(mockDeletePiece).toHaveBeenCalledWith("p1");
       expect(mockRemovePieceFromCollection).not.toHaveBeenCalled();
       expect(mockBack).toHaveBeenCalledTimes(1);
@@ -187,11 +189,11 @@ describe("piece detail destructive footer", () => {
       const PieceDetailScreen = require("@/app/piece/[id]").default;
       const { getByText } = render(<PieceDetailScreen />);
 
-      await fireEvent.press(getByText("Delete piece"));
+      await fireEvent.press(getByText("Delete Piece"));
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(confirmTitle()).toBe("Remove Piece");
+      expect(confirmTitle()).toBe("Delete Piece");
       expect(mockDeletePiece).not.toHaveBeenCalled();
       expect(mockBack).not.toHaveBeenCalled();
     });
@@ -206,11 +208,11 @@ describe("piece detail destructive footer", () => {
       const PieceDetailScreen = require("@/app/piece/[id]").default;
       const { getByText } = render(<PieceDetailScreen />);
 
-      await fireEvent.press(getByText("Remove from collection"));
+      await fireEvent.press(getByText("Remove from this Collection"));
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(confirmTitle()).toBe("Remove from Collection");
+      expect(confirmTitle()).toBe("Remove from this Collection");
       expect(mockRemovePieceFromCollection).toHaveBeenCalledWith("c1", "p1");
       expect(mockDeletePiece).not.toHaveBeenCalled();
       expect(mockBack).toHaveBeenCalledTimes(1);
@@ -221,13 +223,27 @@ describe("piece detail destructive footer", () => {
       const PieceDetailScreen = require("@/app/piece/[id]").default;
       const { getByText } = render(<PieceDetailScreen />);
 
-      await fireEvent.press(getByText("Remove from collection"));
+      await fireEvent.press(getByText("Remove from this Collection"));
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(confirmTitle()).toBe("Remove from Collection");
+      expect(confirmTitle()).toBe("Remove from this Collection");
       expect(mockRemovePieceFromCollection).not.toHaveBeenCalled();
       expect(mockBack).not.toHaveBeenCalled();
+    });
+
+    it("Delete Piece still deletes (does not just unlink) even inside a collection", async () => {
+      const PieceDetailScreen = require("@/app/piece/[id]").default;
+      const { getByText } = render(<PieceDetailScreen />);
+
+      await fireEvent.press(getByText("Delete Piece"));
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(confirmTitle()).toBe("Delete Piece");
+      expect(mockDeletePiece).toHaveBeenCalledWith("p1");
+      expect(mockRemovePieceFromCollection).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -1,0 +1,83 @@
+Do not touch the currently working share/public link system.
+
+Now implement clear Archive / Collection / Portfolio visibility and removal behavior.
+
+Core philosophy:
+- Archive = permanent private memory layer
+- Collections = curated groupings
+- Portfolio/Featured = public presentation layer
+- Making something private is NOT deleting it
+
+Requirements:
+
+1. Remove from Collection
+- Add action:
+  “Remove from this Collection”
+- This only unlinks the piece from the current collection.
+- Do NOT delete the piece from Archive.
+- Do NOT delete image/files.
+- Do NOT affect other collections.
+- Do NOT change Public status.
+- Piece remains safely stored in Archive.
+
+2. Remove from Portfolio
+- Add action:
+  “Remove from Portfolio”
+- This only turns OFF `featured_in_portfolio`.
+- Do NOT delete the piece.
+- Do NOT remove from Collections.
+- Do NOT change Public status.
+- Piece remains in Archive and can still be public.
+
+3. Make Private
+- Separate action:
+  “Make Private”
+- This turns OFF `is_public`.
+- Automatically turns OFF `featured_in_portfolio`.
+- Automatically removes the piece from:
+  - public portfolio
+  - public collections
+  - public profile
+  - public share links
+- Piece MUST remain safely stored in owner’s private Archive.
+- Do NOT delete files or metadata.
+
+4. Important visibility logic
+If a user makes a piece Private from Archive:
+- only that piece is affected
+- other pieces remain unchanged
+- collections themselves remain unchanged
+- featured state is removed only for that piece
+
+5. Delete Piece
+- Separate destructive action only.
+- Permanently removes piece from:
+  - Archive
+  - Collections
+  - Portfolio
+  - Public routes
+- Show confirmation:
+  “Delete this piece permanently? This cannot be undone.”
+
+6. UX labels
+Use clear wording:
+- Remove from this Collection
+- Remove from Portfolio
+- Make Private
+- Delete Piece
+
+7. Optional confirmation text for Make Private:
+“This piece will become private and be removed from:
+• Public Portfolio
+• Public Collections
+• Public Links
+
+The piece will remain safely stored in your Archive.”
+
+8. Keep current visual design.
+9. Do NOT modify:
+- share/copy link system
+- public routing
+- working public visibility code
+
+Only implement clean removal/unlink/private logic.
