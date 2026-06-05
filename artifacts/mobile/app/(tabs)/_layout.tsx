@@ -28,6 +28,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { name: "index", label: "Archive", sf: "archivebox", feather: "grid" },
   { name: "collections", label: "Collections", sf: "rectangle.stack", feather: "layers" },
+  { name: "saved", label: "Saved", sf: "bookmark", feather: "bookmark" },
   { name: "profile", label: "Profile", sf: "person", feather: "user" },
 ];
 
@@ -102,6 +103,7 @@ function GlazeTabBar({ state, navigation }: TabBarProps) {
         </View>
 
         {navItem(NAV_ITEMS[2])}
+        {navItem(NAV_ITEMS[3])}
       </View>
 
       <AddMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
@@ -118,6 +120,7 @@ export default function TabLayout() {
       <Tabs.Screen name="index" />
       <Tabs.Screen name="collections" />
       <Tabs.Screen name="add" options={{ href: null }} />
+      <Tabs.Screen name="saved" />
       <Tabs.Screen name="profile" />
     </Tabs>
   );

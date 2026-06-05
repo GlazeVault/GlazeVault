@@ -25,6 +25,7 @@ import { ToastHost } from "@/components/ToastHost";
 import { CollectionsProvider } from "@/context/CollectionsContext";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { PotteryProvider } from "@/context/PotteryContext";
+import { SavedProvider } from "@/context/SavedContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -58,6 +59,7 @@ export default function RootLayout() {
           <PotteryProvider>
             <CollectionsProvider>
               <ProfileProvider>
+                <SavedProvider>
                 <GestureHandlerRootView>
                   <KeyboardProvider>
                     <Stack screenOptions={{ headerShown: false }}>
@@ -92,6 +94,7 @@ export default function RootLayout() {
                     <ActionSheetHost />
                   </KeyboardProvider>
                 </GestureHandlerRootView>
+                </SavedProvider>
               </ProfileProvider>
             </CollectionsProvider>
           </PotteryProvider>

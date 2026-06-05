@@ -169,6 +169,21 @@ jest.mock("@/context/CollectionsContext", () => ({
   useCollections: () => ({ collections: mockCollections }),
 }));
 
+jest.mock("@/context/SavedContext", () => ({
+  useSaved: () => ({
+    saved: { pieces: [], collections: [], artists: [], following: [] },
+    hydrated: true,
+    isPieceSaved: () => false,
+    togglePieceSaved: () => {},
+    isCollectionSaved: () => false,
+    toggleCollectionSaved: () => {},
+    isArtistSaved: () => false,
+    toggleArtistSaved: () => {},
+    isFollowing: () => false,
+    toggleFollowing: () => {},
+  }),
+}));
+
 jest.mock("@/context/ProfileContext", () => ({
   useProfile: () => ({
     profile: {

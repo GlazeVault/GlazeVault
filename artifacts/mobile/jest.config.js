@@ -1,6 +1,7 @@
 module.exports = {
   preset: "jest-expo",
   testMatch: ["**/__tests__/**/*.test.{ts,tsx}"],
+  setupFiles: ["<rootDir>/jest.setup.js"],
   // pnpm stores packages under node_modules/.pnpm/<name>@<ver>/node_modules/<name>,
   // so the RN/Expo allowlist must match right after the .pnpm/ segment (scoped
   // packages use "+" instead of "/", e.g. @react-native+js-polyfills).

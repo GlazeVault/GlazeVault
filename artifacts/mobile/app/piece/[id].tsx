@@ -18,6 +18,7 @@ import { AdvancedPublicVisibility } from "@/components/AdvancedPublicVisibility"
 import { DraggablePhotoStrip } from "@/components/DraggablePhotoStrip";
 import { confirm } from "@/lib/confirm";
 import { ImageViewer, type ViewerItem } from "@/components/ImageViewer";
+import { SaveButton } from "@/components/SaveButton";
 import { ShareSheet } from "@/components/ShareSheet";
 import {
   buildPublicMetaLine,
@@ -33,6 +34,7 @@ import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { pieceShareUrl, useProfile } from "@/context/ProfileContext";
+import { useSaved } from "@/context/SavedContext";
 import { useColors } from "@/hooks/useColors";
 
 function InfoRow({
@@ -73,6 +75,7 @@ export default function PieceDetailScreen() {
   } = usePottery();
   const { collections } = useCollections();
   const { profile } = useProfile();
+  const { isPieceSaved, togglePieceSaved } = useSaved();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const piece = pieces.find((p) => p.id === id);
@@ -413,12 +416,20 @@ export default function PieceDetailScreen() {
           >
             <Feather name="arrow-left" size={18} color="#8A7B6C" />
           </Pressable>
-          <Pressable
-            style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
-            onPress={() => setShareVisible(true)}
-          >
-            <Feather name="share-2" size={18} color="#8A7B6C" />
-          </Pressable>
+          <View style={styles.topRight}>
+            <SaveButton
+              variant="float"
+              saved={isPieceSaved(piece.id)}
+              onPress={() => togglePieceSaved(piece.id)}
+              accessibilityLabel="Save this piece to your inspiration"
+            />
+            <Pressable
+              style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
+              onPress={() => setShareVisible(true)}
+            >
+              <Feather name="share-2" size={18} color="#8A7B6C" />
+            </Pressable>
+          </View>
         </View>
 
         <ScrollView

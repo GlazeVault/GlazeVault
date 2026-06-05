@@ -104,6 +104,21 @@ jest.mock("@/context/CollectionsContext", () => ({
   useCollections: () => ({ collections: [] }),
 }));
 
+jest.mock("@/context/SavedContext", () => ({
+  useSaved: () => ({
+    saved: { pieces: [], collections: [], artists: [], following: [] },
+    hydrated: true,
+    isPieceSaved: () => false,
+    togglePieceSaved: () => {},
+    isCollectionSaved: () => false,
+    toggleCollectionSaved: () => {},
+    isArtistSaved: () => false,
+    toggleArtistSaved: () => {},
+    isFollowing: () => false,
+    toggleFollowing: () => {},
+  }),
+}));
+
 jest.mock("@/context/ProfileContext", () => ({
   useProfile: () => ({ profile: { name: "Test Artist" } }),
   PUBLIC_SITE_DOMAIN: "glazevault.art",

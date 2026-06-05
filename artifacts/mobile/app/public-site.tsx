@@ -25,9 +25,12 @@ import {
   type PublicPieceView,
 } from "@/constants/privacy";
 import { ExpandableText } from "@/components/ExpandableText";
+import { FollowButton } from "@/components/FollowButton";
+import { SaveButton } from "@/components/SaveButton";
 import { ShareSheet } from "@/components/ShareSheet";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
+import { useSaved } from "@/context/SavedContext";
 import {
   collectionShareUrl,
   portfolioShareUrl,
@@ -117,6 +120,18 @@ export default function PublicSiteScreen({
 
   const site = profile.publicSite;
   const [shareVisible, setShareVisible] = useState(false);
+
+  // Quiet, private viewer-side curation. The artist this page belongs to is
+  // identified by their public slug; saving/following is keyed off it.
+  const {
+    isFollowing,
+    toggleFollowing,
+    isArtistSaved,
+    toggleArtistSaved,
+    isCollectionSaved,
+    toggleCollectionSaved,
+  } = useSaved();
+  const artistRef = { slug: publicSiteSlug(profile.name), name: profile.name || "Studio" };
 
   // The portfolio is a curated exhibition: public collections ARE the
   // storytelling structure (context), but inside each one ONLY the pieces the
@@ -359,6 +374,33 @@ export default function PublicSiteScreen({
               {PUBLIC_SITE_DOMAIN}/{publicSiteSlug(profile.name)}
             </Text>
           </View>
+        </View>
+
+        {/* Quiet network controls. On a single exhibition page the visitor can
+            save that exhibition for inspiration; on the artist's portfolio they
+            can follow the archive and save the artist. No counts, no metrics. */}
+        <View style={styles.inspireRow}>
+          {onlyCollectionId ? (
+            <SaveButton
+              saved={isCollectionSaved(onlyCollectionId)}
+              onPress={() => toggleCollectionSaved(onlyCollectionId)}
+              label={isCollectionSaved(onlyCollectionId) ? "Saved" : "Save Exhibition"}
+              accessibilityLabel="Save this exhibition to your inspiration"
+            />
+          ) : (
+            <>
+              <FollowButton
+                following={isFollowing(artistRef.slug)}
+                onPress={() => toggleFollowing(artistRef)}
+              />
+              <SaveButton
+                saved={isArtistSaved(artistRef.slug)}
+                onPress={() => toggleArtistSaved(artistRef)}
+                label={isArtistSaved(artistRef.slug) ? "Saved" : "Save Artist"}
+                accessibilityLabel="Save this artist to your inspiration"
+              />
+            </>
+          )}
         </View>
 
         {profile.bio.trim() ? (
@@ -612,6 +654,14 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_300Light",
     letterSpacing: 0.3,
     marginTop: 10,
+  },
+  inspireRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    paddingHorizontal: 28,
+    marginTop: 22,
+    marginBottom: 4,
   },
   bioWrap: { marginBottom: 22 },
   bio: {
