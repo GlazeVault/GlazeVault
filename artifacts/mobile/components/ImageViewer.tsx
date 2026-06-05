@@ -50,6 +50,14 @@ type Props = {
   items: ViewerItem[];
   initialIndex: number;
   onClose: () => void;
+  /**
+   * Optional gate run before the viewer's share action opens its sheet. Owner
+   * surfaces pass this to confirm the piece is live on the server first (so a
+   * cache-only piece never yields a dead public link); resolving `false` aborts
+   * the share. When omitted (public-visitor view, where content is already
+   * remote) the share opens directly.
+   */
+  onRequestShare?: () => Promise<boolean>;
 };
 
 /** Warm near-black backdrop — calm, not a harsh pure black. */
@@ -233,7 +241,7 @@ function WebPage({
  * Fullscreen artwork viewer. Swipe between pieces, pinch/double-tap to zoom,
  * single tap to hide the chrome. Opens and closes with a soft fade.
  */
-export function ImageViewer({ visible, items, initialIndex, onClose }: Props) {
+export function ImageViewer({ visible, items, initialIndex, onClose, onRequestShare }: Props) {
   const isWeb = Platform.OS === "web";
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -443,7 +451,14 @@ export function ImageViewer({ visible, items, initialIndex, onClose }: Props) {
           )}
           {current?.share ? (
             <Pressable
-              onPress={() => setShareVisible(true)}
+              onPress={async () => {
+                // Owner surfaces pass a gate to confirm the piece is live on the
+                // server before sharing; resolving false aborts so a cache-only
+                // piece never yields a dead public link. Public-visitor view has
+                // no gate (content is already remote) and opens directly.
+                if (onRequestShare && !(await onRequestShare())) return;
+                setShareVisible(true);
+              }}
               hitSlop={12}
               style={styles.closeBtn}
               accessibilityRole="button"

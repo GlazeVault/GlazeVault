@@ -75,6 +75,7 @@ export default function PieceDetailScreen() {
   const {
     pieces: ownPieces,
     updatePiece,
+    ensurePieceRemote,
     deletePiece,
     addPieceToCollection,
     removePieceFromCollection,
@@ -342,7 +343,18 @@ export default function PieceDetailScreen() {
       return;
     }
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await updatePiece(piece.id, { featuredInPortfolio: true, isPublic: true });
+    // Featuring publishes the piece, so it must reach Supabase — otherwise the
+    // public link 404s. Surface a failed remote write instead of silently
+    // featuring a piece that lives only in the local cache.
+    const ok = await updatePiece(piece.id, { featuredInPortfolio: true, isPublic: true });
+    if (!ok) {
+      notice({
+        title: "Couldn’t publish",
+        message:
+          "This piece was saved on this device but couldn’t reach the cloud, so its public link won’t work yet. Check your connection and try again.",
+        variant: "error",
+      });
+    }
   };
 
   const handleTogglePublic = async () => {
@@ -357,8 +369,41 @@ export default function PieceDetailScreen() {
         showStudioNotes: false,
       });
     } else {
-      await updatePiece(piece.id, { isPublic: true });
+      // Publishing must reach Supabase — the public site reads the server, not
+      // the local cache. If the remote write fails the change is cache-only and
+      // the public link would 404, so surface it instead of silently "publishing".
+      const ok = await updatePiece(piece.id, { isPublic: true });
+      if (!ok) {
+        notice({
+          title: "Couldn’t publish",
+          message:
+            "This piece was saved on this device but couldn’t reach the cloud, so its public link won’t work yet. Check your connection and try again.",
+          variant: "error",
+        });
+      }
     }
+  };
+
+  // Confirms the piece is live on Supabase before any owner share. This
+  // self-heals a piece that only ever made it into the local cache (a past
+  // remote write failed) so the owner is never handed a public link that the
+  // public site cannot read. Returns whether sharing may proceed.
+  const ensureShareable = async (): Promise<boolean> => {
+    const live = await ensurePieceRemote(piece.id);
+    if (!live) {
+      notice({
+        title: "Couldn’t share yet",
+        message:
+          "This piece couldn’t be saved to the cloud, so its public link won’t work yet. Check your connection and try again.",
+        variant: "error",
+      });
+    }
+    return live;
+  };
+
+  // Owner Share button: gate on a live remote row, then open the sheet.
+  const handleOpenShare = async () => {
+    if (await ensureShareable()) setShareVisible(true);
   };
 
   const handleToggleArchive = async () => {
@@ -866,7 +911,7 @@ export default function PieceDetailScreen() {
                       opacity: pressed ? 0.85 : 1,
                     },
                   ]}
-                  onPress={() => setShareVisible(true)}
+                  onPress={handleOpenShare}
                 >
                   <Feather name="share-2" size={14} color={colors.background} />
                   <Text style={[styles.actionBtnText, { color: colors.background }]}>
@@ -1062,6 +1107,7 @@ export default function PieceDetailScreen() {
         items={viewerItems}
         initialIndex={viewerIndex}
         onClose={() => setViewerVisible(false)}
+        onRequestShare={ensureShareable}
       />
     </View>
   );

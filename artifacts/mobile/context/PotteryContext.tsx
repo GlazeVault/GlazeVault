@@ -76,7 +76,12 @@ interface PotteryContextType {
         >
       >
   ) => Promise<PotteryPiece>;
-  updatePiece: (id: string, updates: Partial<PotteryPiece>) => Promise<void>;
+  // Resolves to `true` once the change is safely on Supabase (or there is no
+  // server configured), and `false` when the remote write failed and the change
+  // lives only in the local cache. Sharing-critical callers await this.
+  updatePiece: (id: string, updates: Partial<PotteryPiece>) => Promise<boolean>;
+  // Re-pushes a cached piece to Supabase; `true` once it is live on the server.
+  ensurePieceRemote: (id: string) => Promise<boolean>;
   deletePiece: (id: string) => Promise<void>;
   addPieceToCollection: (collectionId: string, pieceId: string) => Promise<void>;
   removePieceFromCollection: (collectionId: string, pieceId: string) => Promise<void>;
@@ -194,12 +199,16 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   // Pushes a single piece to Supabase. On success the returned record carries
   // any freshly-uploaded image URL, which we fold back into the cache so the
   // same local image is never re-uploaded on later edits. Failures are kept in
-  // the cache (offline buffer) and logged.
+  // the cache (offline buffer) and logged. Returns `true` when the piece is
+  // safely on the server (or there is no server to push to), and `false` when a
+  // remote write was attempted and failed — callers that gate public sharing on
+  // a live row (publish/feature/share) use this to surface the failure instead
+  // of handing out a dead public link.
   const pushPieceRemote = useCallback(
-    async (piece: PotteryPiece) => {
+    async (piece: PotteryPiece): Promise<boolean> => {
       console.log("Saving piece images:", piece.id, piece.imageUri);
       const uid = userIdRef.current;
-      if (!isSupabaseConfigured || !uid) return;
+      if (!isSupabaseConfigured || !uid) return true;
       try {
         const saved = await savePieceRemote(piece, uid);
         const imagesChanged =
@@ -214,11 +223,28 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
             )
           );
         }
+        return true;
       } catch (e) {
         console.warn("[supabase] savePiece failed (kept in local cache)", e);
+        return false;
       }
     },
     [persist]
+  );
+
+  // Re-pushes the currently-cached version of a piece to Supabase and reports
+  // whether it is now live on the server. Used at share time to self-heal a
+  // piece that only ever made it into the local cache (a past remote write
+  // failed), so a public link is never handed out for a row the public site
+  // cannot read. Does NOT introduce a background sync queue — it only runs in
+  // direct response to a sharing-critical action.
+  const ensurePieceRemote = useCallback(
+    async (id: string): Promise<boolean> => {
+      const piece = piecesRef.current.find((p) => p.id === id);
+      if (!piece) return false;
+      return pushPieceRemote(piece);
+    },
+    [pushPieceRemote]
   );
 
   const removePieceRemote = useCallback(async (id: string) => {
@@ -386,7 +412,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
           return merged;
         })
       );
-      if (merged) await pushPieceRemote(merged);
+      return merged ? await pushPieceRemote(merged) : true;
     },
     [persist, pushPieceRemote]
   );
@@ -462,7 +488,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const getPiece = useCallback((id: string) => piecesRef.current.find((p) => p.id === id), []);
 
   return (
-    <PotteryContext.Provider value={{ pieces, hydrated, addPiece, updatePiece, deletePiece, addPieceToCollection, removePieceFromCollection, toggleFavorite, getPiece }}>
+    <PotteryContext.Provider value={{ pieces, hydrated, addPiece, updatePiece, ensurePieceRemote, deletePiece, addPieceToCollection, removePieceFromCollection, toggleFavorite, getPiece }}>
       {children}
     </PotteryContext.Provider>
   );
