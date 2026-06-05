@@ -130,22 +130,63 @@ export default function ProfileScreen() {
 
   const handleCopyLink = async () => {
     if (!site.enabled) return;
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Clipboard.setStringAsync(publicSiteUrl);
-    notice({ title: "Link copied", message: `${publicSiteUrl} is on your clipboard.`, variant: "success" });
+    console.log("[glazevault] share link generated", publicSiteUrl);
+    // Copy FIRST, within the gesture, so iOS Safari allows the clipboard write.
+    let copied = false;
+    try {
+      await Clipboard.setStringAsync(publicSiteUrl);
+      copied = true;
+      console.log("[glazevault] copied link to clipboard", publicSiteUrl);
+    } catch (e) {
+      console.warn("[glazevault] clipboard copy failed", e);
+    }
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    notice(
+      copied
+        ? { title: "Link copied", message: `${publicSiteUrl} is on your clipboard.`, variant: "success" }
+        : { title: "Couldn’t copy automatically", message: publicSiteUrl, variant: "info" },
+    );
   };
 
   const handleShareSite = async () => {
     if (!site.enabled) return;
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log("[glazevault] share action: opening share sheet", publicSiteUrl);
+    // Fire the share SYNCHRONOUSLY (no await before it) so iOS Safari's Web Share
+    // API still sees the user gesture.
+    const sharePromise = Share.share({
+      message: `${profile.name ? `${profile.name} — ` : ""}${publicSiteUrl}`,
+      url: publicSiteUrl,
+      title: profile.name || "My public site",
+    });
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
     try {
-      await Share.share({
-        message: `${profile.name ? `${profile.name} — ` : ""}${publicSiteUrl}`,
-        url: publicSiteUrl,
-        title: profile.name || "My public site",
-      });
+      const result = await sharePromise;
+      console.log("[glazevault] share action result:", result?.action ?? "shared");
     } catch (e) {
-      console.warn("Failed to share public site", e);
+      // A user cancel (iOS Safari rejects with AbortError) is not a failure.
+      if ((e as { name?: string } | null)?.name === "AbortError") {
+        console.log("[glazevault] share action result: dismissed by user");
+        return;
+      }
+      // Share unavailable/errored → auto-copy so the action is never a dead end.
+      console.warn("[glazevault] share failed; falling back to copy link", e);
+      let copied = false;
+      try {
+        await Clipboard.setStringAsync(publicSiteUrl);
+        copied = true;
+        console.log("[glazevault] share fallback copied link to clipboard", publicSiteUrl);
+      } catch (err) {
+        console.warn("[glazevault] clipboard copy failed", err);
+      }
+      notice(
+        copied
+          ? { title: "Link copied", message: "Sharing wasn’t available, so the link is on your clipboard.", variant: "success" }
+          : { title: "Couldn’t share", message: publicSiteUrl, variant: "info" },
+      );
     }
   };
 

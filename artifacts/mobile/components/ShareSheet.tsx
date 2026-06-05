@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import React, { useCallback } from "react";
-import { Modal, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
@@ -20,6 +20,42 @@ interface ShareSheetProps {
   content: ShareContent;
 }
 
+// The Web Share API (iOS Safari) and the async Clipboard write both require the
+// call to happen synchronously inside the user gesture. Awaiting anything first
+// — even a haptic — can drop the transient activation and make share/copy fail
+// silently. So haptics are fire-and-forget and native-only, and every handler
+// issues the share/clipboard call FIRST.
+function tapFeedback() {
+  if (Platform.OS === "web") return;
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+}
+
+// True when the share was dismissed by the user rather than failing. iOS
+// Safari's Web Share API rejects with an AbortError on cancel; native iOS
+// instead resolves with `dismissedAction` (handled without throwing).
+function isShareDismissal(e: unknown): boolean {
+  return (e as { name?: string } | null)?.name === "AbortError";
+}
+
+// Copies the public link to the clipboard, logging the outcome. `viaFallback`
+// marks the copy that happens automatically after a failed native share.
+async function copyLinkToClipboard(
+  url: string,
+  viaFallback: boolean,
+): Promise<boolean> {
+  try {
+    await Clipboard.setStringAsync(url);
+    console.log(
+      `[glazevault] ${viaFallback ? "share fallback " : ""}copied link to clipboard`,
+      url,
+    );
+    return true;
+  } catch (e) {
+    console.warn("[glazevault] clipboard copy failed", e);
+    return false;
+  }
+}
+
 /**
  * A calm, two-action share sheet. "Share…" opens the real OS share sheet (the
  * native iOS share experience) via React Native's Share API; "Copy link" puts
@@ -32,37 +68,78 @@ export function ShareSheet({ visible, onClose, content }: ShareSheetProps) {
   const insets = useSafeAreaInsets();
 
   const handleNativeShare = useCallback(async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    console.log("[glazevault] share action: opening share sheet", content.url);
+    // Fire the OS/Web share SYNCHRONOUSLY (no await before it) so iOS Safari's
+    // Web Share API still sees the user gesture; only then run the (non-blocking)
+    // haptic and close the sheet. `url` is honored by iOS; Android/web also carry
+    // the link in `message`, so it travels on every platform.
+    const sharePromise = Share.share(
+      {
+        // The attribution headline ("Title — Artist on GlazeVault") travels as
+        // the share title/subject and leads the message, so the recipient is
+        // recommended an exhibition with its original artist preserved.
+        title: content.headline,
+        message: content.message,
+        url: content.url,
+      },
+      { subject: content.headline },
+    );
+    tapFeedback();
     onClose();
     try {
-      // `url` is honored by iOS; Android relies on `message` (which already
-      // carries the link), so the URL travels on both platforms.
-      await Share.share(
-        {
-          // The attribution headline ("Title — Artist on GlazeVault") travels as
-          // the share title/subject and leads the message, so the recipient is
-          // recommended an exhibition with its original artist preserved.
-          title: content.headline,
-          message: content.message,
-          url: content.url,
-        },
-        { subject: content.headline },
+      const result = await sharePromise;
+      console.log(
+        "[glazevault] share action result:",
+        result?.action ?? "shared",
       );
     } catch (e) {
-      console.warn("Failed to open share sheet", e);
+      // A user cancel is not a failure — don't fall back on it.
+      if (isShareDismissal(e)) {
+        console.log("[glazevault] share action result: dismissed by user");
+        return;
+      }
+      // Native/Web share is unavailable or errored (e.g. a desktop browser with
+      // no Web Share API): automatically copy the link so the action is never a
+      // dead end, then show a quiet confirmation.
+      console.warn("[glazevault] share failed; falling back to copy link", e);
+      const copied = await copyLinkToClipboard(content.url, true);
+      setTimeout(() => {
+        notice(
+          copied
+            ? {
+                title: "Link copied",
+                message: "Sharing wasn’t available, so the link is on your clipboard.",
+                variant: "success",
+              }
+            : {
+                title: "Couldn’t share",
+                message: content.url,
+                variant: "info",
+              },
+        );
+      }, 250);
     }
   }, [content, onClose]);
 
   const handleCopyLink = useCallback(async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Clipboard.setStringAsync(content.url);
+    // Copy FIRST, within the gesture, so iOS Safari allows the clipboard write.
+    const copied = await copyLinkToClipboard(content.url, false);
+    tapFeedback();
     onClose();
     setTimeout(() => {
-      notice({
-        title: "Link copied",
-        message: `${content.url} is on your clipboard.`,
-        variant: "success",
-      });
+      notice(
+        copied
+          ? {
+              title: "Link copied",
+              message: `${content.url} is on your clipboard.`,
+              variant: "success",
+            }
+          : {
+              title: "Couldn’t copy automatically",
+              message: content.url,
+              variant: "info",
+            },
+      );
     }, 250);
   }, [content.url, onClose]);
 

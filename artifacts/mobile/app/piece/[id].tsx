@@ -403,8 +403,20 @@ export default function PieceDetailScreen() {
 
   // Owner Share button: gate on a live remote row, then open the sheet.
   const handleOpenShare = async () => {
+    // Defense in depth: never generate a public link for a non-public piece. The
+    // Share affordance is already hidden for private pieces, but guard here too
+    // so a private piece can never produce a link that would 404 for visitors.
+    if (!isPubliclyVisiblePiece(piece)) {
+      notice({
+        title: "This piece is private",
+        message: "Make it public before sharing so the link will open for others.",
+        variant: "info",
+      });
+      return;
+    }
+    const url = pieceShareUrl(profile.name, piece.id);
+    console.log("[glazevault] share link generated", url);
     if (await ensureShareable()) {
-      console.log("[glazevault] share link", pieceShareUrl(profile.name, piece.id));
       setShareVisible(true);
     }
   };
