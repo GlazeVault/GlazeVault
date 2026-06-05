@@ -48,3 +48,6 @@ Public output is a FIXED allowlist: **id, title, imageUri, clay, dimensions, yea
 ## Public Site (generated gallery)
 - Curated Portfolio = `getPortfolioPieces(pieces)` (featured pieces). Optional public-collections section gated by `isCollectionPublic`.
 - `hasContent` empty-state when neither portfolio pieces nor public collections exist.
+
+## Add/Save flow = progressive curation (NOT a post-config form)
+The "Save to Archive" screen (`app/(tabs)/add.tsx`) uses stepped disclosure: Private default → Public reveals the Collection step → selecting a collection reveals the Feature step. Collection is OPTIONAL with an explicit "None" chip (rendered first, selected when `collectionIds.length===0`); public pieces NEVER require a collection. **Why:** calm, low-pressure curation for non-technical artists. **How to apply:** keep "None" as the calm default; `selectNone()`/toggling Public off/removing last collection must all clear `featured`; the save handler is the hard gate (`featuredInPortfolio` only when public && ≥1 collection). The edit-piece screen uses a DIFFERENT expandable "Add to Collections" pattern by design — don't unify them blindly.

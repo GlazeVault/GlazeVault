@@ -111,6 +111,12 @@ export default function AddScreen() {
       return next;
     });
   };
+  // "None" is the calm default: a public piece needs no collection. Choosing it
+  // clears any grouping and folds the (collection-gated) Feature step back away.
+  const selectNone = () => {
+    setCollectionIds([]);
+    setFeatured(false);
+  };
 
   const handleSave = async () => {
     if (images.length === 0) {
@@ -267,37 +273,63 @@ export default function AddScreen() {
 
         {isPublic && (
           <>
-            <Label text="Collections" />
+            <Label text="Collection" />
             {collections.length === 0 ? (
               <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>
-                Create a collection from the Collections tab to group and feature this piece.
+                This piece will be saved as a standalone public piece. Create a collection from the Collections tab to group and feature it.
               </Text>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.chipRow}>
-                  {collections.map((col) => {
-                    const selected = collectionIds.includes(col.id);
-                    return (
-                      <Pressable
-                        key={col.id}
-                        style={[
-                          styles.chip,
-                          {
-                            backgroundColor: selected ? colors.cobalt : "transparent",
-                            borderColor: selected ? colors.cobalt : colors.border,
-                            borderRadius: 24,
-                          },
-                        ]}
-                        onPress={() => toggleCollection(col.id)}
-                      >
-                        <Text style={[styles.chipText, { color: selected ? "#FFFFFF" : colors.mutedForeground }]}>
-                          {col.title}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </ScrollView>
+              <>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.chipRow}>
+                    {/* "None" is the default — a public piece never requires a
+                        collection. It stands first and selected until the artist
+                        chooses to file the piece somewhere. */}
+                    <Pressable
+                      key="none"
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: collectionIds.length === 0 ? colors.cobalt : "transparent",
+                          borderColor: collectionIds.length === 0 ? colors.cobalt : colors.border,
+                          borderRadius: 24,
+                        },
+                      ]}
+                      onPress={selectNone}
+                    >
+                      <Text style={[styles.chipText, { color: collectionIds.length === 0 ? "#FFFFFF" : colors.mutedForeground }]}>
+                        None
+                      </Text>
+                    </Pressable>
+                    {collections.map((col) => {
+                      const selected = collectionIds.includes(col.id);
+                      return (
+                        <Pressable
+                          key={col.id}
+                          style={[
+                            styles.chip,
+                            {
+                              backgroundColor: selected ? colors.cobalt : "transparent",
+                              borderColor: selected ? colors.cobalt : colors.border,
+                              borderRadius: 24,
+                            },
+                          ]}
+                          onPress={() => toggleCollection(col.id)}
+                        >
+                          <Text style={[styles.chipText, { color: selected ? "#FFFFFF" : colors.mutedForeground }]}>
+                            {col.title}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+                <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>
+                  {collectionIds.length === 0
+                    ? "Optional — saved as a standalone public piece."
+                    : "Filed into your selected collection."}
+                </Text>
+              </>
             )}
           </>
         )}
