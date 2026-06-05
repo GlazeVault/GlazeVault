@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { coalesceImages } from "@/constants/imageStorage";
+import { useAuth } from "@/context/AuthContext";
 import { isSupabaseConfigured } from "@/services/supabase";
 import {
   deletePiece as deletePieceRemote,
@@ -85,7 +86,11 @@ interface PotteryContextType {
 
 const PotteryContext = createContext<PotteryContextType | undefined>(undefined);
 
-const STORAGE_KEY = "@glazevault_pieces_v2";
+// Cache key is namespaced per user so each account's archive lives in its own
+// slot and signing out / switching accounts never bleeds one artist's pieces
+// into another's.
+const STORAGE_PREFIX = "@glazevault_pieces_v2";
+const cacheKey = (userId: string) => `${STORAGE_PREFIX}:${userId}`;
 
 // GlazeVault originally shipped with one demo "Blue Mug" seed piece
 // (id "seed-blue-mug", a bundled `@seed/blue-mug` image). We no longer seed any
@@ -157,21 +162,30 @@ function normalizePiece(
 }
 
 export function PotteryProvider({ children }: { children: React.ReactNode }) {
+  const { userId, authReady } = useAuth();
   const [pieces, setPieces] = useState<PotteryPiece[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const piecesRef = useRef<PotteryPiece[]>([]);
+  // Latest userId so the stable callbacks below always write to / sync the
+  // current account without being re-created on every sign-in.
+  const userIdRef = useRef<string | null>(userId);
+  userIdRef.current = userId;
   // Serializes AsyncStorage writes so rapid successive saves commit in order and
   // an older snapshot can never overwrite a newer one.
   const writeChain = useRef<Promise<void>>(Promise.resolve());
 
-  // Writes to the AsyncStorage cache only. Supabase is the source of truth when
-  // configured; the cache exists for instant first paint and offline use.
+  // Writes to the per-user AsyncStorage cache only. Supabase is the source of
+  // truth when configured; the cache exists for instant first paint and offline
+  // use. No-ops when signed out (no user to scope the cache to).
   const persist = useCallback(async (updated: PotteryPiece[]) => {
     piecesRef.current = updated;
     setPieces(updated);
+    const uid = userIdRef.current;
+    if (!uid) return;
+    const key = cacheKey(uid);
     const write = writeChain.current
       .catch(() => {})
-      .then(() => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)));
+      .then(() => AsyncStorage.setItem(key, JSON.stringify(updated)));
     writeChain.current = write;
     await write;
     console.log("Saved pieces", updated.length);
@@ -184,9 +198,10 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const pushPieceRemote = useCallback(
     async (piece: PotteryPiece) => {
       console.log("Saving piece images:", piece.id, piece.imageUri);
-      if (!isSupabaseConfigured) return;
+      const uid = userIdRef.current;
+      if (!isSupabaseConfigured || !uid) return;
       try {
-        const saved = await savePieceRemote(piece);
+        const saved = await savePieceRemote(piece, uid);
         const imagesChanged =
           saved.images.length !== piece.images.length ||
           saved.images.some((uri, i) => uri !== piece.images[i]);
@@ -207,7 +222,8 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   );
 
   const removePieceRemote = useCallback(async (id: string) => {
-    if (!isSupabaseConfigured) return;
+    const uid = userIdRef.current;
+    if (!isSupabaseConfigured || !uid) return;
     try {
       await deletePieceRemote(id);
     } catch (e) {
@@ -215,14 +231,27 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Hydrate (and re-hydrate) whenever the signed-in user changes. Gated on
+  // `authReady` so the one-time legacy claim has already run for the first
+  // account before we read pieces — otherwise the inherited archive wouldn't
+  // appear until a later reload.
   useEffect(() => {
+    let cancelled = false;
+    if (!userId || !authReady) {
+      // Signed out / not ready: clear any previous user's pieces from memory.
+      piecesRef.current = [];
+      setPieces([]);
+      setHydrated(false);
+      return;
+    }
+    const key = cacheKey(userId);
     (async () => {
       // 1. Local cache first — instant paint + offline fallback. No demo data is
       //    ever seeded; the retired demo seed piece is stripped here so it never
       //    repaints or gets re-synced up to Supabase.
       let cached: PotteryPiece[] = [];
       try {
-        const data = await AsyncStorage.getItem(STORAGE_KEY);
+        const data = await AsyncStorage.getItem(key);
         if (data) {
           const parsed = JSON.parse(data) as Array<Partial<PotteryPiece> & Pick<PotteryPiece, "id">>;
           cached = parsed.map(normalizePiece).filter((p) => !isDemoSeedPiece(p));
@@ -247,7 +276,8 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
         try {
           // Defensively strip the demo seed from remote too, so an old copy
           // pushed up by a previous version can't repaint or be re-synced.
-          const remote = (await loadPiecesRemote()).filter((p) => !isDemoSeedPiece(p));
+          const remote = (await loadPiecesRemote(userId)).filter((p) => !isDemoSeedPiece(p));
+          if (cancelled) return;
           remote.forEach((p) => console.log("Loaded piece images:", p.id, p.imageUri));
           if (remote.length > 0) {
             const remoteIds = new Set(remote.map((p) => p.id));
@@ -268,7 +298,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
             console.log("[supabase] migrating", cached.length, "local pieces");
             const migrated = await Promise.all(
               cached.map((p) =>
-                savePieceRemote(p).catch((e) => {
+                savePieceRemote(p, userId).catch((e) => {
                   console.warn("[supabase] migrate piece failed", e);
                   return p;
                 })
@@ -280,9 +310,12 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
           console.warn("[supabase] loadPieces failed, using local cache", e);
         }
       }
-      setHydrated(true);
+      if (!cancelled) setHydrated(true);
     })();
-  }, [persist, pushPieceRemote]);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, authReady, persist, pushPieceRemote]);
 
   const addPiece = useCallback(
     async (

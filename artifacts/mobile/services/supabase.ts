@@ -21,6 +21,7 @@
 
 import "react-native-url-polyfill/auto";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? "";
@@ -51,15 +52,17 @@ if (!isSupabaseConfigured) {
  * The shared client, or `null` when not configured. Prefer importing the typed
  * data-service functions in `dataService.ts` over using this directly.
  *
- * Auth session persistence is disabled: GlazeVault has no user auth yet, so we
- * never need to store a session and we avoid pulling in an AsyncStorage auth
- * adapter.
+ * Auth uses email + password. The session is persisted in AsyncStorage (which is
+ * localStorage-backed on web) and auto-refreshed so a signed-in artist stays
+ * signed in across reloads. `detectSessionInUrl` is off because we never use
+ * magic-link / OAuth redirect callbacks.
  */
 export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+        storage: AsyncStorage,
+        persistSession: true,
+        autoRefreshToken: true,
         detectSessionInUrl: false,
       },
     })

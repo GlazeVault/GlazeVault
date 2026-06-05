@@ -34,6 +34,7 @@ import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { pieceShareUrl, useProfile } from "@/context/ProfileContext";
+import { usePublicArtistOptional } from "@/context/PublicArtistContext";
 import { useSaved } from "@/context/SavedContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -65,16 +66,24 @@ export default function PieceDetailScreen() {
     immersive?: string;
   }>();
   const { id, from } = params;
-  const isPublicView = params.public === "1";
+  // When mounted under a `/[slug]/piece/[id]` route a PublicArtistProvider is
+  // present, supplying ANOTHER artist's public archive. That makes this a public
+  // view (owner controls hidden) and the data comes from the remote provider;
+  // otherwise it's the owner's own piece and reads from the local contexts.
+  const pub = usePublicArtistOptional();
+  const isPublicView = params.public === "1" || !!pub;
   const {
-    pieces,
+    pieces: ownPieces,
     updatePiece,
     deletePiece,
     addPieceToCollection,
     removePieceFromCollection,
   } = usePottery();
-  const { collections } = useCollections();
-  const { profile } = useProfile();
+  const { collections: ownCollections } = useCollections();
+  const { profile: ownProfile } = useProfile();
+  const pieces = pub ? pub.pieces : ownPieces;
+  const collections = pub ? pub.collections : ownCollections;
+  const profile = pub ? pub.profile : ownProfile;
   const { isPieceSaved, togglePieceSaved } = useSaved();
   const colors = useColors();
   const insets = useSafeAreaInsets();

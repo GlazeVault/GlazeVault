@@ -1,6 +1,6 @@
 ---
 name: GlazeVault public web exhibition pages
-description: How shareable public links resolve as real web pages, and the gating/readiness rules that keep private content unreachable.
+description: How shareable public links resolve as real web pages, and the provider/gating rules that keep private content unreachable across accounts.
 ---
 
 # GlazeVault public web exhibition pages
@@ -14,35 +14,35 @@ Only literal prefixes claimed in an artifact's `artifact.toml` (e.g. `/api`) rou
 elsewhere. So bare `/{slug}` vanity URLs can ONLY be served from inside the expo app —
 no new server, no proxy/toml change is possible for this URL shape.
 
-## Structure
-- Each live route is a THIN GATE that verifies public visibility BEFORE rendering, then
-  reuses existing public presentation (`PublicSiteScreen` with `live`/`onlyCollectionId`
-  props; piece detail via `?public=1`). No duplicated rendering logic.
-- Gate verdicts use `PublicGate.tsx`: `usePublicReady()` + `<PublicLoading>` + `<PublicMissing>`
-  ("Not on view" — deliberately non-committal, never reveals whether content exists).
+## Cross-account remote fetch (the current model)
+Once auth landed, public links must show ANY artist's public archive to a DIFFERENT
+signed-in artist or an anonymous visitor — not the local (owner) contexts. So each
+`[slug]` route wraps `<PublicArtistProvider slug={slug}>` which REMOTELY fetches that
+one artist's public data from Supabase by slug:
+- `loadPublicProfileBySlug` — fetches RLS-visible profiles and matches `public_site.enabled`
+  + derived `publicSiteSlug(name)`. There is NO persisted unique slug column, so it orders
+  by `created_at ASC` and takes the first match → resolution is DETERMINISTIC (earliest
+  artist wins on a name collision). A true unique-slug column is a follow-up.
+- `loadPublicPiecesForUser` / `loadPublicCollectionsForUser` — `eq user_id`, then filter
+  `isPubliclyVisiblePiece` / public collections.
 
-## Readiness (avoid the not-on-view flash)
-A public visitor arrives with an EMPTY cache, so contexts hydrate from Supabase async.
-`usePublicReady()` waits for ALL THREE stores' `hydrated` flag (Profile/Collections/Pottery
-each flip it once their initial cache+Supabase load settles), with a safety timer fallback.
-**Why all three, not "any data arrived":** the old heuristic flashed "Not on view" on a
-valid link when one store (e.g. pieces) hydrated before the profile that supplies the slug.
+`usePublicArtist()` exposes `status` (`loading|ready|missing`) + profile/pieces/collections.
+`usePublicArtistOptional()` returns the context when inside a provider, else null.
 
-## Gating rule (the important one)
-Private content must NEVER resolve publicly. Real guarantee = `isPubliclyVisiblePiece` /
-`isCollectionPublic` + `publicSite.enabled` + slug match, ALL checked at the live route.
-Shared links always use the gated `/{slug}/...` route. The bare `/piece/{id}?public=1` is
-an INTERNAL owner-preview URL (also the redirect target) — it never leaks a PRIVATE piece
-(still `isPubliclyVisiblePiece`-gated) but it does not re-check `publicSite.enabled`; that
-residual is acceptable under the documented client-gating posture (anon-key + permissive
-RLS; true RLS hardening is a tracked future follow-up).
+## Gating (each [slug] route is a THIN gate)
+Render `<PublicLoading>` while `status==='loading'`; render `<PublicMissing>` ("Not on view",
+deliberately non-committal) when `status==='missing'`, `!profile.publicSite.enabled`, or the
+specific piece/collection isn't found / fails `isPubliclyVisiblePiece` / `isCollectionPublic`.
+Otherwise reuse existing presentation: index→`<PublicSiteScreen live/>`;
+collection→`<PublicSiteScreen live onlyCollectionId={id}/>`; piece→`<PieceDetailScreen/>`.
 
-## Live chrome
-`PublicSiteScreen` `live` prop drops the owner-only back button + "Preview" pill (a visitor
-has no back stack and it isn't a preview); share stays. `onlyCollectionId` switches the
-hero eyebrow to "Exhibition" and sources pieces via `getPublicCollectionPieces`.
+**Dual-source switch:** `public-site.tsx` and `app/piece/[id].tsx` call
+`usePublicArtistOptional()` — when a provider is present they render from the REMOTE public
+context; otherwise they fall back to local owner contexts (owner's own in-app preview). Owner
+preview navigates `/piece/{id}?public=1` (private route a signed-in owner can reach); live
+public nav goes to `/{slug}/piece/{id}` (the guard treats `[slug]` as anon-allowed).
 
-## Domain
-URL host is env-driven via `resolvePublicOrigin()` in ProfileContext
-(`EXPO_PUBLIC_PUBLIC_SITE_URL` → `EXPO_PUBLIC_DOMAIN`→https → `glazevault.art` fallback).
-Custom domain (glazevault.art) is connected at DEPLOY time; user sets the env var after.
+**Do NOT** redirect public routes to `/piece/...` — the auth guard bounces anonymous visitors
+off private routes. `PublicGate.tsx` now only exports `PublicLoading`/`PublicMissing`
+(the old `usePublicReady()` 3-context-hydration readiness gate is GONE — superseded by the
+provider's `status`).

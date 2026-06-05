@@ -16,6 +16,8 @@ import {
 } from "./supabase";
 
 import { coalesceImages } from "@/constants/imageStorage";
+import { isPubliclyVisiblePiece } from "@/constants/privacy";
+import { publicSiteSlug } from "@/constants/slug";
 import type { Collection } from "@/context/CollectionsContext";
 import type { ArtistProfile } from "@/context/ProfileContext";
 import type { PotteryPiece } from "@/context/PotteryContext";
@@ -142,6 +144,9 @@ type PieceRow = {
   // them and `rowToPiece` default-coerces (`!!`). Default false everywhere.
   show_glaze_details: boolean | null;
   show_studio_notes: boolean | null;
+  // Owner. Always set for rows written by the authenticated app; legacy rows
+  // (pre-auth) may be null until claimed by the first account.
+  user_id: string | null;
 };
 
 /**
@@ -165,7 +170,7 @@ function isMissingColumnError(
   return columns.some((c) => message.includes(c));
 }
 
-function pieceToRow(p: PotteryPiece): PieceRow {
+function pieceToRow(p: PotteryPiece, userId: string): PieceRow {
   return {
     id: p.id,
     title: p.title,
@@ -187,6 +192,7 @@ function pieceToRow(p: PotteryPiece): PieceRow {
     archived: p.archived,
     show_glaze_details: p.showGlazeDetails,
     show_studio_notes: p.showStudioNotes,
+    user_id: userId,
   };
 }
 
@@ -221,11 +227,17 @@ function rowToPiece(r: PieceRow): PotteryPiece {
   };
 }
 
-export async function loadPieces(): Promise<PotteryPiece[]> {
+/**
+ * Loads the signed-in artist's OWN pieces. Filtered by `user_id` so the public
+ * pieces of OTHER artists (also visible to this role under RLS) never leak into
+ * the owner's private archive.
+ */
+export async function loadPieces(userId: string): Promise<PotteryPiece[]> {
   const client = requireClient();
   const { data, error } = await client
     .from("pieces")
     .select("*")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data as PieceRow[]).map(rowToPiece);
@@ -236,7 +248,10 @@ export async function loadPieces(): Promise<PotteryPiece[]> {
  * returned record carries the public URL, so callers can keep their cache in
  * sync with what now lives remotely.
  */
-export async function savePiece(piece: PotteryPiece): Promise<PotteryPiece> {
+export async function savePiece(
+  piece: PotteryPiece,
+  userId: string,
+): Promise<PotteryPiece> {
   const client = requireClient();
   // Normalize first so the cover is guaranteed to be a member of the photo set,
   // then upload every photo (uploadImage is idempotent for already-remote URLs)
@@ -258,7 +273,7 @@ export async function savePiece(piece: PotteryPiece): Promise<PotteryPiece> {
   // the upsert fails with a missing-column error. We retry once without those
   // keys so saving never breaks — the flags then live only in the local cache
   // until supabase/schema.sql is applied.
-  const row = pieceToRow(toSave);
+  const row = pieceToRow(toSave, userId);
   let { error } = await client.from("pieces").upsert(row);
   if (error && isMissingColumnError(error, ["show_glaze_details", "show_studio_notes"])) {
     // Degraded mode: the database predates the migration. We retry without the
@@ -298,9 +313,10 @@ type CollectionRow = {
   // (defaults to false) so omitting it from upserts is safe.
   visibility: "public" | "private";
   cover_image_url: string | null;
+  user_id: string | null;
 };
 
-function collectionToRow(c: Collection): CollectionRow {
+function collectionToRow(c: Collection, userId: string): CollectionRow {
   return {
     id: c.id,
     title: c.title,
@@ -308,6 +324,7 @@ function collectionToRow(c: Collection): CollectionRow {
     created_at: c.createdAt,
     visibility: c.visibility,
     cover_image_url: c.coverImageUri ?? null,
+    user_id: userId,
   };
 }
 
@@ -322,21 +339,26 @@ function rowToCollection(r: CollectionRow): Collection {
   };
 }
 
-export async function loadCollections(): Promise<Collection[]> {
+/** Loads the signed-in artist's OWN collections (filtered by `user_id`). */
+export async function loadCollections(userId: string): Promise<Collection[]> {
   const client = requireClient();
   const { data, error } = await client
     .from("collections")
     .select("*")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data as CollectionRow[]).map(rowToCollection);
 }
 
-export async function saveCollection(c: Collection): Promise<Collection> {
+export async function saveCollection(
+  c: Collection,
+  userId: string,
+): Promise<Collection> {
   const client = requireClient();
   const coverUrl = await uploadImage(c.coverImageUri, "collections");
   const toSave: Collection = { ...c, coverImageUri: coverUrl ?? c.coverImageUri };
-  const { error } = await client.from("collections").upsert(collectionToRow(toSave));
+  const { error } = await client.from("collections").upsert(collectionToRow(toSave, userId));
   if (error) throw error;
   return toSave;
 }
@@ -349,10 +371,8 @@ export async function deleteCollection(id: string): Promise<void> {
 
 // ── Profile (singleton) ─────────────────────────────────────────────────────
 
-// GlazeVault has no auth yet, so the profile is a single row keyed by a fixed
-// id. When auth lands, swap this for the authenticated user's id.
-const PROFILE_ID = "default";
-
+// One profile row per authenticated user, keyed by the user id (text) with a
+// matching `user_id` for RLS.
 type ProfileRow = {
   id: string;
   name: string;
@@ -362,11 +382,14 @@ type ProfileRow = {
   instagram: string;
   avatar_url: string | null;
   public_site: ArtistProfile["publicSite"] | null;
+  user_id: string | null;
 };
 
-function profileToRow(p: ArtistProfile): ProfileRow {
+function profileToRow(p: ArtistProfile, userId: string): ProfileRow {
   return {
-    id: PROFILE_ID,
+    // One profile row per user; the primary key is the user id (text). This
+    // replaces the legacy single-row id = 'default' from the pre-auth schema.
+    id: userId,
     name: p.name,
     bio: p.bio,
     statement: p.statement,
@@ -374,6 +397,7 @@ function profileToRow(p: ArtistProfile): ProfileRow {
     instagram: p.instagram,
     avatar_url: p.avatarUri ?? null,
     public_site: p.publicSite,
+    user_id: userId,
   };
 }
 
@@ -389,23 +413,151 @@ function rowToProfile(r: ProfileRow): Partial<ArtistProfile> {
   };
 }
 
-/** Returns the stored profile, or `null` when none has been saved yet. */
-export async function loadProfile(): Promise<Partial<ArtistProfile> | null> {
+/** Returns the signed-in artist's profile, or `null` when none saved yet. */
+export async function loadProfile(
+  userId: string,
+): Promise<Partial<ArtistProfile> | null> {
   const client = requireClient();
   const { data, error } = await client
     .from("profiles")
     .select("*")
-    .eq("id", PROFILE_ID)
+    .eq("user_id", userId)
     .maybeSingle();
   if (error) throw error;
   return data ? rowToProfile(data as ProfileRow) : null;
 }
 
-export async function saveProfile(p: ArtistProfile): Promise<ArtistProfile> {
+export async function saveProfile(
+  p: ArtistProfile,
+  userId: string,
+): Promise<ArtistProfile> {
   const client = requireClient();
   const avatarUrl = await uploadImage(p.avatarUri, "avatars");
   const toSave: ArtistProfile = { ...p, avatarUri: avatarUrl ?? p.avatarUri };
-  const { error } = await client.from("profiles").upsert(profileToRow(toSave));
+  const { error } = await client.from("profiles").upsert(profileToRow(toSave, userId));
   if (error) throw error;
   return toSave;
+}
+
+/**
+ * Seed fields captured at sign-up. All optional except — practically — the
+ * display name, which the UI requires.
+ */
+export type ProfileSeed = {
+  name?: string;
+  website?: string;
+  instagram?: string;
+  avatarUri?: string;
+};
+
+/**
+ * Ensures the signed-in artist has a profile row, creating a minimal one from
+ * the sign-up `seed` if absent. Never overwrites an existing profile, so it is
+ * safe to call on every login. Returns the (possibly newly created) profile.
+ */
+export async function ensureProfile(
+  userId: string,
+  seed: ProfileSeed = {},
+): Promise<Partial<ArtistProfile> | null> {
+  const client = requireClient();
+  const existing = await loadProfile(userId);
+  if (existing) return existing;
+  const avatarUrl = await uploadImage(seed.avatarUri, "avatars");
+  const row: ProfileRow = {
+    id: userId,
+    name: seed.name ?? "",
+    bio: "",
+    statement: "",
+    website: seed.website ?? "",
+    instagram: seed.instagram ?? "",
+    avatar_url: avatarUrl ?? null,
+    public_site: null,
+    user_id: userId,
+  };
+  const { error } = await client.from("profiles").upsert(row);
+  if (error) throw error;
+  return rowToProfile(row);
+}
+
+/**
+ * One-time claim of the pre-auth archive (rows with `user_id` null + the
+ * legacy 'default' profile) for the first account. Server-side function is
+ * latched, so only the very first authenticated caller actually inherits the
+ * data; everyone else gets `false`. Safe to call on any first session.
+ */
+export async function claimLegacyArchive(): Promise<boolean> {
+  const client = requireClient();
+  const { data, error } = await client.rpc("claim_legacy_archive");
+  if (error) throw error;
+  return data === true;
+}
+
+// ── Public (by slug, cross-account) ─────────────────────────────────────────
+
+// These power the LIVE public exhibition pages, which a visitor (a *different*
+// signed-in artist, or a fully anonymous viewer) reaches by link. They read
+// strictly through the public projection — only an artist's publicly-visible
+// pieces and public collections are returned — and rely on RLS allowing anon /
+// authenticated SELECT of public rows. The owner-scoped loaders above are NOT
+// reused here: those filter to the *signed-in* user, whereas a public visitor
+// must be able to load *another* artist's public archive.
+
+/**
+ * Resolves a public artist by their URL slug. There is no slug column — the slug
+ * is derived from the artist name — so we fetch the (RLS-restricted) profiles
+ * whose public site is enabled and match the derived slug in memory. Returns the
+ * owner `userId` plus the public-safe profile, or null when nothing matches.
+ */
+export async function loadPublicProfileBySlug(
+  slug: string,
+): Promise<{ userId: string; profile: Partial<ArtistProfile> } | null> {
+  const client = requireClient();
+  // Slug is derived from the display name (no persisted unique slug column yet),
+  // so two enabled profiles could in principle normalize to the same slug.
+  // Order by creation so resolution is DETERMINISTIC — a given public link
+  // always lands on the same (earliest-registered) artist rather than whichever
+  // row the backend happened to return first.
+  const { data, error } = await client
+    .from("profiles")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  const rows = (data as ProfileRow[]) ?? [];
+  const match = rows.find(
+    (r) =>
+      !!r.user_id &&
+      !!r.public_site?.enabled &&
+      publicSiteSlug(r.name ?? "") === slug,
+  );
+  if (!match || !match.user_id) return null;
+  return { userId: match.user_id, profile: rowToProfile(match) };
+}
+
+/** A public artist's publicly-visible pieces (public, has a photo, not archived). */
+export async function loadPublicPiecesForUser(
+  userId: string,
+): Promise<PotteryPiece[]> {
+  const client = requireClient();
+  const { data, error } = await client
+    .from("pieces")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as PieceRow[]).map(rowToPiece).filter(isPubliclyVisiblePiece);
+}
+
+/** A public artist's public collections. */
+export async function loadPublicCollectionsForUser(
+  userId: string,
+): Promise<Collection[]> {
+  const client = requireClient();
+  const { data, error } = await client
+    .from("collections")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("visibility", "public")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as CollectionRow[]).map(rowToCollection);
 }

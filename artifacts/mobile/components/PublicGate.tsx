@@ -1,34 +1,14 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
-import { useCollections } from "@/context/CollectionsContext";
-import { useProfile } from "@/context/ProfileContext";
-import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 
 /**
- * A public web visitor arrives with an empty cache, so the contexts need a beat
- * to hydrate from Supabase before we can know whether a slug / piece / collection
- * is really public or really missing. Each store exposes a `hydrated` flag that
- * flips once its initial cache + Supabase load has settled, so we wait for ALL
- * three before rendering a verdict — gating on "any data arrived" used to flash
- * "not on view" on a valid link when one store (e.g. pieces) hydrated before the
- * profile that supplies the slug. A safety timer still forces a definitive
- * answer in case a load hangs, so a genuinely-empty studio always resolves.
+ * Shown while a live public page resolves the artist's archive from Supabase.
+ * The status itself now lives in `PublicArtistContext`; these are just the two
+ * verdict screens the slug routes render.
  */
-export function usePublicReady(): boolean {
-  const { hydrated: profileReady } = useProfile();
-  const { hydrated: collectionsReady } = useCollections();
-  const { hydrated: piecesReady } = usePottery();
-  const [timedOut, setTimedOut] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setTimedOut(true), 4000);
-    return () => clearTimeout(t);
-  }, []);
-  return timedOut || (profileReady && collectionsReady && piecesReady);
-}
-
 export function PublicLoading() {
   const colors = useColors();
   return (

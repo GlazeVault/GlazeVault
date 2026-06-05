@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import React, { useState } from "react";
 import {
   Linking,
@@ -39,6 +39,7 @@ import {
   useProfile,
 } from "@/context/ProfileContext";
 import { usePottery } from "@/context/PotteryContext";
+import { usePublicArtistOptional } from "@/context/PublicArtistContext";
 import { useColors } from "@/hooks/useColors";
 import {
   isLandscapeRatio,
@@ -109,9 +110,16 @@ export default function PublicSiteScreen({
 }: { live?: boolean; onlyCollectionId?: string } = {}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile } = useProfile();
-  const { pieces } = usePottery();
-  const { collections } = useCollections();
+  // On a live public page the data comes from the remote PublicArtistContext (a
+  // visitor viewing ANOTHER artist by slug). The owner's own in-app preview has
+  // no such provider, so it falls back to the local owner contexts.
+  const pub = usePublicArtistOptional();
+  const { profile: ownProfile } = useProfile();
+  const { pieces: ownPieces } = usePottery();
+  const { collections: ownCollections } = useCollections();
+  const profile = pub ? pub.profile : ownProfile;
+  const pieces = pub ? pub.pieces : ownPieces;
+  const collections = pub ? pub.collections : ownCollections;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const { height: winHeight } = useWindowDimensions();
   // A tall, cinematic portrait band sized off the viewport so it feels immersive
@@ -120,6 +128,16 @@ export default function PublicSiteScreen({
 
   const site = profile.publicSite;
   const [shareVisible, setShareVisible] = useState(false);
+
+  // Public navigation must stay under the artist `[slug]` routes, which the auth
+  // guard treats as public (reachable by anon/other artists). The owner's own
+  // in-app preview instead uses the private `/piece/...?public=1` route, which a
+  // signed-in owner can reach directly.
+  const slug = publicSiteSlug(profile.name);
+  const pieceHref = (pid: string, extra = ""): Href =>
+    (pub
+      ? `/${slug}/piece/${pid}${extra ? `?${extra}` : ""}`
+      : `/piece/${pid}?public=1${extra ? `&${extra}` : ""}`) as Href;
 
   // Quiet, private viewer-side curation. The artist this page belongs to is
   // identified by their public slug; saving/following is keyed off it.
@@ -237,7 +255,7 @@ export default function PublicSiteScreen({
       <Pressable
         key={piece.id}
         style={({ pressed }) => [styles.tileCol, { opacity: pressed ? 0.85 : 1 }]}
-        onPress={() => router.push(`/piece/${piece.id}?public=1&from=${collectionId}`)}
+        onPress={() => router.push(pieceHref(piece.id, `from=${collectionId}`))}
       >
         <View style={[styles.tileImage, { aspectRatio: ratio }]}>
           {piece.imageUri ? (
@@ -491,7 +509,7 @@ export default function PublicSiteScreen({
                   style={({ pressed }) => [styles.coverWrap, { opacity: pressed ? 0.9 : 1 }]}
                   onPress={() =>
                     coverPieceId
-                      ? router.push(`/piece/${coverPieceId}?public=1&from=${collection.id}`)
+                      ? router.push(pieceHref(coverPieceId, `from=${collection.id}`))
                       : undefined
                   }
                   disabled={!coverPieceId}
@@ -520,7 +538,7 @@ export default function PublicSiteScreen({
                     },
                   ]}
                   onPress={() =>
-                    router.push(`/piece/${cp[0].id}?public=1&immersive=1&from=${collection.id}`)
+                    router.push(pieceHref(cp[0].id, `immersive=1&from=${collection.id}`))
                   }
                   accessibilityRole="button"
                   accessibilityLabel={`View ${collection.title} as an immersive exhibition`}

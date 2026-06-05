@@ -8,6 +8,8 @@ import React, {
   useState,
 } from "react";
 
+import { useAuth } from "@/context/AuthContext";
+
 /**
  * "Save to Inspiration" + "Follow Artist" — the first, deliberately quiet
  * network features. These are PRIVATE to the person browsing: there are no
@@ -32,7 +34,10 @@ type SavedState = {
 
 const EMPTY: SavedState = { pieces: [], collections: [], artists: [], following: [] };
 
-const STORAGE_KEY = "@glazevault_saved_v1";
+// Saves/follows are private to the browsing user and namespaced per account so
+// switching accounts shows that account's own Inspiration shelf.
+const STORAGE_PREFIX = "@glazevault_saved_v1";
+const cacheKey = (userId: string) => `${STORAGE_PREFIX}:${userId}`;
 
 type SavedContextValue = {
   hydrated: boolean;
@@ -72,6 +77,7 @@ function unionArtists(stored: SavedArtist[], pending: SavedArtist[]): SavedArtis
 }
 
 export function SavedProvider({ children }: { children: React.ReactNode }) {
+  const { userId, authReady } = useAuth();
   const [saved, setSaved] = useState<SavedState>(EMPTY);
   const [hydrated, setHydrated] = useState(false);
 
@@ -79,11 +85,19 @@ export function SavedProvider({ children }: { children: React.ReactNode }) {
   // each other (mirrors the writeChain pattern used by the archive contexts).
   const writeChain = useRef<Promise<void>>(Promise.resolve());
 
+  // Hydrate the signed-in user's shelf; reset to empty when signed out / between
+  // accounts so one account's saves never bleed into another's.
   useEffect(() => {
     let cancelled = false;
+    if (!userId || !authReady) {
+      setSaved(EMPTY);
+      setHydrated(false);
+      return;
+    }
+    const key = cacheKey(userId);
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        const raw = await AsyncStorage.getItem(key);
         if (!cancelled && raw) {
           const parsed = JSON.parse(raw) as Partial<SavedState>;
           // Merge (union) rather than overwrite: if the user tapped Save/Follow
@@ -106,17 +120,18 @@ export function SavedProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [userId, authReady]);
 
   // Persist whenever the state changes, but only after the initial hydrate so we
   // never overwrite stored data with the empty default on first mount.
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !userId) return;
+    const key = cacheKey(userId);
     writeChain.current = writeChain.current
       .catch(() => {})
-      .then(() => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(saved)))
+      .then(() => AsyncStorage.setItem(key, JSON.stringify(saved)))
       .catch(() => {});
-  }, [saved, hydrated]);
+  }, [saved, hydrated, userId]);
 
   const isPieceSaved = useCallback((id: string) => saved.pieces.includes(id), [saved.pieces]);
   const togglePieceSaved = useCallback(

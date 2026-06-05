@@ -24,6 +24,7 @@ import { persistPieceImage } from "@/constants/imageStorage";
 import { ImportedText, pickAndExtractText, UnsupportedFileError } from "@/constants/importText";
 import { getPortfolioCollectionPieces, isCollectionPublic } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
+import { useAuth } from "@/context/AuthContext";
 import { useCollections } from "@/context/CollectionsContext";
 import {
   portfolioShareUrl,
@@ -33,11 +34,13 @@ import {
 } from "@/context/ProfileContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
+import { confirm } from "@/lib/confirm";
 import { notice } from "@/lib/notice";
 
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { isConfigured, signOut } = useAuth();
   const { profile, updateProfile, updatePublicSite } = useProfile();
   const { pieces } = usePottery();
   const { collections } = useCollections();
@@ -143,6 +146,23 @@ export default function ProfileScreen() {
       });
     } catch (e) {
       console.warn("Failed to share public site", e);
+    }
+  };
+
+  const handleLogout = async () => {
+    const ok = await confirm({
+      title: "Log out?",
+      message: "Your archive stays safe in the cloud. You can log back in anytime.",
+      confirmText: "Log out",
+      cancelText: "Stay",
+    });
+    if (!ok) return;
+    try {
+      await signOut();
+      // The auth gate redirects to the sign-in flow once the session clears.
+    } catch (e) {
+      console.warn("Failed to log out", e);
+      notice({ title: "Couldn’t log out", message: "Please try again.", variant: "error" });
     }
   };
 
@@ -795,6 +815,25 @@ export default function ProfileScreen() {
             </Text>
           ) : null}
         </View>
+
+        {/* Account */}
+        {isConfigured ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Account</Text>
+            <Pressable
+              style={[
+                styles.logoutBtn,
+                { borderColor: "rgba(120,110,100,0.2)" },
+              ]}
+              onPress={handleLogout}
+              accessibilityRole="button"
+              accessibilityLabel="Log out"
+            >
+              <Feather name="log-out" size={14} color={colors.mutedForeground} />
+              <Text style={[styles.logoutText, { color: colors.foreground }]}>Log out</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </ScrollView>
 
       <Modal
@@ -1150,6 +1189,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     marginTop: 10,
   },
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 12,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  logoutText: { fontSize: 15, fontFamily: "Poppins_500Medium", letterSpacing: 0.3 },
   importBtn: {
     flexDirection: "row",
     alignItems: "center",

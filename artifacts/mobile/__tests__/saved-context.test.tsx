@@ -10,9 +10,16 @@ import React from "react";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// SavedProvider scopes its shelf by the signed-in user, so give it a stable
+// fake account. The auth machinery (Supabase/session) is irrelevant to what
+// this suite verifies (the hydration race + per-account persistence).
+jest.mock("@/context/AuthContext", () => ({
+  useAuth: () => ({ userId: "test-user", authReady: true }),
+}));
+
 import { SavedProvider, useSaved } from "@/context/SavedContext";
 
-const STORAGE_KEY = "@glazevault_saved_v1";
+const STORAGE_KEY = "@glazevault_saved_v1:test-user";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <SavedProvider>{children}</SavedProvider>

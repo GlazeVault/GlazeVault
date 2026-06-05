@@ -2,11 +2,12 @@
 -- Run this once in your Supabase project: Dashboard → SQL Editor → New query →
 -- paste → Run. Then create the public storage bucket (see bottom of file).
 --
--- NOTE ON SECURITY: GlazeVault has no user authentication yet, so these tables
--- use permissive policies that allow the anonymous (anon) key full read/write.
--- This is fine for a single-artist MVP. Before sharing the app with multiple
--- users, add Supabase Auth and replace the policies below with per-user rules
--- (e.g. `using (auth.uid() = user_id)`).
+-- SECURITY: GlazeVault uses Supabase Auth (email + password). Every row is owned
+-- by a user via `user_id` (FK auth.users). RLS gives the owner full access to
+-- their own rows and lets anon + authenticated read only PUBLIC content (public
+-- pieces, public collections, profiles whose public site is enabled) so shared
+-- exhibition links resolve without login. The first account to sign up inherits
+-- the pre-auth archive via the one-time `claim_legacy_archive()` function.
 
 -- ── pieces ──────────────────────────────────────────────────────────────────
 create table if not exists public.pieces (
@@ -110,6 +111,12 @@ alter table public.pieces drop column if exists visibility;
 alter table public.pieces add column if not exists show_glaze_details boolean not null default false;
 alter table public.pieces add column if not exists show_studio_notes  boolean not null default false;
 
+-- Per-user ownership. Null only for legacy rows created before auth (claimed by
+-- the first account via claim_legacy_archive). On delete of the user, their
+-- pieces cascade away.
+alter table public.pieces add column if not exists user_id uuid references auth.users(id) on delete cascade;
+create index if not exists pieces_user_id_idx on public.pieces(user_id);
+
 -- ── collections ─────────────────────────────────────────────────────────────
 create table if not exists public.collections (
   id                text primary key,
@@ -127,7 +134,14 @@ create table if not exists public.collections (
 -- Dropped here for existing DBs.
 alter table public.collections drop column if exists featured_on_site;
 
--- ── profiles (single row, id = 'default' until auth is added) ────────────────
+-- Per-user ownership (see pieces.user_id).
+alter table public.collections add column if not exists user_id uuid references auth.users(id) on delete cascade;
+create index if not exists collections_user_id_idx on public.collections(user_id);
+
+-- ── profiles (one row per user; legacy id = 'default' until claimed) ─────────
+-- New accounts store their profile with id = user_id::text and user_id = uid.
+-- The legacy single-artist row (id = 'default', user_id null) is migrated into
+-- the first account's profile and deleted by claim_legacy_archive().
 create table if not exists public.profiles (
   id          text primary key,
   name        text not null default '',
@@ -139,44 +153,122 @@ create table if not exists public.profiles (
   public_site jsonb
 );
 
--- ── Row Level Security (permissive, anon-only MVP) ───────────────────────────
+-- Per-user ownership. Unique (partial) so a user has at most one profile row.
+alter table public.profiles add column if not exists user_id uuid references auth.users(id) on delete cascade;
+create unique index if not exists profiles_user_id_key on public.profiles(user_id) where user_id is not null;
+
+-- ── One-time legacy claim ────────────────────────────────────────────────────
+-- The pre-auth archive (pieces/collections/profile with user_id null) belongs to
+-- whoever signs up first. `app_meta.legacy_claimed` is a one-row latch; the
+-- SECURITY DEFINER function assigns all unowned rows to the first authenticated
+-- caller, folds the 'default' profile into theirs, deletes it, and trips the
+-- latch so no later account can claim. Returns true only for that first caller.
+create table if not exists public.app_meta (
+  id             int primary key default 1,
+  legacy_claimed boolean not null default false,
+  constraint app_meta_singleton check (id = 1)
+);
+insert into public.app_meta (id, legacy_claimed) values (1, false) on conflict (id) do nothing;
+
+create or replace function public.claim_legacy_archive()
+returns boolean language plpgsql security definer set search_path = public as $fn$
+declare uid uuid := auth.uid(); already boolean;
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+  select legacy_claimed into already from public.app_meta where id = 1 for update;
+  if already is null then
+    insert into public.app_meta (id, legacy_claimed) values (1, false) on conflict (id) do nothing;
+    already := false;
+  end if;
+  if already then return false; end if;
+  update public.pieces      set user_id = uid where user_id is null;
+  update public.collections set user_id = uid where user_id is null;
+  update public.profiles p set
+    name = d.name, bio = d.bio, statement = d.statement, website = d.website,
+    instagram = d.instagram, avatar_url = d.avatar_url, public_site = d.public_site
+  from public.profiles d
+  where d.id = 'default' and d.user_id is null and p.user_id = uid;
+  delete from public.profiles where id = 'default' and user_id is null;
+  update public.app_meta set legacy_claimed = true where id = 1;
+  return true;
+end; $fn$;
+revoke all on function public.claim_legacy_archive() from public, anon;
+grant execute on function public.claim_legacy_archive() to authenticated;
+
+-- ── Row Level Security (per-user owner + public read) ────────────────────────
 alter table public.pieces      enable row level security;
 alter table public.collections enable row level security;
 alter table public.profiles    enable row level security;
 
-do $$
-declare
-  t text;
-begin
-  foreach t in array array['pieces','collections','profiles'] loop
-    execute format(
-      'drop policy if exists "anon_all_%1$s" on public.%1$s;', t
-    );
-    execute format(
-      'create policy "anon_all_%1$s" on public.%1$s
-         for all to anon using (true) with check (true);', t
-    );
-  end loop;
-end $$;
+-- Drop the old permissive anon-everything policies.
+drop policy if exists "anon_all_pieces"      on public.pieces;
+drop policy if exists "anon_all_collections" on public.collections;
+drop policy if exists "anon_all_profiles"    on public.profiles;
 
--- RLS controls WHICH rows are visible; table-level GRANTs control whether the
--- anon/authenticated roles may touch the table at all. Both are required for the
--- PostgREST API (used by @supabase/supabase-js) to read/write these tables.
+-- pieces: owner sees all of theirs; anyone may read public, non-archived pieces.
+drop policy if exists "pieces_select" on public.pieces;
+create policy "pieces_select" on public.pieces for select to anon, authenticated
+  using (user_id = auth.uid() or (is_public = true and archived = false));
+drop policy if exists "pieces_insert" on public.pieces;
+create policy "pieces_insert" on public.pieces for insert to authenticated
+  with check (user_id = auth.uid());
+drop policy if exists "pieces_update" on public.pieces;
+create policy "pieces_update" on public.pieces for update to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "pieces_delete" on public.pieces;
+create policy "pieces_delete" on public.pieces for delete to authenticated
+  using (user_id = auth.uid());
+
+-- collections: owner sees all; anyone may read public collections.
+drop policy if exists "collections_select" on public.collections;
+create policy "collections_select" on public.collections for select to anon, authenticated
+  using (user_id = auth.uid() or visibility = 'public');
+drop policy if exists "collections_insert" on public.collections;
+create policy "collections_insert" on public.collections for insert to authenticated
+  with check (user_id = auth.uid());
+drop policy if exists "collections_update" on public.collections;
+create policy "collections_update" on public.collections for update to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "collections_delete" on public.collections;
+create policy "collections_delete" on public.collections for delete to authenticated
+  using (user_id = auth.uid());
+
+-- profiles: owner sees their own; anyone may read a profile whose public site is
+-- enabled (so shared exhibition links resolve for logged-out visitors).
+drop policy if exists "profiles_select" on public.profiles;
+create policy "profiles_select" on public.profiles for select to anon, authenticated
+  using (user_id = auth.uid() or (public_site->>'enabled') = 'true');
+drop policy if exists "profiles_insert" on public.profiles;
+create policy "profiles_insert" on public.profiles for insert to authenticated
+  with check (user_id = auth.uid());
+drop policy if exists "profiles_update" on public.profiles;
+create policy "profiles_update" on public.profiles for update to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- RLS controls WHICH rows are visible; table-level GRANTs control whether a role
+-- may touch the table at all. anon is read-only (public viewing); authenticated
+-- gets full CRUD (still constrained to their own rows by RLS).
 grant usage on schema public to anon, authenticated;
+revoke insert, update, delete on public.pieces, public.collections, public.profiles from anon;
+grant select on public.pieces, public.collections, public.profiles to anon;
 grant select, insert, update, delete
   on public.pieces, public.collections, public.profiles
-  to anon, authenticated;
+  to authenticated;
 
 -- ── Storage bucket for images ────────────────────────────────────────────────
 -- Create a PUBLIC bucket named `images`:
 --   Dashboard → Storage → New bucket → name `images` → toggle "Public" on.
--- Then allow the anon key to upload/read (run this after the bucket exists):
 insert into storage.buckets (id, name, public)
 values ('images', 'images', true)
 on conflict (id) do update set public = true;
 
+-- Public read (the bucket is public anyway); only authenticated users may write.
 drop policy if exists "anon_images_all" on storage.objects;
-create policy "anon_images_all" on storage.objects
-  for all to anon
-  using (bucket_id = 'images')
-  with check (bucket_id = 'images');
+drop policy if exists "images_read"   on storage.objects;
+drop policy if exists "images_write"  on storage.objects;
+drop policy if exists "images_update" on storage.objects;
+drop policy if exists "images_delete" on storage.objects;
+create policy "images_read"   on storage.objects for select using (bucket_id = 'images');
+create policy "images_write"  on storage.objects for insert to authenticated with check (bucket_id = 'images');
+create policy "images_update" on storage.objects for update to authenticated using (bucket_id = 'images') with check (bucket_id = 'images');
+create policy "images_delete" on storage.objects for delete to authenticated using (bucket_id = 'images');

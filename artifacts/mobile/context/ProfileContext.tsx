@@ -1,11 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
+import { useAuth } from "@/context/AuthContext";
 import { isSupabaseConfigured } from "@/services/supabase";
 import {
   loadProfile as loadProfileRemote,
   saveProfile as saveProfileRemote,
 } from "@/services/dataService";
+import { publicSiteSlug } from "@/constants/slug";
 
 export interface PublicSiteSettings {
   enabled: boolean;
@@ -49,7 +51,9 @@ interface ProfileContextType {
 }
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
-const STORAGE_KEY = "@glazevault_profile_v1";
+// Cache key is namespaced per user (see PotteryContext for the rationale).
+const STORAGE_PREFIX = "@glazevault_profile_v1";
+const cacheKey = (userId: string) => `${STORAGE_PREFIX}:${userId}`;
 
 function normalizeProfile(raw: Partial<ArtistProfile>): ArtistProfile {
   // Whitelist publicSite to the current schema so legacy keys (e.g. the old
@@ -66,6 +70,7 @@ function normalizeProfile(raw: Partial<ArtistProfile>): ArtistProfile {
 }
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
+  const { userId, authReady } = useAuth();
   const [profile, setProfile] = useState<ArtistProfile>(DEFAULT_PROFILE);
   const [hydrated, setHydrated] = useState(false);
   // Mirror of the latest profile so concurrent updates merge against fresh
@@ -73,6 +78,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   // saves from clobbering each other).
   const profileRef = useRef(profile);
   profileRef.current = profile;
+  // Latest userId for the stable callbacks below.
+  const userIdRef = useRef<string | null>(userId);
+  userIdRef.current = userId;
   // Serializes AsyncStorage writes so rapid successive saves commit in order and
   // an older snapshot can never overwrite a newer one.
   const writeChain = useRef<Promise<void>>(Promise.resolve());
@@ -85,24 +93,38 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  // Writes to the AsyncStorage cache only.
+  // Writes to the per-user AsyncStorage cache only. No-ops when signed out.
   const persistCache = useCallback(async (updated: ArtistProfile) => {
     profileRef.current = updated;
     setProfile(updated);
+    const uid = userIdRef.current;
+    if (!uid) return;
+    const key = cacheKey(uid);
     const write = writeChain.current
       .catch(() => {})
-      .then(() => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)));
+      .then(() => AsyncStorage.setItem(key, JSON.stringify(updated)));
     writeChain.current = write;
     await write;
     console.log("Saved profile", updated.name || "(unnamed)");
   }, []);
 
+  // Hydrate per signed-in user; gated on authReady (see PotteryContext). The
+  // sign-up bootstrap (AuthContext) has already ensured a remote profile row by
+  // the time this runs, so the remote-wins branch loads the artist's profile.
   useEffect(() => {
+    let cancelled = false;
+    if (!userId || !authReady) {
+      profileRef.current = DEFAULT_PROFILE;
+      setProfile(DEFAULT_PROFILE);
+      setHydrated(false);
+      return;
+    }
+    const key = cacheKey(userId);
     (async () => {
       // 1. Local cache first.
       let cached: ArtistProfile = DEFAULT_PROFILE;
       try {
-        const data = await AsyncStorage.getItem(STORAGE_KEY);
+        const data = await AsyncStorage.getItem(key);
         if (data) {
           cached = normalizeProfile(JSON.parse(data));
           profileRef.current = cached;
@@ -119,16 +141,17 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       // 2. Supabase is the source of truth when configured + reachable.
       if (isSupabaseConfigured) {
         try {
-          const remote = await loadProfileRemote();
+          const remote = await loadProfileRemote(userId);
+          if (cancelled) return;
           if (remote) {
             const next = normalizeProfile({ ...cached, ...remote });
             profileRef.current = next;
             setProfile(next);
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+            await AsyncStorage.setItem(key, JSON.stringify(next));
             console.log("[supabase] loaded profile", next.name || "(unnamed)");
           } else if (hasContent(cached)) {
             console.log("[supabase] migrating local profile");
-            await saveProfileRemote(cached).catch((e) =>
+            await saveProfileRemote(cached, userId).catch((e) =>
               console.warn("[supabase] migrate profile failed", e)
             );
           }
@@ -136,17 +159,21 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           console.warn("[supabase] loadProfile failed, using local cache", e);
         }
       }
-      setHydrated(true);
+      if (!cancelled) setHydrated(true);
     })();
-  }, [hasContent]);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, authReady, hasContent]);
 
   const updateProfile = useCallback(
     async (updates: Partial<ArtistProfile>) => {
       const updated = { ...profileRef.current, ...updates };
       await persistCache(updated);
-      if (isSupabaseConfigured) {
+      const uid = userIdRef.current;
+      if (isSupabaseConfigured && uid) {
         try {
-          const saved = await saveProfileRemote(updated);
+          const saved = await saveProfileRemote(updated, uid);
           // Fold any uploaded avatar URL back into the cache.
           if (saved.avatarUri !== updated.avatarUri) {
             await persistCache({ ...profileRef.current, avatarUri: saved.avatarUri });
@@ -179,18 +206,11 @@ export function useProfile() {
   return ctx;
 }
 
-/**
- * Derives the public-facing URL slug from the artist name. Falls back to a
- * neutral placeholder so the URL preview is never empty.
- */
-export function publicSiteSlug(name: string): string {
-  const slug = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || "your-studio";
-}
+// The slug derivation lives in a dependency-free module (`@/constants/slug`) so
+// the data service can resolve a public artist by slug without importing this
+// context (which would be circular). Re-exported here for the many call sites
+// that already import it from the profile context.
+export { publicSiteSlug };
 
 export const PUBLIC_SITE_DOMAIN = "glazevault.art";
 
