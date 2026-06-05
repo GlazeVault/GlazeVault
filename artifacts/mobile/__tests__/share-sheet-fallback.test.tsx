@@ -25,7 +25,7 @@ import { Share } from "react-native";
 import { ShareSheet } from "@/components/ShareSheet";
 import type { ShareContent } from "@/constants/privacy";
 
-const mockSetStringAsync = jest.fn(() => Promise.resolve(true));
+const mockSetStringAsync = jest.fn((..._args: unknown[]) => Promise.resolve(true));
 jest.mock("expo-clipboard", () => ({
   setStringAsync: (...args: unknown[]) => mockSetStringAsync(...args),
 }));

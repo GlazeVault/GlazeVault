@@ -34,6 +34,7 @@ import {
   collectionShareUrl,
   portfolioShareUrl,
   PUBLIC_SITE_DOMAIN,
+  publicSiteLabel,
   publicSiteSlug,
   useProfile,
 } from "@/context/ProfileContext";
@@ -388,7 +389,7 @@ export default function PublicSiteScreen({
               {profile.name || "Your Studio"}
             </Text>
             <Text style={[styles.heroUrl, { color: colors.mutedForeground }]}>
-              {PUBLIC_SITE_DOMAIN}/{publicSiteSlug(profile.name)}
+              {publicSiteLabel(profile.name)}
             </Text>
           </View>
         </View>

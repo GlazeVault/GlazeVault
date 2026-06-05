@@ -29,6 +29,7 @@ import { useCollections } from "@/context/CollectionsContext";
 import {
   portfolioShareUrl,
   PUBLIC_SITE_DOMAIN,
+  publicSiteLabel,
   publicSiteSlug,
   useProfile,
 } from "@/context/ProfileContext";
@@ -696,7 +697,7 @@ export default function ProfileScreen() {
           <View style={[styles.urlRow, { borderColor: "rgba(120,110,100,0.16)" }]}>
             <Feather name="link" size={13} color={colors.mutedForeground} />
             <Text style={[styles.urlText, { color: colors.foreground }]} numberOfLines={1}>
-              {PUBLIC_SITE_DOMAIN}/{publicSiteSlug(isEditing ? name : profile.name)}
+              {publicSiteLabel(isEditing ? name : profile.name)}
             </Text>
           </View>
 

@@ -204,6 +204,8 @@ jest.mock("@/context/ProfileContext", () => ({
   }),
   PUBLIC_SITE_DOMAIN: "glazevault.art",
   publicSiteSlug: (name: string) => name.toLowerCase().replace(/\s+/g, "-"),
+  publicSiteLabel: (name: string) =>
+    `glazevault.art/${name.toLowerCase().replace(/\s+/g, "-")}`,
   publicBaseUrl: (name: string) =>
     `https://glazevault.art/${name.toLowerCase().replace(/\s+/g, "-")}`,
   portfolioShareUrl: (name: string) =>

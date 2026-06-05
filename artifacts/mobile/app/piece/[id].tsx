@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -419,6 +420,54 @@ export default function PieceDetailScreen() {
     if (await ensureShareable()) {
       setShareVisible(true);
     }
+  };
+
+  // The exact public URL shown in the detail and used by Share / Copy. Empty
+  // only when it genuinely can't be built (no piece id); logged so the reason is
+  // visible in the console.
+  const publicUrl = piece.id ? pieceShareUrl(profile.name, piece.id) : "";
+
+  // Tap-to-copy on the displayed link (gesture-safe: the clipboard write fires
+  // synchronously inside the tap, no awaited work before it).
+  const handleCopyPublicUrl = () => {
+    if (!isPubliclyVisiblePiece(piece)) {
+      notice({
+        title: "This piece is private",
+        message: "Make it public before sharing so the link will open for others.",
+        variant: "info",
+      });
+      return;
+    }
+    if (!publicUrl) {
+      console.warn(
+        "[glazevault] copy link skipped: public URL could not be generated",
+        { pieceId: piece.id, artist: profile.name },
+      );
+      notice({
+        title: "Couldn’t generate link",
+        message: "This piece doesn’t have a public link yet.",
+        variant: "error",
+      });
+      return;
+    }
+    console.log("[glazevault] copy link", publicUrl);
+    Clipboard.setStringAsync(publicUrl)
+      .then(() => {
+        console.log("[glazevault] copied link to clipboard", publicUrl);
+        notice({
+          title: "Link copied",
+          message: "The public link is on your clipboard.",
+          variant: "success",
+        });
+      })
+      .catch((err) => {
+        console.warn("[glazevault] clipboard copy failed", err);
+        notice({
+          title: "Couldn’t copy automatically",
+          message: publicUrl,
+          variant: "info",
+        });
+      });
   };
 
   const handleToggleArchive = async () => {
@@ -936,6 +985,39 @@ export default function PieceDetailScreen() {
               ) : null}
             </View>
 
+            {/* Public link — the exact URL Share / Copy use. Visible and
+                copyable only when the piece is public; a quiet hint otherwise. */}
+            {isPublic ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.publicUrlRow,
+                  {
+                    backgroundColor: pressed ? colors.secondary : "transparent",
+                    borderColor: "rgba(120,110,100,0.16)",
+                  },
+                ]}
+                onPress={handleCopyPublicUrl}
+                accessibilityRole="button"
+                accessibilityLabel="Copy public link"
+              >
+                <Feather name="link" size={13} color={colors.mutedForeground} />
+                <Text
+                  style={[styles.publicUrlText, { color: colors.foreground }]}
+                  numberOfLines={1}
+                  ellipsizeMode="middle"
+                >
+                  {publicUrl.replace(/^https?:\/\//, "")}
+                </Text>
+                <Feather name="copy" size={13} color={colors.mutedForeground} />
+              </Pressable>
+            ) : (
+              <Text
+                style={[styles.publicUrlHint, { color: colors.mutedForeground }]}
+              >
+                Make public to share.
+              </Text>
+            )}
+
             <Pressable
               style={({ pressed }) => [
                 styles.archiveLink,
@@ -1342,6 +1424,27 @@ const styles = StyleSheet.create({
   },
   shareBtn: { borderWidth: 0 },
   actionBtnText: { fontSize: 13, fontFamily: "Poppins_400Regular", letterSpacing: 0.3 },
+  publicUrlRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  publicUrlText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontFamily: "Poppins_400Regular",
+    letterSpacing: 0.2,
+  },
+  publicUrlHint: {
+    fontSize: 12.5,
+    fontFamily: "Poppins_300Light",
+    letterSpacing: 0.2,
+    paddingVertical: 2,
+  },
   archiveLink: {
     flexDirection: "row",
     alignItems: "center",

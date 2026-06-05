@@ -225,6 +225,13 @@ export const PUBLIC_SITE_DOMAIN = "glazevault.art";
  *      set in the expo workflow), so links work immediately.
  *   3. The canonical brand domain as a last resort.
  */
+// Last-resort public origin when no env host is injected (e.g. a runtime where
+// EXPO_PUBLIC_DOMAIN wasn't set). The current Replit public domain serves the
+// public pages today, so links still resolve — unlike the not-yet-connected
+// brand domain, which would 404.
+const REPLIT_FALLBACK_ORIGIN =
+  "https://5f3a3e03-daa6-4dbc-8c84-41a7d9ee3d10-00-1i7gcdnbgsjs7.spock.replit.dev";
+
 function resolvePublicOrigin(): string {
   const explicit = process.env.EXPO_PUBLIC_PUBLIC_SITE_URL?.trim();
   if (explicit) return explicit.replace(/\/+$/, "");
@@ -233,7 +240,11 @@ function resolvePublicOrigin(): string {
     const host = domain.replace(/^https?:\/\//, "").replace(/\/+$/, "");
     if (host) return `https://${host}`;
   }
-  return `https://${PUBLIC_SITE_DOMAIN}`;
+  console.warn(
+    "[glazevault] public origin: EXPO_PUBLIC_PUBLIC_SITE_URL / EXPO_PUBLIC_DOMAIN are unset; using Replit fallback origin",
+    REPLIT_FALLBACK_ORIGIN,
+  );
+  return REPLIT_FALLBACK_ORIGIN;
 }
 
 /**
@@ -259,4 +270,13 @@ export function collectionShareUrl(name: string, collectionId: string): string {
 /** Public link to a single piece. */
 export function pieceShareUrl(name: string, pieceId: string): string {
   return `${publicBaseUrl(name)}/piece/${pieceId}`;
+}
+
+/**
+ * Display label for a public link: the canonical base URL without its scheme, so
+ * previews show the SAME host that Share / Copy actually use — never a stale
+ * brand domain that wouldn't resolve yet.
+ */
+export function publicSiteLabel(name: string): string {
+  return publicBaseUrl(name).replace(/^https?:\/\//, "");
 }

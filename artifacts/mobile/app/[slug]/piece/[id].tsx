@@ -26,6 +26,17 @@ function PieceInner({ id }: { id: string }) {
     !piece ||
     !isPubliclyVisiblePiece(piece)
   ) {
+    // Diagnostic: surface WHY a public link lands on "Not on view" so a broken
+    // share link can be debugged from the console (does the id match a Supabase
+    // record? is the site enabled? is the piece actually public?).
+    console.warn("[glazevault] public piece not on view", {
+      requestedId: id,
+      status,
+      siteEnabled: profile.publicSite.enabled,
+      pieceFound: !!piece,
+      publiclyVisible: piece ? isPubliclyVisiblePiece(piece) : false,
+      availablePieceIds: pieces.map((p) => p.id),
+    });
     return <PublicMissing />;
   }
   return <PieceDetailScreen />;
