@@ -542,7 +542,12 @@ export default function ProfileScreen() {
                         opacity: pressed ? 0.85 : 1,
                       },
                     ]}
-                    onPress={() => router.push(`/collection/${c.id}`)}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/collection/[id]",
+                        params: { id: c.id, context: "portfolio" },
+                      })
+                    }
                   >
                     <View style={[styles.featuredCover, { backgroundColor: "rgba(120,110,100,0.1)" }]}>
                       {coverUri ? (

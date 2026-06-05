@@ -156,7 +156,13 @@ function GalleryTile({
 }
 
 export default function CollectionDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, context } = useLocalSearchParams<{ id: string; context?: string }>();
+  // When the collection is opened from the Profile → Portfolio section, pieces
+  // are viewed in a portfolio context: their detail screen should offer
+  // "Remove from Portfolio" (unfeature only), not "Remove from this Collection".
+  // Reaching the same collection from the Collections tab keeps collection
+  // context. The `from=portfolio` sentinel is what the piece detail reads.
+  const pieceFrom = context === "portfolio" ? "portfolio" : id;
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { getCollection, updateCollection, deleteCollection } = useCollections();
@@ -568,7 +574,7 @@ export default function CollectionDetailScreen() {
                     piece={item.left}
                     span="half"
                     ratio={orientations[item.left.imageUri] ?? 0.8}
-                    fromCollectionId={id}
+                    fromCollectionId={pieceFrom}
                     colors={colors}
                   />
                 </View>
@@ -578,7 +584,7 @@ export default function CollectionDetailScreen() {
                       piece={item.right}
                       span="half"
                       ratio={orientations[item.right.imageUri] ?? 0.8}
-                      fromCollectionId={id}
+                      fromCollectionId={pieceFrom}
                       colors={colors}
                     />
                   ) : null}
@@ -590,7 +596,7 @@ export default function CollectionDetailScreen() {
                 piece={item.item}
                 span="full"
                 ratio={orientations[item.item.imageUri] ?? 1.4}
-                fromCollectionId={id}
+                fromCollectionId={pieceFrom}
                 colors={colors}
               />
             )}

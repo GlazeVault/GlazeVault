@@ -19,3 +19,8 @@ The tab bar is a single custom `tabBar` rendered on expo-router `<Tabs>` (`Glaze
 ## Nav button wiring
 - Standard pattern: `navigation.emit({type:"tabPress",...})` then `navigation.navigate(name)` if not focused and not default-prevented. Active state via `state.routes[state.index].name`.
 - `TabBarProps` type is derived from `Tabs` props (`Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0]`) to avoid depending on `@react-navigation/bottom-tabs`, which is not a direct dependency.
+
+## Portfolio entry context (Remove from Portfolio vs Collection)
+- The piece detail's `from=portfolio` sentinel ("Remove from Portfolio" = unfeature only) is reachable ONLY via the Profile→Portfolio path: Portfolio cards push `/collection/[id]` with `context:"portfolio"`; collection detail maps that to `pieceFrom = context==="portfolio" ? "portfolio" : id` and threads it to the piece-tile taps.
+- Collections-tab entry (no context) stays collection-scoped (`from=<collectionId>` → "Remove from this Collection"). The collection's immersive "View Exhibition" button intentionally keeps `from=id`.
+- **Why:** user wanted a piece opened *through the Portfolio* to behave as portfolio context, while collection behavior is preserved everywhere else. Accepted side effect: `from=portfolio` makes `fromCollectionId` undefined, so owner swipe set/caption become portfolio-wide there (intended, not a bug).
