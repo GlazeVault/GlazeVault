@@ -1,0 +1,152 @@
+GLAZEVAULT — CORE PRODUCT POSITIONING & LONG-TERM PLATFORM DIRECTION
+
+Do NOT evolve GlazeVault into a generic social media app for ceramics.
+
+The long-term strength of GlazeVault is:
+
+archive-first creative infrastructure.
+
+CORE PHILOSOPHY
+
+Most social platforms are:
+share-first.
+
+GlazeVault should remain:
+record-first.
+
+Artists should feel:
+
+“I am building a lifelong ceramic archive.”
+not
+“I am posting content.”
+
+CORE PRODUCT IDENTITY
+
+GlazeVault =
+private studio archive
++
+public portfolio system
++
+quiet exhibition network
+
+The archive is the foundation.
+The social layer emerges naturally from shared archives.
+
+DO NOT OPTIMIZE FOR:
+- virality
+- engagement addiction
+- infinite scrolling
+- content farming
+- creator pressure
+- trending competition
+
+DO NOT BUILD:
+- loud notifications
+- follower count obsession
+- aggressive algorithmic feeds
+- TikTok/Reels behavior
+- engagement bait systems
+
+DISCOVERY PHILOSOPHY
+
+Discovery should feel like:
+- wandering through open studios
+- visiting exhibitions
+- browsing artist monographs
+- discovering collections slowly
+
+NOT:
+- doomscrolling
+- rapid content consumption
+- dopamine loops
+
+DISCOVERY STRUCTURE
+
+Prioritize:
+- collection-first discovery
+- featured collections
+- recently updated archives
+- aesthetic diversity
+- slow exploration
+- calm editorial pacing
+
+Collections are more important than isolated posts.
+
+Users should discover:
+artist worlds,
+not random disconnected content.
+
+FOLLOW SYSTEM
+
+Keep:
+“Follow Artist”
+
+But frame it as:
+following an artist archive,
+not following a social creator.
+
+FOLLOW SHOULD ENABLE:
+- new public collections
+- new featured works
+- exhibition updates
+
+without social pressure.
+
+SHARING PHILOSOPHY
+
+Sharing should feel like:
+sending someone to a digital exhibition.
+
+NOT:
+posting social content.
+
+Core sharing units:
+- Piece
+- Collection
+- Portfolio
+
+Collections are especially important because they act like mini exhibitions.
+
+LONG-TERM BUSINESS DIRECTION
+
+The strongest business opportunity is NOT:
+“Instagram for ceramics.”
+
+The strongest opportunity is:
+a trusted lifelong archive and portfolio infrastructure for ceramic artists.
+
+Key value:
+- artists build years of work inside the system
+- glaze history accumulates
+- firing knowledge accumulates
+- collections evolve over time
+- public portfolios emerge naturally
+
+This creates:
+high trust,
+long retention,
+and deep emotional attachment.
+
+DESIGN PRINCIPLES
+
+The app should feel:
+- calm
+- contemplative
+- tactile
+- editorial
+- trustworthy
+- artist-centered
+
+Avoid:
+- overstimulation
+- clutter
+- excessive gamification
+- addictive mechanics
+
+TARGET FEELING
+
+GlazeVault should feel like:
+a quiet digital ceramic library,
+a personal studio archive,
+and a contemporary exhibition space,
+all connected through intentional sharing.
