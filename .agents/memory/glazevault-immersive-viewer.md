@@ -19,6 +19,18 @@ viewer component — reuse it.
   mounting the viewer elsewhere) guarantees the immersive path can't drift from the
   normal path's privacy rules.
 
+- **Web (react-native-web) needs its own page renderer in `ImageViewer`.**
+  gesture-handler's `GestureDetector` applies `touch-action: none` on web, and it
+  sits directly on the horizontal swipe path (both the outer dismiss-pan wrapper
+  AND each `ZoomablePage`), so the FlatList's native horizontal scroll never
+  starts — most visibly on iOS Safari from a shared public link. Fix: on
+  `Platform.OS === "web"` render a plain `Pressable`-based `WebPage` (no gesture
+  detector, tap toggles chrome, browser owns pinch) and DON'T wrap the stage in
+  the dismiss `GestureDetector`; let native scroll page between pieces. Keep the
+  counter synced via `onScroll` on web (react-native-web doesn't reliably fire
+  `onMomentumScrollEnd`). **Why:** native and web disagree on how gesture-handler
+  cooperates with scroll views; don't try to make one gesture tree serve both.
+
 - **Firing atmosphere is OWNER-ONLY, even in immersive mode.** The owner viewer
   caption materials line includes `firingEnvironment || firing`; the public branch
   still projects through `toPublicPiece` + `buildPublicMetaLine` (title · clay ·

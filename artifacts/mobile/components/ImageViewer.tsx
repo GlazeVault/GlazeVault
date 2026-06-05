@@ -6,6 +6,7 @@ import React, { useEffect, useState } from "react";
 import {
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -197,10 +198,43 @@ function ZoomablePage({
 }
 
 /**
+ * Web counterpart of {@link ZoomablePage}. On react-native-web,
+ * gesture-handler's GestureDetector applies `touch-action: none` to its view,
+ * which sits directly on the horizontal swipe path and stops the parent
+ * FlatList's native scroll from ever starting (most visibly on iOS Safari). So
+ * on web we drop the gesture wrapper entirely and use a plain Pressable: native
+ * horizontal scroll keeps paging between pieces, and a tap still toggles the
+ * chrome. Pinch/double-tap zoom is left to the browser's own gestures.
+ */
+function WebPage({
+  item,
+  width,
+  height,
+  onToggleUi,
+}: {
+  item: ViewerItem;
+  width: number;
+  height: number;
+  onToggleUi: () => void;
+}) {
+  return (
+    <Pressable style={[styles.page, { width, height }]} onPress={onToggleUi}>
+      <Image
+        source={resolveImageSource(item.uri)}
+        style={{ width, height }}
+        contentFit="contain"
+        transition={150}
+      />
+    </Pressable>
+  );
+}
+
+/**
  * Fullscreen artwork viewer. Swipe between pieces, pinch/double-tap to zoom,
  * single tap to hide the chrome. Opens and closes with a soft fade.
  */
 export function ImageViewer({ visible, items, initialIndex, onClose }: Props) {
+  const isWeb = Platform.OS === "web";
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -309,8 +343,8 @@ export function ImageViewer({ visible, items, initialIndex, onClose }: Props) {
             backdropStyle,
           ]}
         />
-        <GestureDetector gesture={dismiss}>
-          <Animated.View style={[styles.stage, stageStyle]}>
+        {(() => {
+          const list = (
             <FlatList
               data={items}
               horizontal
@@ -325,25 +359,68 @@ export function ImageViewer({ visible, items, initialIndex, onClose }: Props) {
               })}
               keyExtractor={(_, i) => String(i)}
               extraData={`${index}-${resetSignal}`}
+              scrollEventThrottle={16}
+              // react-native-web's ScrollView does not reliably emit
+              // onMomentumScrollEnd, so keep the counter in sync from onScroll
+              // on web; native still uses onMomentumScrollEnd.
+              onScroll={
+                isWeb
+                  ? (e) => {
+                      // Clamp against Safari overscroll/bounce so the counter
+                      // never reports an out-of-range page.
+                      const i = Math.max(
+                        0,
+                        Math.min(
+                          items.length - 1,
+                          Math.round(e.nativeEvent.contentOffset.x / width),
+                        ),
+                      );
+                      if (i !== index) setIndex(i);
+                    }
+                  : undefined
+              }
               onMomentumScrollEnd={(e) => {
                 const i = Math.round(e.nativeEvent.contentOffset.x / width);
                 if (i !== index) setIndex(i);
               }}
-              renderItem={({ item, index: i }) => (
-                <ZoomablePage
-                  item={item}
-                  width={width}
-                  height={height}
-                  zoomed={zoomed}
-                  active={i === index}
-                  resetSignal={resetSignal}
-                  onToggleUi={() => setUiVisible((v) => !v)}
-                  onZoomChange={setZoomed}
-                />
-              )}
+              renderItem={({ item, index: i }) =>
+                isWeb ? (
+                  <WebPage
+                    item={item}
+                    width={width}
+                    height={height}
+                    onToggleUi={() => setUiVisible((v) => !v)}
+                  />
+                ) : (
+                  <ZoomablePage
+                    item={item}
+                    width={width}
+                    height={height}
+                    zoomed={zoomed}
+                    active={i === index}
+                    resetSignal={resetSignal}
+                    onToggleUi={() => setUiVisible((v) => !v)}
+                    onZoomChange={setZoomed}
+                  />
+                )
+              }
             />
-          </Animated.View>
-        </GestureDetector>
+          );
+          // On web the gesture-handler dismiss wrapper would block the
+          // FlatList's native horizontal scroll (touch-action: none), so render
+          // the stage bare and rely on the close control to dismiss.
+          return isWeb ? (
+            <Animated.View style={[styles.stage, stageStyle]}>
+              {list}
+            </Animated.View>
+          ) : (
+            <GestureDetector gesture={dismiss}>
+              <Animated.View style={[styles.stage, stageStyle]}>
+                {list}
+              </Animated.View>
+            </GestureDetector>
+          );
+        })()}
 
         {/* Top chrome: close button + counter */}
         <Animated.View
