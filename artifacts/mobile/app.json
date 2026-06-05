@@ -17,7 +17,8 @@
       "supportsTablet": false,
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Allow GlazeVault to access your photos to upload ceramic images.",
-        "NSCameraUsageDescription": "Allow GlazeVault to use your camera to photograph your ceramic work."
+        "NSCameraUsageDescription": "Allow GlazeVault to use your camera to photograph your ceramic work.",
+        "LSApplicationQueriesSchemes": ["instagram"]
       }
     },
     "android": {

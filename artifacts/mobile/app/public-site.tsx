@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -40,6 +41,64 @@ import {
   isLandscapeRatio,
   useImageOrientations,
 } from "@/hooks/useImageOrientations";
+
+/** A contact/social link with the icon, the label shown, and how to open it. */
+type ProfileLink = {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  /** Web URL the row resolves to (always has a scheme). */
+  url: string;
+  /** Optional app deep link tried first (e.g. the Instagram app). */
+  appUrl?: string;
+};
+
+/** Strip a bare Instagram handle out of whatever the artist typed. */
+function instagramHandle(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^@/, "")
+    .replace(/^https?:\/\//i, "")
+    .replace(/^(www\.|m\.)?instagram\.com\//i, "")
+    .replace(/\/+$/, "")
+    .split(/[/?#]/)[0];
+}
+
+/** Ensure a user-typed URL/email turns into something openable. */
+function buildProfileLink(
+  icon: keyof typeof Feather.glyphMap,
+  label: string,
+): ProfileLink {
+  if (icon === "mail") {
+    return { icon, label, url: `mailto:${label}` };
+  }
+  if (icon === "instagram") {
+    const handle = instagramHandle(label);
+    return {
+      icon,
+      label,
+      url: `https://instagram.com/${handle}`,
+      appUrl: `instagram://user?username=${handle}`,
+    };
+  }
+  const url = /^https?:\/\//i.test(label) ? label : `https://${label}`;
+  return { icon, label, url };
+}
+
+/** Open a profile link, preferring a native app deep link when available. */
+async function openProfileLink(link: ProfileLink) {
+  try {
+    if (link.appUrl && Platform.OS !== "web") {
+      const supported = await Linking.canOpenURL(link.appUrl);
+      if (supported) {
+        await Linking.openURL(link.appUrl);
+        return;
+      }
+    }
+    await Linking.openURL(link.url);
+  } catch {
+    // Best-effort: a malformed link should never crash the page.
+  }
+}
 
 export default function PublicSiteScreen({
   live = false,
@@ -96,12 +155,12 @@ export default function PublicSiteScreen({
     publicCollections.flatMap((e) => e.gridPieces.map((p) => p.imageUri)),
   );
 
-  const links: { icon: keyof typeof Feather.glyphMap; label: string }[] = [];
-  if (site.contactEmail.trim()) links.push({ icon: "mail", label: site.contactEmail.trim() });
-  if (profile.instagram.trim()) links.push({ icon: "instagram", label: profile.instagram.trim() });
-  if (profile.website.trim()) links.push({ icon: "globe", label: profile.website.trim() });
-  if (site.etsy.trim()) links.push({ icon: "shopping-bag", label: site.etsy.trim() });
-  if (site.shopify.trim()) links.push({ icon: "shopping-cart", label: site.shopify.trim() });
+  const links: ProfileLink[] = [];
+  if (site.contactEmail.trim()) links.push(buildProfileLink("mail", site.contactEmail.trim()));
+  if (profile.instagram.trim()) links.push(buildProfileLink("instagram", profile.instagram.trim()));
+  if (profile.website.trim()) links.push(buildProfileLink("globe", profile.website.trim()));
+  if (site.etsy.trim()) links.push(buildProfileLink("shopping-bag", site.etsy.trim()));
+  if (site.shopify.trim()) links.push(buildProfileLink("shopping-cart", site.shopify.trim()));
 
   const initial = profile.name.trim().charAt(0).toUpperCase();
 
@@ -331,12 +390,19 @@ export default function PublicSiteScreen({
         {links.length > 0 ? (
           <View style={styles.links}>
             {links.map((l) => (
-              <View key={l.label} style={styles.linkRow}>
+              <Pressable
+                key={l.label}
+                style={({ pressed }) => [styles.linkRow, { opacity: pressed ? 0.5 : 1 }]}
+                onPress={() => openProfileLink(l)}
+                accessibilityRole="link"
+                accessibilityLabel={`Open ${l.label}`}
+                hitSlop={6}
+              >
                 <Feather name={l.icon} size={13} color={colors.mutedForeground} />
                 <Text style={[styles.linkText, { color: colors.cobalt }]} numberOfLines={1}>
                   {l.label}
                 </Text>
-              </View>
+              </Pressable>
             ))}
           </View>
         ) : null}
