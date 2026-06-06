@@ -17,10 +17,24 @@ Alpha/web users hitting the URL saw the QR page, not the app. We replaced that
 flow entirely.
 
 **How to apply:**
-- `build` = `expo export --platform web --output-dir dist` (heap bumped via
-  `NODE_OPTIONS=--max-old-space-size=4096` — the export OOMs under memory
-  contention; the first symptom is an empty `dist/` with the log stopping at
-  "Starting Metro Bundler" and exit code -1, NOT an error message).
+- `build` = `expo export --platform web --output-dir dist --max-workers 2`
+  (heap bumped via `NODE_OPTIONS=--max-old-space-size=4096`). The export is
+  memory-heavy; `--max-workers 2` caps Metro transform workers (default = nproc,
+  4 here) so peak RSS stays under the deploy builder's ceiling (container cgroup
+  is 8 GB). OOM symptom: empty `dist/`, log stuck at "Starting Metro Bundler",
+  SIGKILL with no exit code / no error message.
+- VERIFIED 2026-06-06: the exported SPA builds, serves, and runs in a real
+  browser with a clean console (`[supabase] Configured for …`, auth init, no
+  errors) and `/status` returns 200 (deploy healthcheck passes). The web build
+  itself is healthy — if prod still shows the Expo Go landing page, the cause is
+  a STALE deployment (new build never published), not a runtime crash. Fix =
+  republish.
+- TESTING GOTCHA: you cannot build/verify `expo export` via detached background
+  bash (`nohup`/`setsid &`) — those processes are reaped when the tool call
+  returns, dying with no exit code (looks identical to an OOM). To run a >120s
+  build or serve the prod SPA for a browser test, use a MANAGED workflow
+  (configureWorkflow build+serve on 18115 → screenshot via the expo domain),
+  then remove it and restart `artifacts/mobile: expo`.
 - `app.json` `web.output: "single"` → SPA (one `dist/index.html`). Required
   because public artist routes are dynamic (`[slug]`, `[slug]/archive`, etc.) and
   can't be statically pre-rendered (slugs come from Supabase at runtime).
