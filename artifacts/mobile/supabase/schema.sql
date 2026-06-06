@@ -156,6 +156,15 @@ create table if not exists public.profiles (
 
 -- Optional single-line identity (studio/motto/nickname) under the public name.
 alter table public.profiles add column if not exists tagline text not null default '';
+-- Large landing/portfolio hero image, independent of the small round avatar, plus
+-- its vertical focal point (0 = top .. 1 = bottom) used when the image is taller
+-- than its display frame so the artist can reposition without distorting it.
+alter table public.profiles add column if not exists hero_image_url text;
+alter table public.profiles add column if not exists hero_focal_y real not null default 0.5;
+-- One-time backfill: existing artists whose avatar doubled as the hero keep that
+-- image as their hero. Runs only where no hero has been set yet (idempotent).
+update public.profiles set hero_image_url = avatar_url
+  where hero_image_url is null and avatar_url is not null;
 -- Per-user ownership. Unique (partial) so a user has at most one profile row.
 alter table public.profiles add column if not exists user_id uuid references auth.users(id) on delete cascade;
 create unique index if not exists profiles_user_id_key on public.profiles(user_id) where user_id is not null;
@@ -189,6 +198,7 @@ begin
   update public.profiles p set
     name = d.name, tagline = d.tagline, bio = d.bio, statement = d.statement,
     website = d.website, instagram = d.instagram, avatar_url = d.avatar_url,
+    hero_image_url = d.hero_image_url, hero_focal_y = d.hero_focal_y,
     public_site = d.public_site
   from public.profiles d
   where d.id = 'default' and d.user_id is null and p.user_id = uid;

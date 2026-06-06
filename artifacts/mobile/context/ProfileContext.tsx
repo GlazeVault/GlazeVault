@@ -35,7 +35,19 @@ export interface ArtistProfile {
   statement: string;
   website: string;
   instagram: string;
+  /** Small round profile photo. SEPARATE from the hero image. */
   avatarUri?: string;
+  /**
+   * Large landing/portfolio hero image. Independent of `avatarUri` — changing
+   * one never changes the other. Empty/undefined renders the calm placeholder.
+   */
+  heroImageUri?: string;
+  /**
+   * Vertical focal point (0 = top, 1 = bottom) used only when the hero image is
+   * taller than its display frame. Lets the artist reposition without distorting
+   * proportions or aggressively cropping. Defaults to centered.
+   */
+  heroFocalY?: number;
   publicSite: PublicSiteSettings;
 }
 
@@ -46,6 +58,7 @@ const DEFAULT_PROFILE: ArtistProfile = {
   statement: "",
   website: "",
   instagram: "",
+  heroFocalY: 0.5,
   publicSite: DEFAULT_PUBLIC_SITE,
 };
 
@@ -181,9 +194,17 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       if (isSupabaseConfigured && uid) {
         try {
           const saved = await saveProfileRemote(updated, uid);
-          // Fold any uploaded avatar URL back into the cache.
-          if (saved.avatarUri !== updated.avatarUri) {
-            await persistCache({ ...profileRef.current, avatarUri: saved.avatarUri });
+          // Fold any uploaded avatar/hero URLs back into the cache so the local
+          // copy matches the post-upload remote URLs (both upload separately).
+          if (
+            saved.avatarUri !== updated.avatarUri ||
+            saved.heroImageUri !== updated.heroImageUri
+          ) {
+            await persistCache({
+              ...profileRef.current,
+              avatarUri: saved.avatarUri,
+              heroImageUri: saved.heroImageUri,
+            });
           }
         } catch (e) {
           console.warn("[supabase] saveProfile failed (kept in local cache)", e);

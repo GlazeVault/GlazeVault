@@ -404,6 +404,8 @@ type ProfileRow = {
   website: string;
   instagram: string;
   avatar_url: string | null;
+  hero_image_url: string | null;
+  hero_focal_y: number | null;
   public_site: ArtistProfile["publicSite"] | null;
   user_id: string | null;
 };
@@ -420,6 +422,8 @@ function profileToRow(p: ArtistProfile, userId: string): ProfileRow {
     website: p.website,
     instagram: p.instagram,
     avatar_url: p.avatarUri ?? null,
+    hero_image_url: p.heroImageUri ?? null,
+    hero_focal_y: p.heroFocalY ?? 0.5,
     public_site: p.publicSite,
     user_id: userId,
   };
@@ -434,6 +438,8 @@ function rowToProfile(r: ProfileRow): Partial<ArtistProfile> {
     website: r.website ?? "",
     instagram: r.instagram ?? "",
     avatarUri: r.avatar_url ?? undefined,
+    heroImageUri: r.hero_image_url ?? undefined,
+    heroFocalY: r.hero_focal_y ?? 0.5,
     publicSite: r.public_site ?? undefined,
   };
 }
@@ -458,7 +464,14 @@ export async function saveProfile(
 ): Promise<ArtistProfile> {
   const client = requireClient();
   const avatarUrl = await uploadImage(p.avatarUri, "avatars");
-  const toSave: ArtistProfile = { ...p, avatarUri: avatarUrl ?? p.avatarUri };
+  // The hero image is uploaded independently of the avatar so the two never
+  // share storage or overwrite each other.
+  const heroUrl = await uploadImage(p.heroImageUri, "avatars");
+  const toSave: ArtistProfile = {
+    ...p,
+    avatarUri: avatarUrl ?? p.avatarUri,
+    heroImageUri: heroUrl ?? p.heroImageUri,
+  };
   const { error } = await client.from("profiles").upsert(profileToRow(toSave, userId));
   if (error) throw error;
   return toSave;
@@ -497,6 +510,8 @@ export async function ensureProfile(
     website: seed.website ?? "",
     instagram: seed.instagram ?? "",
     avatar_url: avatarUrl ?? null,
+    hero_image_url: null,
+    hero_focal_y: 0.5,
     public_site: null,
     user_id: userId,
   };

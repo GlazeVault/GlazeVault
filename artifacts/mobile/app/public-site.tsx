@@ -347,7 +347,8 @@ export default function PublicSiteScreen({
             single-exhibition page, otherwise the artist's own tagline). Shared
             with the owner's app entry so both first impressions feel identical. */}
         <ArtistHero
-          avatarUri={profile.avatarUri}
+          imageUri={profile.heroImageUri}
+          focalY={profile.heroFocalY}
           name={profile.name}
           secondLine={
             onlyCollectionId

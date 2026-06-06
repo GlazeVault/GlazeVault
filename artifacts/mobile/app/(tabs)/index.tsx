@@ -68,7 +68,8 @@ export default function GalleryScreen() {
           portfolio so opening the app and visiting the shared link feel the same.
           The Archive itself sits below, so the grid is not the first thing seen. */}
       <ArtistHero
-        avatarUri={profile.avatarUri}
+        imageUri={profile.heroImageUri}
+        focalY={profile.heroFocalY}
         name={profile.name}
         secondLine={profile.tagline}
         pullUp={topPad + 32}

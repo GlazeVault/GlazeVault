@@ -20,6 +20,9 @@ import {
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArtistHero } from "@/components/ArtistHero";
+import { HeroImage } from "@/components/HeroImage";
+import { HeroReposition } from "@/components/HeroReposition";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { ImportedText, pickAndExtractText, UnsupportedFileError } from "@/constants/importText";
 import {
@@ -62,6 +65,11 @@ export default function ProfileScreen() {
   const [etsy, setEtsy] = useState(profile.publicSite.etsy);
   const [shopify, setShopify] = useState(profile.publicSite.shopify);
   const [avatarUri, setAvatarUri] = useState(profile.avatarUri ?? "");
+  // Hero image is independent of the avatar; both live as local edit-form state
+  // and are persisted together on Save.
+  const [heroImageUri, setHeroImageUri] = useState(profile.heroImageUri ?? "");
+  const [heroFocalY, setHeroFocalY] = useState(profile.heroFocalY ?? 0.5);
+  const [repositionVisible, setRepositionVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   // Import-from-file flow: which field we're importing into, the extracted
   // preview awaiting a Replace/Append choice, and an in-flight guard.
@@ -71,6 +79,7 @@ export default function ProfileScreen() {
   // Prevents overlapping picker/save runs (and duplicate native file copies)
   // from rapid taps on the avatar.
   const pickingAvatar = useRef(false);
+  const pickingHero = useRef(false);
 
   // The Profile previews the public Portfolio, so it must match what visitors
   // see: public collections that contain at least one FEATURED piece. A public
@@ -91,6 +100,8 @@ export default function ProfileScreen() {
     setEtsy(profile.publicSite.etsy);
     setShopify(profile.publicSite.shopify);
     setAvatarUri(profile.avatarUri ?? "");
+    setHeroImageUri(profile.heroImageUri ?? "");
+    setHeroFocalY(profile.heroFocalY ?? 0.5);
     setIsEditing(true);
   };
 
@@ -109,6 +120,17 @@ export default function ProfileScreen() {
         return;
       }
     }
+    let storedHero = heroImageUri;
+    if (heroImageUri) {
+      try {
+        storedHero = await persistPieceImage(heroImageUri);
+      } catch (e) {
+        console.warn("Failed to persist hero image", e);
+        setSaving(false);
+        notice({ title: "Couldn’t save hero image", message: "We couldn’t store that image. Please try again.", variant: "error" });
+        return;
+      }
+    }
     await updateProfile({
       name,
       tagline,
@@ -117,6 +139,8 @@ export default function ProfileScreen() {
       website,
       instagram,
       avatarUri: storedAvatar || undefined,
+      heroImageUri: storedHero || undefined,
+      heroFocalY,
     });
     await updatePublicSite({ contactEmail, etsy, shopify });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -226,6 +250,66 @@ export default function ProfileScreen() {
     } finally {
       pickingAvatar.current = false;
     }
+  };
+
+  // Hero image flow — kept fully separate from the avatar so changing one never
+  // touches the other. No forced aspect/crop: the hero keeps its true
+  // proportions and is framed by repositioning, not cropping.
+  const runPickHero = async () => {
+    if (Platform.OS !== "web") {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        notice({ title: "Permission needed", message: "Allow access to your photo library." });
+        return;
+      }
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 0.85,
+      base64: Platform.OS === "web",
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    const asset = result.assets[0];
+    let stored: string;
+    try {
+      if (Platform.OS === "web") {
+        if (!asset.base64) throw new Error("Picker returned no base64 data on web");
+        stored = `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}`;
+      } else {
+        stored = await persistPieceImage(asset.uri);
+      }
+    } catch (e) {
+      console.warn("Failed to load hero image", e);
+      notice({ title: "Couldn’t load image", message: "We couldn’t use that image. Please try again.", variant: "error" });
+      return;
+    }
+    // A fresh image starts centered; the artist can reposition from there.
+    setHeroImageUri(stored);
+    setHeroFocalY(0.5);
+  };
+
+  const pickHero = async () => {
+    if (pickingHero.current) return;
+    pickingHero.current = true;
+    try {
+      await runPickHero();
+    } finally {
+      pickingHero.current = false;
+    }
+  };
+
+  const handleRemoveHero = async () => {
+    const ok = await confirm({
+      title: "Remove hero image?",
+      message: "Your landing page will show a calm placeholder until you add another.",
+      confirmText: "Remove",
+      cancelText: "Keep",
+      destructive: true,
+    });
+    if (!ok) return;
+    setHeroImageUri("");
+    setHeroFocalY(0.5);
   };
 
   const runPickAvatar = async () => {
@@ -451,17 +535,77 @@ export default function ProfileScreen() {
           </Text>
         )}
 
-        {/* Tagline — optional single line shown under the name on the public site */}
+        {/* Optional line — a single line under the name shown on the landing page */}
         {isEditing ? (
-          <TextInput
-            style={[styles.taglineInput, { color: colors.mutedForeground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
-            value={tagline}
-            onChangeText={setTagline}
-            placeholder="Studio, motto, or a short line (optional)"
-            placeholderTextColor={colors.mutedForeground}
-          />
+          <View style={styles.optionalLineWrap}>
+            <Text style={[styles.optionalLineLabel, { color: colors.mutedForeground }]}>Optional line</Text>
+            <TextInput
+              style={[styles.taglineInput, { color: colors.mutedForeground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
+              value={tagline}
+              onChangeText={setTagline}
+              placeholder="Studio name, motto, nickname, or short phrase"
+              placeholderTextColor={colors.mutedForeground}
+            />
+          </View>
         ) : profile.tagline ? (
           <Text style={[styles.tagline, { color: colors.mutedForeground }]}>{profile.tagline}</Text>
+        ) : null}
+
+        {/* Hero Image — the large image at the entrance of the landing page,
+            curated independently of the small round profile photo. Edit-only. */}
+        {isEditing ? (
+          <View style={styles.heroSection}>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Hero Image</Text>
+            <Text style={[styles.heroHelp, { color: colors.mutedForeground }]}>
+              The large image at the entrance of your landing page. Separate from your profile photo.
+            </Text>
+
+            <View style={[styles.heroPreviewFrame, { borderColor: colors.border }]}>
+              <HeroImage
+                uri={heroImageUri || undefined}
+                focalY={heroFocalY}
+                maxHeight={300}
+                initial={(name || profile.name).trim().charAt(0).toUpperCase()}
+                borderRadius={6}
+              />
+            </View>
+
+            <View style={styles.heroButtons}>
+              <Pressable onPress={pickHero} style={[styles.heroBtn, { borderColor: "rgba(120,110,100,0.25)" }]}>
+                <Feather name="image" size={13} color={colors.foreground} />
+                <Text style={[styles.heroBtnText, { color: colors.foreground }]}>
+                  {heroImageUri ? "Change Hero Image" : "Add Hero Image"}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setRepositionVisible(true)}
+                disabled={!heroImageUri}
+                style={[styles.heroBtn, { borderColor: "rgba(120,110,100,0.25)", opacity: heroImageUri ? 1 : 0.4 }]}
+              >
+                <Feather name="move" size={13} color={colors.foreground} />
+                <Text style={[styles.heroBtnText, { color: colors.foreground }]}>Reposition</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleRemoveHero}
+                disabled={!heroImageUri}
+                style={[styles.heroBtn, { borderColor: "rgba(120,110,100,0.25)", opacity: heroImageUri ? 1 : 0.4 }]}
+              >
+                <Feather name="trash-2" size={13} color={colors.mutedForeground} />
+                <Text style={[styles.heroBtnText, { color: colors.mutedForeground }]}>Remove Hero Image</Text>
+              </Pressable>
+            </View>
+
+            <Text style={[styles.heroPreviewLabel, { color: colors.mutedForeground }]}>How your landing page opens</Text>
+            <View style={[styles.landingPreview, { borderColor: colors.border }]}>
+              <ArtistHero
+                imageUri={heroImageUri || undefined}
+                focalY={heroFocalY}
+                name={name}
+                secondLine={tagline}
+                maxHeight={170}
+              />
+            </View>
+          </View>
         ) : null}
 
         {/* Bio */}
@@ -982,6 +1126,19 @@ export default function ProfileScreen() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      {heroImageUri ? (
+        <HeroReposition
+          visible={repositionVisible}
+          uri={heroImageUri}
+          focalY={heroFocalY}
+          onDone={(f) => {
+            setHeroFocalY(f);
+            setRepositionVisible(false);
+          }}
+          onCancel={() => setRepositionVisible(false)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -1085,6 +1242,69 @@ const styles = StyleSheet.create({
     marginTop: -10,
     marginBottom: 24,
     letterSpacing: 0.4,
+  },
+  optionalLineWrap: {
+    marginTop: -10,
+    marginBottom: 24,
+  },
+  optionalLineLabel: {
+    fontSize: 9,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+    textAlign: "center",
+    marginBottom: 2,
+  },
+  heroSection: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  heroHelp: {
+    fontSize: 12.5,
+    fontFamily: "Poppins_300Light",
+    lineHeight: 18,
+    marginTop: -4,
+    marginBottom: 14,
+  },
+  heroPreviewFrame: {
+    width: "100%",
+    borderWidth: 0.75,
+    borderRadius: 6,
+    overflow: "hidden",
+  },
+  heroButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 14,
+  },
+  heroBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 0.75,
+    borderRadius: 9,
+  },
+  heroBtnText: {
+    fontSize: 12.5,
+    fontFamily: "Poppins_400Regular",
+  },
+  heroPreviewLabel: {
+    fontSize: 9,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+    marginTop: 26,
+    marginBottom: 10,
+  },
+  landingPreview: {
+    borderWidth: 0.75,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    overflow: "hidden",
   },
   section: { marginTop: 28 },
   sectionLabel: {
