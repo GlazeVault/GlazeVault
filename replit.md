@@ -56,7 +56,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- **Public pages show "Not on view" in production but work in dev:** the deployed `expo export` build does NOT receive the workspace Secrets, so `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` inline as empty strings → `isSupabaseConfigured` is false → every public artist page renders the "Not on view" gate. Fix: a committed `artifacts/mobile/.env.production` (NOT gitignored; only `.env` and `.env*.local` are) supplies these two public values to the export. dotenv won't override real `process.env`, so dev is unaffected. After changing these, re-publish so the build re-inlines them.
 
 ## Pointers
 

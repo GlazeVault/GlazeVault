@@ -15,6 +15,13 @@
 // Find both in your Supabase dashboard under: Project Settings → API.
 // See `supabase/SETUP.md` for the full one-time setup (tables + storage bucket).
 //
+// DEPLOYMENT: the production `expo export` build does NOT receive the workspace
+// Secrets, so without help it inlines empty strings and every public page falls
+// back to "Not on view". The committed `.env.production` (next to package.json)
+// supplies these two PUBLIC values to the export so they get baked into the
+// deployed bundle. dotenv does not override real process.env, so it has no
+// effect on local dev — it only fills the gap in the credential-less build.
+//
 // If either var is missing the app still runs fully offline against the
 // AsyncStorage cache — `isSupabaseConfigured` is false and every remote call is
 // skipped, so nothing crashes.
