@@ -5,7 +5,14 @@ description: Why the tab bar is a custom JS tabBar (not NativeTabs) and how the 
 
 # GlazeVault bottom navigation
 
-The tab bar is a single custom `tabBar` rendered on expo-router `<Tabs>` (`GlazeTabBar` in `app/(tabs)/_layout.tsx`). It shows Archive · Collections · [+ FAB] · Profile.
+The tab bar is a single custom `tabBar` rendered on expo-router `<Tabs>` (`GlazeTabBar` in `app/(tabs)/_layout.tsx`). It shows Home · Collections · [+ FAB] · Saved · Profile.
+
+## The landing is a calm "foyer", not the grid
+- `app/(tabs)/index.tsx` (the Home tab) is a foyer: shared `ArtistHero` (hero+name+optional tagline) + 3 `EntranceCard` doorways — Portfolio→`router.push('/public-site')`, Collections→`router.navigate('/(tabs)/collections')`, Archive→`router.push('/archive')`. NO grid here.
+- The full archive grid lives at `app/archive.tsx` (root Stack card, `presentation:'card'`), reached via the Archive doorway so the grid is never the first impression. It is the ORIGINAL landing grid moved verbatim (FlashList orientation rows + search), plus a "Foyer" back button (`router.canGoBack() ? back() : replace('/')`).
+- `archive` must be in `PRIVATE_ROOTS` (AuthGate, `app/_layout.tsx`) or it gets misread as a public `[slug]` route.
+- After saving a piece, `add.tsx` does `router.replace('/archive')` (not `/`) so the user lands on the grid and sees the new piece — hence the archive back button's `canGoBack` fallback.
+- **Why:** user wanted "choosing where to wander inside an artist's space," gallery-foyer not app-dashboard. The first tab was renamed Archive→**Home** (house icon) because index is no longer the grid.
 
 ## Why custom instead of NativeTabs
 - The previous layout had two paths: NativeTabs (liquid-glass, iOS 26) and a classic JS tab bar. A centered emphasized **+** FAB that opens a menu is not expressible with NativeTabs' trigger model, so both were replaced by one custom tabBar.

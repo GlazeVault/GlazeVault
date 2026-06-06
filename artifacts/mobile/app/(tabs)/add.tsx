@@ -175,7 +175,7 @@ export default function AddScreen() {
     setIsPublic(false); setCollectionIds([]); setFeatured(false);
     setShowGlazeDetails(false); setShowStudioNotes(false);
     setSaving(false);
-    router.replace("/");
+    router.replace("/archive");
   };
 
   const Field = ({ value, onChange, placeholder, multiline = false }: {

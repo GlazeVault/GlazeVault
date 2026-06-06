@@ -26,7 +26,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { name: "index", label: "Archive", sf: "archivebox", feather: "grid" },
+  { name: "index", label: "Home", sf: "house", feather: "home" },
   { name: "collections", label: "Collections", sf: "rectangle.stack", feather: "layers" },
   { name: "saved", label: "Saved", sf: "bookmark", feather: "bookmark" },
   { name: "profile", label: "Profile", sf: "person", feather: "user" },
