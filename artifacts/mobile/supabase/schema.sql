@@ -145,6 +145,7 @@ create index if not exists collections_user_id_idx on public.collections(user_id
 create table if not exists public.profiles (
   id          text primary key,
   name        text not null default '',
+  tagline     text not null default '',
   bio         text not null default '',
   statement   text not null default '',
   website     text not null default '',
@@ -153,6 +154,8 @@ create table if not exists public.profiles (
   public_site jsonb
 );
 
+-- Optional single-line identity (studio/motto/nickname) under the public name.
+alter table public.profiles add column if not exists tagline text not null default '';
 -- Per-user ownership. Unique (partial) so a user has at most one profile row.
 alter table public.profiles add column if not exists user_id uuid references auth.users(id) on delete cascade;
 create unique index if not exists profiles_user_id_key on public.profiles(user_id) where user_id is not null;
@@ -184,8 +187,9 @@ begin
   update public.pieces      set user_id = uid where user_id is null;
   update public.collections set user_id = uid where user_id is null;
   update public.profiles p set
-    name = d.name, bio = d.bio, statement = d.statement, website = d.website,
-    instagram = d.instagram, avatar_url = d.avatar_url, public_site = d.public_site
+    name = d.name, tagline = d.tagline, bio = d.bio, statement = d.statement,
+    website = d.website, instagram = d.instagram, avatar_url = d.avatar_url,
+    public_site = d.public_site
   from public.profiles d
   where d.id = 'default' and d.user_id is null and p.user_id = uid;
   delete from public.profiles where id = 'default' and user_id is null;

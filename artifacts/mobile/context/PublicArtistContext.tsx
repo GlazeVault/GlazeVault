@@ -35,6 +35,7 @@ interface PublicArtistValue {
 
 const EMPTY_PROFILE: ArtistProfile = {
   name: "",
+  tagline: "",
   bio: "",
   statement: "",
   website: "",

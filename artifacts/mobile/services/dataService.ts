@@ -398,6 +398,7 @@ export async function deleteCollection(id: string): Promise<void> {
 type ProfileRow = {
   id: string;
   name: string;
+  tagline: string;
   bio: string;
   statement: string;
   website: string;
@@ -413,6 +414,7 @@ function profileToRow(p: ArtistProfile, userId: string): ProfileRow {
     // replaces the legacy single-row id = 'default' from the pre-auth schema.
     id: userId,
     name: p.name,
+    tagline: p.tagline,
     bio: p.bio,
     statement: p.statement,
     website: p.website,
@@ -426,6 +428,7 @@ function profileToRow(p: ArtistProfile, userId: string): ProfileRow {
 function rowToProfile(r: ProfileRow): Partial<ArtistProfile> {
   return {
     name: r.name ?? "",
+    tagline: r.tagline ?? "",
     bio: r.bio ?? "",
     statement: r.statement ?? "",
     website: r.website ?? "",
@@ -488,6 +491,7 @@ export async function ensureProfile(
   const row: ProfileRow = {
     id: userId,
     name: seed.name ?? "",
+    tagline: "",
     bio: "",
     statement: "",
     website: seed.website ?? "",

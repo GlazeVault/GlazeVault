@@ -1,6 +1,5 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, type Href } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -34,8 +33,6 @@ import { useSaved } from "@/context/SavedContext";
 import {
   collectionShareUrl,
   portfolioShareUrl,
-  PUBLIC_SITE_DOMAIN,
-  publicSiteLabel,
   publicSiteSlug,
   useProfile,
 } from "@/context/ProfileContext";
@@ -123,9 +120,14 @@ export default function PublicSiteScreen({
   const collections = pub ? pub.collections : ownCollections;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const { height: winHeight } = useWindowDimensions();
-  // A tall, cinematic portrait band sized off the viewport so it feels immersive
-  // without ever dominating the whole screen — clamped to a calm editorial range.
-  const portraitHeight = Math.max(440, Math.min(winHeight * 0.62, 640));
+  // The hero is one large full-width image shown at its TRUE proportions (no
+  // crop). We measure its natural ratio and let the frame take that shape, only
+  // clamping the height so an extreme portrait can't dominate the whole screen —
+  // and even then we contain (letterbox) rather than crop.
+  const heroRatios = useImageOrientations([profile.avatarUri]);
+  const heroRatio =
+    (profile.avatarUri ? heroRatios[profile.avatarUri] : undefined) ?? 4 / 5;
+  const heroMaxHeight = Math.min(winHeight * 0.78, 720);
 
   const site = profile.publicSite;
   const [shareVisible, setShareVisible] = useState(false);
@@ -350,25 +352,20 @@ export default function PublicSiteScreen({
           { paddingTop: topPad + 64, paddingBottom: insets.bottom + 48 },
         ]}
       >
-        {/* Editorial artist portrait — entering the artist's world before the work.
-            A large, full-bleed studio portrait that dissolves into the page via a
-            soft gradient, with the name and address breathing in the quiet below. */}
-        <View
-          style={[
-            styles.portraitWrap,
-            { height: portraitHeight, marginTop: -(topPad + 64), backgroundColor: colors.secondary },
-          ]}
-        >
+        {/* Entering the artist's world before the work: one large, full-width
+            hero shown at its TRUE proportions — no crop, no overlay, no gradient.
+            The identity breathes in the calm directly beneath it. */}
+        <View style={[styles.heroWrap, { marginTop: -(topPad + 64) }]}>
           {profile.avatarUri ? (
             <Image
               source={resolveImageSource(profile.avatarUri)}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
+              style={[styles.heroImage, { aspectRatio: heroRatio, maxHeight: heroMaxHeight }]}
+              contentFit="contain"
               transition={280}
               cachePolicy="memory-disk"
             />
           ) : (
-            <View style={[StyleSheet.absoluteFill, styles.portraitPlaceholder]}>
+            <View style={[styles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
               {initial ? (
                 <Text style={[styles.portraitInitial, { color: colors.mutedForeground }]}>{initial}</Text>
               ) : (
@@ -376,51 +373,25 @@ export default function PublicSiteScreen({
               )}
             </View>
           )}
-          {/* Soft fade so the portrait melts into the page rather than ending hard */}
-          <LinearGradient
-            pointerEvents="none"
-            colors={["transparent", "transparent", colors.background]}
-            locations={[0, 0.5, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.portraitCaption}>
-            <Text style={[styles.heroEyebrow, { color: colors.emerald }]}>
-              {onlyCollectionId ? "Exhibition" : "Portfolio"}
-            </Text>
-            <Text style={[styles.heroName, { color: colors.foreground }]}>
-              {profile.name || "Your Studio"}
-            </Text>
-            <Text style={[styles.heroUrl, { color: colors.mutedForeground }]}>
-              {publicSiteLabel(profile.name)}
-            </Text>
-          </View>
         </View>
 
-        {/* Quiet network controls. On a single exhibition page the visitor can
-            save that exhibition for inspiration; on the artist's portfolio they
-            can follow the archive and save the artist. No counts, no metrics. */}
-        <View style={styles.inspireRow}>
-          {onlyCollectionId ? (
-            <SaveButton
-              saved={isCollectionSaved(onlyCollectionId)}
-              onPress={() => toggleCollectionSaved(onlyCollectionId)}
-              label={isCollectionSaved(onlyCollectionId) ? "Saved" : "Save Exhibition"}
-              accessibilityLabel="Save this exhibition to your inspiration"
-            />
-          ) : (
-            <>
-              <FollowButton
-                following={isFollowing(artistRef.slug)}
-                onPress={() => toggleFollowing(artistRef)}
-              />
-              <SaveButton
-                saved={isArtistSaved(artistRef.slug)}
-                onPress={() => toggleArtistSaved(artistRef)}
-                label={isArtistSaved(artistRef.slug) ? "Saved" : "Save Artist"}
-                accessibilityLabel="Save this artist to your inspiration"
-              />
-            </>
-          )}
+        {/* Calm identity: the artist name, then ONE optional second line — the
+            collection title on a single-exhibition page, otherwise the artist's
+            own tagline. Nothing is rendered when there's nothing to say. */}
+        <View style={styles.identity}>
+          <Text style={[styles.heroName, { color: colors.foreground }]}>
+            {profile.name || "Your Studio"}
+          </Text>
+          {(() => {
+            const secondLine = onlyCollectionId
+              ? (publicCollections[0]?.collection.title ?? "").trim()
+              : (profile.tagline ?? "").trim();
+            return secondLine ? (
+              <Text style={[styles.heroSecondLine, { color: colors.mutedForeground }]}>
+                {secondLine}
+              </Text>
+            ) : null;
+          })()}
         </View>
 
         {profile.bio.trim() ? (
@@ -468,6 +439,34 @@ export default function PublicSiteScreen({
             ))}
           </View>
         ) : null}
+
+        {/* Quiet network controls — kept deliberately low, after the artist's
+            words, never at the top. On a single exhibition page the visitor can
+            save that exhibition; on the portfolio they can follow the archive and
+            save the artist. No counts, no metrics, no pressure. */}
+        <View style={styles.inspireRow}>
+          {onlyCollectionId ? (
+            <SaveButton
+              saved={isCollectionSaved(onlyCollectionId)}
+              onPress={() => toggleCollectionSaved(onlyCollectionId)}
+              label={isCollectionSaved(onlyCollectionId) ? "Saved" : "Save Exhibition"}
+              accessibilityLabel="Save this exhibition to your inspiration"
+            />
+          ) : (
+            <>
+              <FollowButton
+                following={isFollowing(artistRef.slug)}
+                onPress={() => toggleFollowing(artistRef)}
+              />
+              <SaveButton
+                saved={isArtistSaved(artistRef.slug)}
+                onPress={() => toggleArtistSaved(artistRef)}
+                label={isArtistSaved(artistRef.slug) ? "Saved" : "Save Artist"}
+                accessibilityLabel="Save this artist to your inspiration"
+              />
+            </>
+          )}
+        </View>
 
         <View style={[styles.divider, { backgroundColor: "rgba(120,110,100,0.12)" }]} />
 
@@ -647,43 +646,42 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   previewPillText: { fontSize: 11, fontFamily: "Poppins_500Medium", letterSpacing: 0.4 },
-  portraitWrap: {
+  heroWrap: {
     marginHorizontal: -28,
-    marginBottom: 34,
-    justifyContent: "flex-end",
+    marginBottom: 26,
     overflow: "hidden",
   },
-  portraitPlaceholder: { alignItems: "center", justifyContent: "center" },
-  portraitInitial: { fontSize: 88, fontFamily: "PlayfairDisplay_400Regular", opacity: 0.5 },
-  portraitCaption: {
-    paddingHorizontal: 28,
-    paddingBottom: 6,
+  heroImage: {
+    width: "100%",
   },
-  heroEyebrow: {
-    fontSize: 11,
-    fontFamily: "Poppins_500Medium",
-    letterSpacing: 2.5,
-    textTransform: "uppercase",
-    marginBottom: 14,
+  heroPlaceholder: {
+    width: "100%",
+    height: 360,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  portraitInitial: { fontSize: 88, fontFamily: "PlayfairDisplay_400Regular", opacity: 0.5 },
+  identity: {
+    paddingHorizontal: 4,
+    marginBottom: 28,
   },
   heroName: {
-    fontSize: 40,
+    fontSize: 38,
     fontFamily: "PlayfairDisplay_400Regular",
     letterSpacing: 0.3,
-    lineHeight: 46,
+    lineHeight: 44,
   },
-  heroUrl: {
-    fontSize: 12,
+  heroSecondLine: {
+    fontSize: 15,
     fontFamily: "Poppins_300Light",
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
     marginTop: 10,
+    lineHeight: 22,
   },
   inspireRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    paddingHorizontal: 28,
-    marginTop: 22,
     marginBottom: 4,
   },
   bioWrap: { marginBottom: 22 },

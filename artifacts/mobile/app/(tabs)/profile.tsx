@@ -53,6 +53,7 @@ export default function ProfileScreen() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(profile.name);
+  const [tagline, setTagline] = useState(profile.tagline);
   const [bio, setBio] = useState(profile.bio);
   const [statement, setStatement] = useState(profile.statement);
   const [website, setWebsite] = useState(profile.website);
@@ -81,6 +82,7 @@ export default function ProfileScreen() {
 
   const startEditing = () => {
     setName(profile.name);
+    setTagline(profile.tagline);
     setBio(profile.bio);
     setStatement(profile.statement);
     setWebsite(profile.website);
@@ -109,6 +111,7 @@ export default function ProfileScreen() {
     }
     await updateProfile({
       name,
+      tagline,
       bio,
       statement,
       website,
@@ -447,6 +450,19 @@ export default function ProfileScreen() {
             )}
           </Text>
         )}
+
+        {/* Tagline — optional single line shown under the name on the public site */}
+        {isEditing ? (
+          <TextInput
+            style={[styles.taglineInput, { color: colors.mutedForeground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
+            value={tagline}
+            onChangeText={setTagline}
+            placeholder="Studio, motto, or a short line (optional)"
+            placeholderTextColor={colors.mutedForeground}
+          />
+        ) : profile.tagline ? (
+          <Text style={[styles.tagline, { color: colors.mutedForeground }]}>{profile.tagline}</Text>
+        ) : null}
 
         {/* Bio */}
         <View style={styles.section}>
@@ -1050,6 +1066,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.75,
     marginBottom: 24,
     letterSpacing: 0.3,
+  },
+  tagline: {
+    fontSize: 14,
+    fontFamily: "Poppins_300Light",
+    letterSpacing: 0.4,
+    lineHeight: 20,
+    textAlign: "center",
+    marginTop: -14,
+    marginBottom: 24,
+  },
+  taglineInput: {
+    fontSize: 14,
+    fontFamily: "Poppins_300Light",
+    textAlign: "center",
+    paddingVertical: 6,
+    borderBottomWidth: 0.75,
+    marginTop: -10,
+    marginBottom: 24,
+    letterSpacing: 0.4,
   },
   section: { marginTop: 28 },
   sectionLabel: {

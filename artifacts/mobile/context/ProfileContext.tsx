@@ -25,6 +25,12 @@ export const DEFAULT_PUBLIC_SITE: PublicSiteSettings = {
 
 export interface ArtistProfile {
   name: string;
+  /**
+   * Optional single-line identity shown under the artist name on the public
+   * landing page — a studio name, short motto, nickname, or one-line statement.
+   * Empty = nothing rendered.
+   */
+  tagline: string;
   bio: string;
   statement: string;
   website: string;
@@ -35,6 +41,7 @@ export interface ArtistProfile {
 
 const DEFAULT_PROFILE: ArtistProfile = {
   name: "",
+  tagline: "",
   bio: "",
   statement: "",
   website: "",
@@ -89,7 +96,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   // on first connect (avoids pushing an empty default row).
   const hasContent = useCallback((p: ArtistProfile): boolean => {
     return Boolean(
-      p.name || p.bio || p.statement || p.website || p.instagram || p.avatarUri
+      p.name || p.tagline || p.bio || p.statement || p.website || p.instagram || p.avatarUri
     );
   }, []);
 
