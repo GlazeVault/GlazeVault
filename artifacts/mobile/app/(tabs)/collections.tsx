@@ -61,6 +61,16 @@ export default function CollectionsScreen() {
         ]}
         ListHeaderComponent={
           <View style={styles.header}>
+            <Pressable
+              style={styles.backRow}
+              accessibilityRole="button"
+              accessibilityLabel="Back to foyer"
+              hitSlop={10}
+              onPress={() => router.navigate("/")}
+            >
+              <Feather name="chevron-left" size={20} color={colors.mutedForeground} />
+              <Text style={[styles.backLabel, { color: colors.mutedForeground }]}>Foyer</Text>
+            </Pressable>
             <View style={styles.headerRow}>
               <View>
                 <Text style={[styles.eyebrow, { color: colors.cobalt }]}>GlazeVault</Text>
@@ -181,6 +191,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   list: { paddingHorizontal: 28 },
   header: { marginBottom: 40 },
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 18,
+    marginLeft: -4,
+  },
+  backLabel: {
+    fontSize: 13,
+    fontFamily: "Poppins_400Regular",
+    letterSpacing: 0.3,
+    marginLeft: 2,
+  },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
