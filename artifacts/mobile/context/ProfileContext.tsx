@@ -48,6 +48,16 @@ export interface ArtistProfile {
    * proportions or aggressively cropping. Defaults to centered.
    */
   heroFocalY?: number;
+  /**
+   * Horizontal focal point (0 = left, 1 = right). Only meaningful when the hero
+   * is zoomed in (otherwise there is no horizontal overflow). Defaults centered.
+   */
+  heroFocalX?: number;
+  /**
+   * Hero zoom factor (>= 1). 1 shows the image at its natural frame size; higher
+   * values scale it up so the focal point can crop/reposition within the frame.
+   */
+  heroZoom?: number;
   publicSite: PublicSiteSettings;
 }
 
@@ -59,6 +69,8 @@ const DEFAULT_PROFILE: ArtistProfile = {
   website: "",
   instagram: "",
   heroFocalY: 0.5,
+  heroFocalX: 0.5,
+  heroZoom: 1,
   publicSite: DEFAULT_PUBLIC_SITE,
 };
 

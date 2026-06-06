@@ -43,6 +43,8 @@ const EMPTY_PROFILE: ArtistProfile = {
   avatarUri: undefined,
   heroImageUri: undefined,
   heroFocalY: 0.5,
+  heroFocalX: 0.5,
+  heroZoom: 1,
   publicSite: DEFAULT_PUBLIC_SITE,
 };
 

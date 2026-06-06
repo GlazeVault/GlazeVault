@@ -9,6 +9,10 @@ interface ArtistHeroProps {
   imageUri?: string;
   /** Vertical focal point 0..1 used when the hero is taller than its frame. */
   focalY?: number;
+  /** Horizontal focal point 0..1, meaningful when the hero is zoomed in. */
+  focalX?: number;
+  /** Zoom factor (>= 1) applied to the saved hero crop. */
+  zoom?: number;
   name: string;
   /** One optional line below the name (studio / motto / nickname / statement). */
   secondLine?: string;
@@ -30,6 +34,8 @@ interface ArtistHeroProps {
 export function ArtistHero({
   imageUri,
   focalY = 0.5,
+  focalX = 0.5,
+  zoom = 1,
   name,
   secondLine,
   pullUp = 0,
@@ -48,7 +54,7 @@ export function ArtistHero({
   return (
     <View>
       <View style={[styles.heroWrap, { marginTop: -pullUp, marginHorizontal: -bleed }]}>
-        <HeroImage uri={imageUri} focalY={focalY} maxHeight={heroMaxHeight} initial={initial} />
+        <HeroImage uri={imageUri} focalY={focalY} focalX={focalX} zoom={zoom} maxHeight={heroMaxHeight} initial={initial} />
       </View>
 
       <View style={styles.identity}>

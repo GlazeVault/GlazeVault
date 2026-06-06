@@ -406,6 +406,8 @@ type ProfileRow = {
   avatar_url: string | null;
   hero_image_url: string | null;
   hero_focal_y: number | null;
+  hero_focal_x: number | null;
+  hero_zoom: number | null;
   public_site: ArtistProfile["publicSite"] | null;
   user_id: string | null;
 };
@@ -424,6 +426,8 @@ function profileToRow(p: ArtistProfile, userId: string): ProfileRow {
     avatar_url: p.avatarUri ?? null,
     hero_image_url: p.heroImageUri ?? null,
     hero_focal_y: p.heroFocalY ?? 0.5,
+    hero_focal_x: p.heroFocalX ?? 0.5,
+    hero_zoom: p.heroZoom ?? 1,
     public_site: p.publicSite,
     user_id: userId,
   };
@@ -440,6 +444,8 @@ function rowToProfile(r: ProfileRow): Partial<ArtistProfile> {
     avatarUri: r.avatar_url ?? undefined,
     heroImageUri: r.hero_image_url ?? undefined,
     heroFocalY: r.hero_focal_y ?? 0.5,
+    heroFocalX: r.hero_focal_x ?? 0.5,
+    heroZoom: r.hero_zoom ?? 1,
     publicSite: r.public_site ?? undefined,
   };
 }
@@ -512,6 +518,8 @@ export async function ensureProfile(
     avatar_url: avatarUrl ?? null,
     hero_image_url: null,
     hero_focal_y: 0.5,
+    hero_focal_x: 0.5,
+    hero_zoom: 1,
     public_site: null,
     user_id: userId,
   };

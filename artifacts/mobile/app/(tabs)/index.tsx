@@ -70,6 +70,8 @@ export default function GalleryScreen() {
       <ArtistHero
         imageUri={profile.heroImageUri}
         focalY={profile.heroFocalY}
+        focalX={profile.heroFocalX}
+        zoom={profile.heroZoom}
         name={profile.name}
         secondLine={profile.tagline}
         pullUp={topPad + 32}

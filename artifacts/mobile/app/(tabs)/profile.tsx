@@ -69,6 +69,8 @@ export default function ProfileScreen() {
   // and are persisted together on Save.
   const [heroImageUri, setHeroImageUri] = useState(profile.heroImageUri ?? "");
   const [heroFocalY, setHeroFocalY] = useState(profile.heroFocalY ?? 0.5);
+  const [heroFocalX, setHeroFocalX] = useState(profile.heroFocalX ?? 0.5);
+  const [heroZoom, setHeroZoom] = useState(profile.heroZoom ?? 1);
   const [repositionVisible, setRepositionVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   // Import-from-file flow: which field we're importing into, the extracted
@@ -102,6 +104,8 @@ export default function ProfileScreen() {
     setAvatarUri(profile.avatarUri ?? "");
     setHeroImageUri(profile.heroImageUri ?? "");
     setHeroFocalY(profile.heroFocalY ?? 0.5);
+    setHeroFocalX(profile.heroFocalX ?? 0.5);
+    setHeroZoom(profile.heroZoom ?? 1);
     setIsEditing(true);
   };
 
@@ -141,6 +145,8 @@ export default function ProfileScreen() {
       avatarUri: storedAvatar || undefined,
       heroImageUri: storedHero || undefined,
       heroFocalY,
+      heroFocalX,
+      heroZoom,
     });
     await updatePublicSite({ contactEmail, etsy, shopify });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -284,9 +290,11 @@ export default function ProfileScreen() {
       notice({ title: "Couldn’t load image", message: "We couldn’t use that image. Please try again.", variant: "error" });
       return;
     }
-    // A fresh image starts centered; the artist can reposition from there.
+    // A fresh image starts centered, unzoomed; the artist can reposition from there.
     setHeroImageUri(stored);
     setHeroFocalY(0.5);
+    setHeroFocalX(0.5);
+    setHeroZoom(1);
   };
 
   const pickHero = async () => {
@@ -310,6 +318,8 @@ export default function ProfileScreen() {
     if (!ok) return;
     setHeroImageUri("");
     setHeroFocalY(0.5);
+    setHeroFocalX(0.5);
+    setHeroZoom(1);
   };
 
   const runPickAvatar = async () => {
@@ -564,6 +574,8 @@ export default function ProfileScreen() {
               <HeroImage
                 uri={heroImageUri || undefined}
                 focalY={heroFocalY}
+                focalX={heroFocalX}
+                zoom={heroZoom}
                 maxHeight={300}
                 initial={(name || profile.name).trim().charAt(0).toUpperCase()}
                 borderRadius={6}
@@ -600,6 +612,8 @@ export default function ProfileScreen() {
               <ArtistHero
                 imageUri={heroImageUri || undefined}
                 focalY={heroFocalY}
+                focalX={heroFocalX}
+                zoom={heroZoom}
                 name={name}
                 secondLine={tagline}
                 maxHeight={170}
@@ -1131,9 +1145,13 @@ export default function ProfileScreen() {
         <HeroReposition
           visible={repositionVisible}
           uri={heroImageUri}
+          focalX={heroFocalX}
           focalY={heroFocalY}
-          onDone={(f) => {
-            setHeroFocalY(f);
+          zoom={heroZoom}
+          onDone={(fx, fy, z) => {
+            setHeroFocalX(fx);
+            setHeroFocalY(fy);
+            setHeroZoom(z);
             setRepositionVisible(false);
           }}
           onCancel={() => setRepositionVisible(false)}

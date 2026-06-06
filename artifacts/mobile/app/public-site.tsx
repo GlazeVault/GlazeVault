@@ -349,6 +349,8 @@ export default function PublicSiteScreen({
         <ArtistHero
           imageUri={profile.heroImageUri}
           focalY={profile.heroFocalY}
+          focalX={profile.heroFocalX}
+          zoom={profile.heroZoom}
           name={profile.name}
           secondLine={
             onlyCollectionId

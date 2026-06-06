@@ -161,6 +161,10 @@ alter table public.profiles add column if not exists tagline text not null defau
 -- than its display frame so the artist can reposition without distorting it.
 alter table public.profiles add column if not exists hero_image_url text;
 alter table public.profiles add column if not exists hero_focal_y real not null default 0.5;
+-- Horizontal focal point (0 = left .. 1 = right) and zoom factor (>= 1) so the
+-- artist can pan/zoom the hero crop within the frame, not just shift it vertically.
+alter table public.profiles add column if not exists hero_focal_x real not null default 0.5;
+alter table public.profiles add column if not exists hero_zoom real not null default 1;
 -- One-time backfill: existing artists whose avatar doubled as the hero keep that
 -- image as their hero. Runs only where no hero has been set yet (idempotent).
 update public.profiles set hero_image_url = avatar_url
@@ -199,6 +203,7 @@ begin
     name = d.name, tagline = d.tagline, bio = d.bio, statement = d.statement,
     website = d.website, instagram = d.instagram, avatar_url = d.avatar_url,
     hero_image_url = d.hero_image_url, hero_focal_y = d.hero_focal_y,
+    hero_focal_x = d.hero_focal_x, hero_zoom = d.hero_zoom,
     public_site = d.public_site
   from public.profiles d
   where d.id = 'default' and d.user_id is null and p.user_id = uid;
