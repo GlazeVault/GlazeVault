@@ -22,3 +22,16 @@ their avatar at migration time.
   into the cache in `ProfileContext.updateProfile`.
 - The "optional line" under the name on the landing is the existing `tagline`
   field (hidden when empty), not a new field.
+
+## Web drag/reposition gesture (PanResponder)
+
+For drag gestures over an image on react-native-web, the underlying `<img>`
+captures the pointer and triggers native drag-and-drop, so a PanResponder on the
+parent never fires. Two things are required to make drag work on web AND native:
+1. Wrap the image in `<View pointerEvents="none">` so events reach the parent.
+2. On the gesture frame, set `onStart*`+`onMove*` ShouldSet (+ capture variants)
+   and `onPanResponderTerminationRequest: () => false`; on web also set
+   `touchAction:'none', userSelect:'none'` so the page doesn't scroll/select.
+
+**Why:** without (1) the web img eats the gesture; without the start/capture
+handlers RNW won't reliably claim the responder from touch-down.

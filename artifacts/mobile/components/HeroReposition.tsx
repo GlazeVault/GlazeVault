@@ -3,6 +3,7 @@ import React, { useMemo, useRef, useState } from "react";
 import {
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -55,7 +56,13 @@ export function HeroReposition({ visible, uri, focalY, onDone, onCancel }: HeroR
   const panResponder = useMemo(
     () =>
       PanResponder.create({
+        // Claim the gesture on touch-down AND on move, with capture variants, so
+        // neither the child image nor the web pointer system can steal it.
+        onStartShouldSetPanResponder: () => overflow > 0,
+        onStartShouldSetPanResponderCapture: () => overflow > 0,
         onMoveShouldSetPanResponder: () => overflow > 0,
+        onMoveShouldSetPanResponderCapture: () => overflow > 0,
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
           startFocal.current = draftRef.current;
         },
@@ -82,10 +89,23 @@ export function HeroReposition({ visible, uri, focalY, onDone, onCancel }: HeroR
           </Text>
 
           <View
-            style={[styles.frame, { width: frameWidth, alignSelf: "center" }]}
+            style={[
+              styles.frame,
+              { width: frameWidth, alignSelf: "center" },
+              // On web, stop the browser from scrolling/selecting/drag-ghosting
+              // the image so the pan gesture owns the pointer.
+              overflow > 0 && Platform.OS === "web"
+                ? ({ cursor: "grab", touchAction: "none", userSelect: "none" } as object)
+                : null,
+            ]}
             {...panResponder.panHandlers}
           >
-            <HeroImage uri={uri} focalY={draft} maxHeight={maxHeight} width={frameWidth} borderRadius={4} />
+            {/* The image is non-interactive so every pointer/touch event reaches
+                the frame's PanResponder above (web <img> would otherwise capture
+                it and trigger native drag-and-drop). */}
+            <View pointerEvents="none">
+              <HeroImage uri={uri} focalY={draft} maxHeight={maxHeight} width={frameWidth} borderRadius={4} />
+            </View>
             {overflow > 0 ? (
               <View style={styles.dragHint} pointerEvents="none">
                 <Feather name="move" size={16} color="#fff" />
