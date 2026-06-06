@@ -8,9 +8,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArtistHero } from "@/components/ArtistHero";
 import { PotteryCard } from "@/components/PotteryCard";
 import { SearchBar } from "@/components/SearchBar";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
+import { useProfile } from "@/context/ProfileContext";
 import { useColors } from "@/hooks/useColors";
 import {
   buildOrientationRows,
@@ -35,6 +37,7 @@ function EmptyState({ colors }: { colors: ReturnType<typeof useColors> }) {
 export default function GalleryScreen() {
   const colors = useColors();
   const { pieces } = usePottery();
+  const { profile } = useProfile();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const [query, setQuery] = React.useState("");
@@ -59,31 +62,44 @@ export default function GalleryScreen() {
   );
 
   const header = (
-    <View style={styles.headerInset}>
-      <View style={styles.header}>
-        <Text style={[styles.eyebrow, { color: colors.cobalt }]}>
-          GlazeVault
-        </Text>
-        <Text style={[styles.heading, { color: colors.foreground }]}>
-          Archive
-        </Text>
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        <Text style={[styles.count, { color: colors.mutedForeground }]}>
-          {pieces.length === 0
-            ? "No pieces recorded"
-            : trimmed
-              ? `${filtered.length} of ${pieces.length} ${pieces.length === 1 ? "piece" : "pieces"}`
-              : `${pieces.length} ${pieces.length === 1 ? "piece" : "pieces"}`}
-        </Text>
-        {pieces.length > 0 ? (
-          <View style={styles.searchWrap}>
-            <SearchBar
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search pieces"
-            />
-          </View>
-        ) : null}
+    <View>
+      {/* The calm first impression: one large hero shown at its true proportions,
+          the artist name, and one optional line — identical to the public
+          portfolio so opening the app and visiting the shared link feel the same.
+          The Archive itself sits below, so the grid is not the first thing seen. */}
+      <ArtistHero
+        avatarUri={profile.avatarUri}
+        name={profile.name}
+        secondLine={profile.tagline}
+        pullUp={topPad + 32}
+        bleed={15}
+      />
+      <View style={styles.headerInset}>
+        <View style={styles.header}>
+          <Text style={[styles.eyebrow, { color: colors.cobalt }]}>
+            GlazeVault
+          </Text>
+          <Text style={[styles.heading, { color: colors.foreground }]}>
+            Archive
+          </Text>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <Text style={[styles.count, { color: colors.mutedForeground }]}>
+            {pieces.length === 0
+              ? "No pieces recorded"
+              : trimmed
+                ? `${filtered.length} of ${pieces.length} ${pieces.length === 1 ? "piece" : "pieces"}`
+                : `${pieces.length} ${pieces.length === 1 ? "piece" : "pieces"}`}
+          </Text>
+          {pieces.length > 0 ? (
+            <View style={styles.searchWrap}>
+              <SearchBar
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search pieces"
+              />
+            </View>
+          ) : null}
+        </View>
       </View>
     </View>
   );

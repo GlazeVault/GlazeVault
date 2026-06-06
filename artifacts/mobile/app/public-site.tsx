@@ -9,7 +9,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,6 +22,7 @@ import {
   toPublicPiece,
   type PublicPieceView,
 } from "@/constants/privacy";
+import { ArtistHero } from "@/components/ArtistHero";
 import { ExpandableText } from "@/components/ExpandableText";
 import { FollowButton } from "@/components/FollowButton";
 import { SaveButton } from "@/components/SaveButton";
@@ -119,15 +119,6 @@ export default function PublicSiteScreen({
   const pieces = pub ? pub.pieces : ownPieces;
   const collections = pub ? pub.collections : ownCollections;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const { height: winHeight } = useWindowDimensions();
-  // The hero is one large full-width image shown at its TRUE proportions (no
-  // crop). We measure its natural ratio and let the frame take that shape, only
-  // clamping the height so an extreme portrait can't dominate the whole screen —
-  // and even then we contain (letterbox) rather than crop.
-  const heroRatios = useImageOrientations([profile.avatarUri]);
-  const heroRatio =
-    (profile.avatarUri ? heroRatios[profile.avatarUri] : undefined) ?? 4 / 5;
-  const heroMaxHeight = Math.min(winHeight * 0.78, 720);
 
   const site = profile.publicSite;
   const [shareVisible, setShareVisible] = useState(false);
@@ -196,8 +187,6 @@ export default function PublicSiteScreen({
   if (profile.website.trim()) links.push(buildProfileLink("globe", profile.website.trim()));
   if (site.etsy.trim()) links.push(buildProfileLink("shopping-bag", site.etsy.trim()));
   if (site.shopify.trim()) links.push(buildProfileLink("shopping-cart", site.shopify.trim()));
-
-  const initial = profile.name.trim().charAt(0).toUpperCase();
 
   // The share payload follows what the page actually is: a single-collection
   // page shares that collection (a mini-exhibition); otherwise the whole
@@ -353,46 +342,21 @@ export default function PublicSiteScreen({
         ]}
       >
         {/* Entering the artist's world before the work: one large, full-width
-            hero shown at its TRUE proportions — no crop, no overlay, no gradient.
-            The identity breathes in the calm directly beneath it. */}
-        <View style={[styles.heroWrap, { marginTop: -(topPad + 64) }]}>
-          {profile.avatarUri ? (
-            <Image
-              source={resolveImageSource(profile.avatarUri)}
-              style={[styles.heroImage, { aspectRatio: heroRatio, maxHeight: heroMaxHeight }]}
-              contentFit="contain"
-              transition={280}
-              cachePolicy="memory-disk"
-            />
-          ) : (
-            <View style={[styles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
-              {initial ? (
-                <Text style={[styles.portraitInitial, { color: colors.mutedForeground }]}>{initial}</Text>
-              ) : (
-                <Feather name="user" size={44} color={colors.mutedForeground} style={{ opacity: 0.3 }} />
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* Calm identity: the artist name, then ONE optional second line — the
-            collection title on a single-exhibition page, otherwise the artist's
-            own tagline. Nothing is rendered when there's nothing to say. */}
-        <View style={styles.identity}>
-          <Text style={[styles.heroName, { color: colors.foreground }]}>
-            {profile.name || "Your Studio"}
-          </Text>
-          {(() => {
-            const secondLine = onlyCollectionId
-              ? (publicCollections[0]?.collection.title ?? "").trim()
-              : (profile.tagline ?? "").trim();
-            return secondLine ? (
-              <Text style={[styles.heroSecondLine, { color: colors.mutedForeground }]}>
-                {secondLine}
-              </Text>
-            ) : null;
-          })()}
-        </View>
+            hero shown at its TRUE proportions, then the calm identity — the
+            artist name and ONE optional second line (the collection title on a
+            single-exhibition page, otherwise the artist's own tagline). Shared
+            with the owner's app entry so both first impressions feel identical. */}
+        <ArtistHero
+          avatarUri={profile.avatarUri}
+          name={profile.name}
+          secondLine={
+            onlyCollectionId
+              ? publicCollections[0]?.collection.title
+              : profile.tagline
+          }
+          pullUp={topPad + 64}
+          bleed={28}
+        />
 
         {profile.bio.trim() ? (
           <ExpandableText
@@ -646,38 +610,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   previewPillText: { fontSize: 11, fontFamily: "Poppins_500Medium", letterSpacing: 0.4 },
-  heroWrap: {
-    marginHorizontal: -28,
-    marginBottom: 26,
-    overflow: "hidden",
-  },
-  heroImage: {
-    width: "100%",
-  },
-  heroPlaceholder: {
-    width: "100%",
-    height: 360,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  portraitInitial: { fontSize: 88, fontFamily: "PlayfairDisplay_400Regular", opacity: 0.5 },
-  identity: {
-    paddingHorizontal: 4,
-    marginBottom: 28,
-  },
-  heroName: {
-    fontSize: 38,
-    fontFamily: "PlayfairDisplay_400Regular",
-    letterSpacing: 0.3,
-    lineHeight: 44,
-  },
-  heroSecondLine: {
-    fontSize: 15,
-    fontFamily: "Poppins_300Light",
-    letterSpacing: 0.4,
-    marginTop: 10,
-    lineHeight: 22,
-  },
   inspireRow: {
     flexDirection: "row",
     flexWrap: "wrap",
