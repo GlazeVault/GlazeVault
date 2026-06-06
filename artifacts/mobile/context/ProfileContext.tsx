@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Platform } from "react-native";
 
 import { useAuth } from "@/context/AuthContext";
 import { isSupabaseConfigured } from "@/services/supabase";
@@ -261,27 +262,42 @@ export const PUBLIC_SITE_DOMAIN = "glazevault.art";
  * so the running host already serves them. Order of precedence:
  *   1. EXPO_PUBLIC_PUBLIC_SITE_URL — explicit override. Set this to
  *      `https://glazevault.art` once that custom domain is connected at deploy.
- *   2. EXPO_PUBLIC_DOMAIN — the Replit dev/prod host the app runs on (already
- *      set in the expo workflow), so links work immediately.
- *   3. The canonical brand domain as a last resort.
+ *   2. On web, the live origin the page is currently served from
+ *      (`window.location.origin`). This is ALWAYS the host that actually serves
+ *      the public pages right now — the current Replit dev domain today, the
+ *      published `.replit.app` domain after deploy, or a custom domain once
+ *      connected — so a copied/shared link is guaranteed to resolve without any
+ *      env wiring. This is the requirement-4 "fall back to the current Replit
+ *      public URL" behaviour, derived live instead of hardcoded.
+ *   3. EXPO_PUBLIC_DOMAIN — a host injected via env (mainly for native builds,
+ *      which have no `window`).
+ *   4. A hardcoded dev origin as an absolute last resort.
  */
-// Last-resort public origin when no env host is injected (e.g. a runtime where
-// EXPO_PUBLIC_DOMAIN wasn't set). The current Replit public domain serves the
-// public pages today, so links still resolve — unlike the not-yet-connected
-// brand domain, which would 404.
+// Last-resort public origin when nothing else resolves (e.g. a native runtime
+// with no `window` and no EXPO_PUBLIC_* host injected). Stale by nature — the
+// web path above is the reliable source for the dominant share flow.
 const REPLIT_FALLBACK_ORIGIN =
   "https://5f3a3e03-daa6-4dbc-8c84-41a7d9ee3d10-00-1i7gcdnbgsjs7.spock.replit.dev";
 
 function resolvePublicOrigin(): string {
   const explicit = process.env.EXPO_PUBLIC_PUBLIC_SITE_URL?.trim();
   if (explicit) return explicit.replace(/\/+$/, "");
+  // On web the app is already being served from the live public host, so the
+  // current origin is exactly the host that serves the public pages right now.
+  if (
+    Platform.OS === "web" &&
+    typeof window !== "undefined" &&
+    window.location?.origin
+  ) {
+    return window.location.origin.replace(/\/+$/, "");
+  }
   const domain = process.env.EXPO_PUBLIC_DOMAIN?.trim();
   if (domain) {
     const host = domain.replace(/^https?:\/\//, "").replace(/\/+$/, "");
     if (host) return `https://${host}`;
   }
   console.warn(
-    "[glazevault] public origin: EXPO_PUBLIC_PUBLIC_SITE_URL / EXPO_PUBLIC_DOMAIN are unset; using Replit fallback origin",
+    "[glazevault] public origin: no explicit override, web origin, or EXPO_PUBLIC_DOMAIN; using last-resort fallback origin",
     REPLIT_FALLBACK_ORIGIN,
   );
   return REPLIT_FALLBACK_ORIGIN;

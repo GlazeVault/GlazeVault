@@ -105,7 +105,8 @@ async function openProfileLink(link: ProfileLink) {
 export default function PublicSiteScreen({
   live = false,
   onlyCollectionId,
-}: { live?: boolean; onlyCollectionId?: string } = {}) {
+  backHref,
+}: { live?: boolean; onlyCollectionId?: string; backHref?: string } = {}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   // On a live public page the data comes from the remote PublicArtistContext (a
@@ -538,7 +539,24 @@ export default function PublicSiteScreen({
           share affordance remains. */}
       <View style={[styles.topBar, { top: topPad + 10 }]}>
         {live ? (
-          <View />
+          // On a live public sub-page (reached from the foyer) offer a quiet way
+          // back to the entrance; falls back to the foyer href on a cold load
+          // that has no back stack. Without a backHref (the foyer itself opening
+          // the portfolio directly) there is nothing to go back to.
+          backHref ? (
+            <Pressable
+              style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}
+              onPress={() =>
+                router.canGoBack()
+                  ? router.back()
+                  : router.replace(backHref as Href)
+              }
+            >
+              <Feather name="arrow-left" size={18} color="#8A7B6C" />
+            </Pressable>
+          ) : (
+            <View />
+          )
         ) : (
           <Pressable
             style={[styles.floatBtn, { backgroundColor: "rgba(253,250,245,0.9)" }]}

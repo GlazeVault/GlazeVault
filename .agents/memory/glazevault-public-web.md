@@ -33,8 +33,22 @@ one artist's public data from Supabase by slug:
 Render `<PublicLoading>` while `status==='loading'`; render `<PublicMissing>` ("Not on view",
 deliberately non-committal) when `status==='missing'`, `!profile.publicSite.enabled`, or the
 specific piece/collection isn't found / fails `isPubliclyVisiblePiece` / `isCollectionPublic`.
-Otherwise reuse existing presentation: index→`<PublicSiteScreen live/>`;
-collection→`<PublicSiteScreen live onlyCollectionId={id}/>`; piece→`<PieceDetailScreen/>`.
+
+## Foyer structure (the slug ROOT is a foyer, not the portfolio)
+`[slug]/index` is a public FOYER (ArtistHero + 3 EntranceCards) mirroring the in-app home
+foyer — it does NOT render the portfolio directly anymore. The three doorways are their own
+routes (all registered in `_layout.tsx`, all wrapped in their own PublicArtistProvider):
+- `[slug]/portfolio` → `<PublicSiteScreen live backHref={/${slug}}/>` (the OLD `[slug]/index`
+  behavior; PublicSiteScreen gained an optional `backHref` → shows a back arrow in live mode,
+  `canGoBack?back:replace(backHref)`).
+- `[slug]/collections` → calm list of PUBLIC collections only (`isCollectionPublic` +
+  `getPortfolioCollectionPieces` + `resolveGatedCover`, drop empty), cards open existing
+  `[slug]/collection/{id}`.
+- `[slug]/archive` → grid of EVERY public piece (provider pieces are already
+  `isPubliclyVisiblePiece`-filtered; project via `toPublicPiece`), tiles open existing
+  `[slug]/piece/{id}`. Orientation-aware NO-CROP layout (buildOrientationRows + always
+  `contentFit="contain"`, never cover — cover crops; covers are the only crop exception).
+Collection/piece detail routes are unchanged. Owner foyer & piece share links untouched.
 
 **Dual-source switch:** `public-site.tsx` and `app/piece/[id].tsx` call
 `usePublicArtistOptional()` — when a provider is present they render from the REMOTE public

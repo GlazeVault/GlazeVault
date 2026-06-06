@@ -141,8 +141,13 @@ export default function RootLayout() {
                           options={{ presentation: "card" }}
                         />
                         {/* Live public web exhibition routes (served by the expo
-                            web build at the artist's slug). */}
+                            web build at the artist's slug). The slug root is the
+                            public foyer; portfolio/collections/archive are its
+                            three doorways. */}
                         <Stack.Screen name="[slug]/index" />
+                        <Stack.Screen name="[slug]/portfolio" />
+                        <Stack.Screen name="[slug]/collections" />
+                        <Stack.Screen name="[slug]/archive" />
                         <Stack.Screen name="[slug]/piece/[id]" />
                         <Stack.Screen name="[slug]/collection/[id]" />
                       </Stack>
