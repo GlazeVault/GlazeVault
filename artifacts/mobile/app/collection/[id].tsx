@@ -25,7 +25,11 @@ import { ExpandableText } from "@/components/ExpandableText";
 import { PieceStatusBadge } from "@/components/StatusBadge";
 import { ShareSheet } from "@/components/ShareSheet";
 import { persistPieceImage } from "@/constants/imageStorage";
-import { buildLinkShareContent, isCollectionPublic } from "@/constants/privacy";
+import {
+  buildLinkShareContent,
+  getPortfolioCollectionPieces,
+  isCollectionPublic,
+} from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
@@ -262,10 +266,20 @@ export default function CollectionDetailScreen() {
     );
   }
 
+  // In portfolio context (Profile → Portfolio → Collection) the gallery must
+  // render ONLY the portfolio (featured) pieces, so unfeaturing a piece makes
+  // it disappear from this list immediately — the list is driven by the
+  // reactive `pieces`, so "Remove from Portfolio" updates it on return.
+  // Collection-tab context is unchanged: it shows every member piece.
+  const portfolioMode = context === "portfolio";
+  const displayPieces = portfolioMode
+    ? getPortfolioCollectionPieces(collection, pieces)
+    : collectionPieces;
+
   // Display fallback order: explicit cover -> first piece in this collection
   // that actually has a photo (skipping imageless pieces so the banner never
   // falls back to a blank/placeholder while later pieces do have images).
-  const firstPieceImage = collectionPieces.find((p) => p.imageUri)?.imageUri ?? "";
+  const firstPieceImage = displayPieces.find((p) => p.imageUri)?.imageUri ?? "";
   const headerCover = (collection.coverImageUri || firstPieceImage) || "";
   // The cover image acts as a banner/intro. While editing only the explicit
   // selection is shown (so Remove visibly clears it); otherwise the resolved
@@ -273,8 +287,8 @@ export default function CollectionDetailScreen() {
   // the same image never appears twice.
   const activeCover = isEditing ? coverImageUri || "" : headerCover;
   const gridPieces = activeCover
-    ? collectionPieces.filter((p) => p.imageUri !== activeCover)
-    : collectionPieces;
+    ? displayPieces.filter((p) => p.imageUri !== activeCover)
+    : displayPieces;
   const galleryRows = buildOrientationRows(
     gridPieces,
     (p) => p.id,
@@ -423,11 +437,11 @@ export default function CollectionDetailScreen() {
               />
             ) : null}
             <Text style={[styles.count, { color: colors.mutedForeground, marginTop: 12 }]}>
-              {collectionPieces.length === 0
+              {displayPieces.length === 0
                 ? "No pieces in this collection"
-                : `${collectionPieces.length} ${collectionPieces.length === 1 ? "piece" : "pieces"}`}
+                : `${displayPieces.length} ${displayPieces.length === 1 ? "piece" : "pieces"}`}
             </Text>
-            {!isEditing && collectionPieces.length > 0 ? (
+            {!isEditing && displayPieces.length > 0 ? (
               <Pressable
                 style={({ pressed }) => [
                   styles.galleryEntry,
@@ -438,7 +452,7 @@ export default function CollectionDetailScreen() {
                 ]}
                 onPress={() => {
                   const first =
-                    collectionPieces.find((p) => p.imageUri) ?? collectionPieces[0];
+                    displayPieces.find((p) => p.imageUri) ?? displayPieces[0];
                   if (!first) return;
                   router.push({
                     pathname: "/piece/[id]",
@@ -551,7 +565,7 @@ export default function CollectionDetailScreen() {
           </View>
         }
         ListEmptyComponent={
-          collectionPieces.length === 0 ? (
+          displayPieces.length === 0 ? (
             <View style={styles.empty}>
               <View style={[styles.emptyCircle, { backgroundColor: colors.secondary }]}>
                 <Feather name="layers" size={22} color={colors.mutedForeground} style={{ opacity: 0.4 }} />

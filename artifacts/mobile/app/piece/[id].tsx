@@ -318,7 +318,18 @@ export default function PieceDetailScreen() {
     });
     if (!confirmed) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const portfolioCountBefore = pieces.filter((p) => p.featuredInPortfolio).length;
+    console.log("[portfolio] Remove from Portfolio", {
+      pieceId: piece.id,
+      featuredBefore: piece.featuredInPortfolio,
+      portfolioCountBefore,
+    });
     await updatePiece(piece.id, { featuredInPortfolio: false });
+    console.log("[portfolio] Removed from Portfolio", {
+      pieceId: piece.id,
+      featuredAfter: false,
+      portfolioCountAfter: portfolioCountBefore - 1,
+    });
     router.back();
   };
 

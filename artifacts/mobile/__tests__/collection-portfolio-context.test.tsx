@@ -56,7 +56,19 @@ const PIECE_2: PotteryPiece = {
   images: ["pieces/p2.jpg"],
 };
 
-const mockPieces: PotteryPiece[] = [PIECE, PIECE_2];
+// A collected, public, but NOT-featured piece. It belongs to the collection so
+// it shows in the Collections-tab view, but must be hidden in portfolio context
+// (the portfolio list renders only featured_in_portfolio pieces).
+const PIECE_3: PotteryPiece = {
+  ...PIECE,
+  id: "p3",
+  title: "Stoneware Jar",
+  imageUri: "pieces/p3.jpg",
+  images: ["pieces/p3.jpg"],
+  featuredInPortfolio: false,
+};
+
+const mockPieces: PotteryPiece[] = [PIECE, PIECE_2, PIECE_3];
 
 let mockParams: Record<string, string> = { id: "col1" };
 const mockPush = jest.fn();
@@ -223,5 +235,25 @@ describe("collection detail piece-tile entry context", () => {
     fireEvent.press(getByText("Celadon Bowl"));
 
     expect(pushedFrom()).toBe("portfolio");
+  });
+
+  it("renders every member piece in the default (Collections-tab) context", () => {
+    const CollectionDetailScreen = require("@/app/collection/[id]").default;
+    const { queryByText } = render(<CollectionDetailScreen />);
+
+    // Featured and non-featured pieces both appear when not in portfolio context.
+    expect(queryByText("Celadon Bowl")).not.toBeNull();
+    expect(queryByText("Stoneware Jar")).not.toBeNull();
+  });
+
+  it("renders only featured pieces in portfolio context (the core fix)", () => {
+    mockParams = { id: "col1", context: "portfolio" };
+    const CollectionDetailScreen = require("@/app/collection/[id]").default;
+    const { queryByText } = render(<CollectionDetailScreen />);
+
+    // Featured piece stays; the non-featured piece is hidden so unfeaturing a
+    // piece makes it disappear from the Portfolio list immediately.
+    expect(queryByText("Celadon Bowl")).not.toBeNull();
+    expect(queryByText("Stoneware Jar")).toBeNull();
   });
 });

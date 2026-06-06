@@ -24,3 +24,8 @@ The tab bar is a single custom `tabBar` rendered on expo-router `<Tabs>` (`Glaze
 - The piece detail's `from=portfolio` sentinel ("Remove from Portfolio" = unfeature only) is reachable ONLY via the Profile→Portfolio path: Portfolio cards push `/collection/[id]` with `context:"portfolio"`; collection detail maps that to `pieceFrom = context==="portfolio" ? "portfolio" : id` and threads it to the piece-tile taps.
 - Collections-tab entry (no context) stays collection-scoped (`from=<collectionId>` → "Remove from this Collection"). The collection's immersive "View Exhibition" button intentionally keeps `from=id`.
 - **Why:** user wanted a piece opened *through the Portfolio* to behave as portfolio context, while collection behavior is preserved everywhere else. Accepted side effect: `from=portfolio` makes `fromCollectionId` undefined, so owner swipe set/caption become portfolio-wide there (intended, not a bug).
+
+## Portfolio list must FILTER, not just relabel
+- In portfolio context the collection detail must render the gallery (plus piece-count text, empty-state, immersive entry) from `getPortfolioCollectionPieces(collection, pieces)` — featured/portfolio pieces only — NOT the full member set.
+- **Why:** "Remove from Portfolio" only sets featuredInPortfolio=false; if the list still shows all members the piece never visibly disappears (the original bug). The list is driven by reactive `pieces`, so filtering + the existing updatePiece→router.back() makes it vanish on return; no manual refetch needed.
+- **How to apply:** gate on `context==="portfolio"`; default (Collections-tab) context keeps the full member list unchanged. Cover-picker grid (edit mode) intentionally stays on the full set.
