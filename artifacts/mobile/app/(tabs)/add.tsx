@@ -135,12 +135,16 @@ export default function AddScreen() {
       return;
     }
     setSaving(true);
+    console.log("[add] save start; photos:", images.length);
     let storedImages: string[];
     try {
       // Fail-closed: persist every photo before saving so no temp picker URI is
       // ever stored. The chosen cover keeps its position in the array.
       storedImages = await Promise.all(images.map((uri) => persistPieceImage(uri)));
-    } catch {
+      console.log("[add] photos persisted:", storedImages.length);
+    } catch (err) {
+      // Re-enable the form so the maker can retry rather than being stuck.
+      console.log("[add] persist failed", err);
       setSaving(false);
       notice({ title: "Couldn’t save photo", message: "We couldn’t store those photos. Please try again.", variant: "error" });
       return;
@@ -170,11 +174,13 @@ export default function AddScreen() {
       showGlazeDetails: isPublic ? showGlazeDetails : false,
       showStudioNotes: isPublic ? showStudioNotes : false,
     });
+    console.log("[add] piece added; resetting form");
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setImages([]); setCoverIndex(0); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear()));
     setIsPublic(false); setCollectionIds([]); setFeatured(false);
     setShowGlazeDetails(false); setShowStudioNotes(false);
     setSaving(false);
+    console.log("[add] state reset complete; navigating to archive");
     router.replace("/archive");
   };
 

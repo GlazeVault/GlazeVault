@@ -53,7 +53,10 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
+      console.log("[photoset] picked from library", asset.uri, asset.width, asset.height);
       setCropSource({ uri: asset.uri, width: asset.width, height: asset.height });
+    } else {
+      console.log("[photoset] library pick canceled");
     }
   };
 
@@ -69,7 +72,10 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
+      console.log("[photoset] captured from camera", asset.uri, asset.width, asset.height);
       setCropSource({ uri: asset.uri, width: asset.width, height: asset.height });
+    } else {
+      console.log("[photoset] camera capture canceled");
     }
   };
 
@@ -88,9 +94,13 @@ export function PhotoSetEditor({ images, coverIndex, onChange }: PhotoSetEditorP
 
   const handleCropConfirm = (uri: string) => {
     const next = [...images, uri];
+    console.log("[photoset] crop confirmed; photo count now", next.length);
     // First photo becomes the cover automatically.
     onChange(next, images.length === 0 ? next.length - 1 : coverIndex);
+    // Clear the picker source so the cropper closes and is fully ready for the
+    // next "Add" tap — nothing about the previous photo can block a new one.
     setCropSource(null);
+    console.log("[photoset] cropSource reset, ready for next photo");
   };
 
   const handleSetCover = (index: number) => {
