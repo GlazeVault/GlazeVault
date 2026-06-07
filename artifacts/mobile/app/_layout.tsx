@@ -19,6 +19,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { AccountButton } from "@/components/AccountButton";
 import { ActionSheetHost } from "@/components/ActionSheetHost";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ToastHost } from "@/components/ToastHost";
@@ -79,6 +80,29 @@ function AuthGate() {
   }, [loading, userId, isConfigured, inAuthGroup, isPublicSlugRoute, pathname, router]);
 
   return null;
+}
+
+/**
+ * The always-visible Account / Settings affordance. Rendered once at the root so
+ * it floats over every MAIN private surface — the tab screens AND the standalone
+ * Archive Stack screen — giving a signed-in artist a single, discoverable way to
+ * reach their email + log out without hunting through tabs or hidden routes.
+ *
+ * Scoped to the home-base surfaces only: the tabs (Home/Collections/Saved/
+ * Profile) and Archive. Deliberately NOT shown on the auth flow, public
+ * exhibition pages, drill-in detail/modal screens, the settings screen itself,
+ * or Portfolio (`public-site`) — Portfolio already has its own floating
+ * top-right share control, so the account button would collide there; it stays
+ * reachable from the foyer one step back.
+ */
+function GlobalAccountAccess() {
+  const { userId, isConfigured } = useAuth();
+  const segments = useSegments();
+  if (!isConfigured || !userId) return null;
+  const root = segments[0];
+  const MAIN_ROOTS = new Set(["(tabs)", "archive"]);
+  if (!root || !MAIN_ROOTS.has(root)) return null;
+  return <AccountButton />;
 }
 
 export default function RootLayout() {
@@ -156,6 +180,7 @@ export default function RootLayout() {
                         <Stack.Screen name="[slug]/piece/[id]" />
                         <Stack.Screen name="[slug]/collection/[id]" />
                       </Stack>
+                      <GlobalAccountAccess />
                       <ToastHost />
                       <ActionSheetHost />
                     </KeyboardProvider>
