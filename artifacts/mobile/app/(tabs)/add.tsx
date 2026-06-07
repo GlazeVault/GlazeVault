@@ -15,6 +15,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AdvancedPublicVisibility } from "@/components/AdvancedPublicVisibility";
+import { CollectionOnboardingSheet } from "@/components/CollectionOnboardingSheet";
 import { PhotoSetEditor } from "@/components/PhotoSetEditor";
 import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
@@ -70,7 +71,7 @@ function ChipSelector({
 
 export default function AddScreen() {
   const colors = useColors();
-  const { addPiece } = usePottery();
+  const { addPiece, addPieceToCollection } = usePottery();
   const { collections } = useCollections();
   const insets = useSafeAreaInsets();
   const [images, setImages] = useState<string[]>([]);
@@ -91,6 +92,12 @@ export default function AddScreen() {
   const [showGlazeDetails, setShowGlazeDetails] = useState(false);
   const [showStudioNotes, setShowStudioNotes] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Post-save Collection discoverability sheet. `savedPieceId` is the freshly
+  // created piece we offer to file; `filingId` is the collection currently being
+  // filed into (drives the inline spinner). The form is already reset by the
+  // time this opens, so the sheet only carries the new piece's id.
+  const [savedPieceId, setSavedPieceId] = useState<string | null>(null);
+  const [filingId, setFilingId] = useState<string | null>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -154,7 +161,7 @@ export default function AddScreen() {
     // gate is re-applied here so featuredInPortfolio can never be saved true for a
     // piece that isn't both public and collected.
     const canFeature = isPublic && collectionIds.length > 0;
-    await addPiece({
+    const created = await addPiece({
       title: title.trim(),
       notes: notes.trim(),
       clay,
@@ -180,7 +187,50 @@ export default function AddScreen() {
     setIsPublic(false); setCollectionIds([]); setFeatured(false);
     setShowGlazeDetails(false); setShowStudioNotes(false);
     setSaving(false);
-    console.log("[add] state reset complete; navigating to archive");
+    // Offer the calm Collection next-step instead of jumping straight to the
+    // archive. The form is already reset; the sheet only needs the new piece id.
+    console.log("[add] state reset complete; opening collection sheet");
+    setSavedPieceId(created.id);
+  };
+
+  // File the just-saved piece into an existing collection. Membership is pure
+  // organization — it never changes the piece's public/private/featured state —
+  // so this is safe to offer right after a private save.
+  const handleFileIntoCollection = async (collectionId: string) => {
+    if (!savedPieceId) return;
+    setFilingId(collectionId);
+    try {
+      await addPieceToCollection(collectionId, savedPieceId);
+      if (Platform.OS !== "web") {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      setFilingId(null);
+      setSavedPieceId(null);
+      router.replace("/archive");
+    } catch (err) {
+      // Fail loudly and keep the sheet open so the maker can retry rather than
+      // being silently routed away thinking the piece was filed.
+      console.log("[add] file into collection failed", err);
+      setFilingId(null);
+      notice({ title: "Couldn’t add to collection", message: "Please try again.", variant: "error" });
+    }
+  };
+
+  // "Create New Collection" / "Create Your First Collection": hand off to the
+  // existing creation screen with the new piece attached, so it is filed the
+  // moment the collection exists.
+  const handleCreateCollection = () => {
+    const pieceId = savedPieceId;
+    setSavedPieceId(null);
+    router.push(
+      pieceId
+        ? { pathname: "/collection/new", params: { attachPieceId: pieceId } }
+        : "/collection/new"
+    );
+  };
+
+  const handleSkipCollection = () => {
+    setSavedPieceId(null);
     router.replace("/archive");
   };
 
@@ -207,6 +257,7 @@ export default function AddScreen() {
   );
 
   return (
+    <>
     <KeyboardAwareScrollView
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[styles.container, { paddingTop: topPad + 28, paddingBottom: insets.bottom + 120 }]}
@@ -411,6 +462,16 @@ export default function AddScreen() {
         </Pressable>
       </View>
     </KeyboardAwareScrollView>
+
+      <CollectionOnboardingSheet
+        visible={savedPieceId !== null}
+        collections={collections.map((c) => ({ id: c.id, title: c.title }))}
+        busyId={filingId}
+        onSelectCollection={handleFileIntoCollection}
+        onCreateNew={handleCreateCollection}
+        onSkip={handleSkipCollection}
+      />
+    </>
   );
 }
 
