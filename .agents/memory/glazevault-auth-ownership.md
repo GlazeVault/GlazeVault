@@ -40,13 +40,19 @@ them later in the Profile tab. Empty name renders gracefully (`ArtistHero` → "
 usernames / questionnaire. Do not reintroduce profile fields into the signup screen.
 
 ## Route gating (signed-out users never enter the studio)
-`app/_layout.tsx` is the single gate. `isPublicRoute(first)` = the auth flow OR a dynamic
-`[slug]` exhibition route; everything else is the private studio and requires a session.
+`app/_layout.tsx` is the single gate, now built on expo-router `Stack.Protected` (the real
+access boundary — private studio screens are NOT MOUNTED when signed out, so no flash/cover
+hack is needed; `RouteGuardCover`/`GlobalAccountAccess` were deleted). `RootNavigator` shows a
+themed blank view while `isConfigured && loading`, then `studioUnlocked = !isConfigured ||
+!!userId` selects which `Stack.Protected` group mounts. `[slug]/*` lives OUTSIDE both guards.
 **Public `[slug]` exhibition links intentionally stay open without login (user-confirmed) — do
-NOT gate them.** AuthGate's `router.replace('/auth')` runs in an effect (post-mount), so a
-`RouteGuardCover` (opaque absoluteFill, themed bg) covers private routes whenever
-`isConfigured && (loading || !userId)` to kill the flash of studio content before redirect.
-Offline mode (Supabase unconfigured) = both are no-ops (single local user).
+NOT gate them.** `AuthGate` is kept only for deterministic landing redirects, not security.
+Offline mode (Supabase unconfigured) = studio always unlocked (single local user).
+**Why namespacing, not a hard cache wipe, is the isolation mechanism:** logout (Profile tab
+ONLY — do not scatter logout buttons) = `signOut()` → in-memory context state resets on
+`userId→null` → studio unmounts. AsyncStorage is per-user namespaced, so a different account
+gets its own (empty) namespace and the prior user's cache survives for fast re-login. Confirmed
+sufficient for multi-account isolation by e2e (new account sees empty archive).
 
 ## Testing gotcha
 Contexts that call `useAuth()` (e.g. SavedContext) break RTL tests that render the provider

@@ -48,7 +48,7 @@ import { notice } from "@/lib/notice";
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { isConfigured } = useAuth();
+  const { isConfigured, user, signOut } = useAuth();
   const { profile, updateProfile, updatePublicSite } = useProfile();
   const { pieces } = usePottery();
   const { collections } = useCollections();
@@ -73,6 +73,7 @@ export default function ProfileScreen() {
   const [heroZoom, setHeroZoom] = useState(profile.heroZoom ?? 1);
   const [repositionVisible, setRepositionVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   // Import-from-file flow: which field we're importing into, the extracted
   // preview awaiting a Replace/Append choice, and an in-flight guard.
   const [importTarget, setImportTarget] = useState<"bio" | "statement" | null>(null);
@@ -110,6 +111,29 @@ export default function ProfileScreen() {
   };
 
   const cancelEditing = () => setIsEditing(false);
+
+  // Log out: end the Supabase session. Signing out flips auth state, the
+  // user-scoped data contexts reset themselves to empty, and the root navigator
+  // (Stack.Protected) tears down the Studio stack and shows the Auth stack — so
+  // there is nothing to manually navigate or clear here.
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    const ok = await confirm({
+      title: "Log out?",
+      message: "Your archive stays safe in the cloud. You can log back in anytime.",
+      confirmText: "Log out",
+      cancelText: "Stay",
+    });
+    if (!ok) return;
+    setLoggingOut(true);
+    try {
+      await signOut();
+    } catch (e) {
+      console.warn("[profile] logout failed", e);
+      setLoggingOut(false);
+      notice({ title: "Couldn’t log out", message: "Please try again.", variant: "error" });
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -1025,22 +1049,46 @@ export default function ProfileScreen() {
           ) : null}
         </View>
 
-        {/* Account */}
+        {/* Account — signed-in identity + the single place to log out. */}
         {isConfigured ? (
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Account</Text>
+            <View
+              style={[
+                styles.accountCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <View style={[styles.accountAvatar, { backgroundColor: colors.secondary }]}>
+                <Feather name="user" size={17} color={colors.cobalt} />
+              </View>
+              <View style={styles.accountCardText}>
+                <Text style={[styles.accountEmailLabel, { color: colors.mutedForeground }]}>
+                  Signed in as
+                </Text>
+                <Text style={[styles.accountEmail, { color: colors.foreground }]} numberOfLines={1}>
+                  {user?.email ?? "—"}
+                </Text>
+              </View>
+            </View>
             <Pressable
               style={[
                 styles.accountRow,
-                { borderColor: "rgba(120,110,100,0.2)" },
+                { borderColor: "rgba(120,110,100,0.2)", opacity: loggingOut ? 0.6 : 1 },
               ]}
-              onPress={() => router.push("/settings")}
+              onPress={handleLogout}
+              disabled={loggingOut}
               accessibilityRole="button"
-              accessibilityLabel="Account and settings"
+              accessibilityLabel="Log out"
             >
-              <Feather name="settings" size={15} color={colors.mutedForeground} />
-              <Text style={[styles.logoutText, { color: colors.foreground }]}>Account & Settings</Text>
-              <Feather name="chevron-right" size={18} color={colors.mutedForeground} style={{ marginLeft: "auto" }} />
+              {loggingOut ? (
+                <ActivityIndicator size="small" color={colors.mutedForeground} />
+              ) : (
+                <Feather name="log-out" size={15} color={colors.destructive} />
+              )}
+              <Text style={[styles.logoutText, { color: colors.foreground }]}>
+                {loggingOut ? "Logging out…" : "Log out"}
+              </Text>
             </Pressable>
           </View>
         ) : null}
@@ -1508,9 +1556,34 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
+  accountCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  accountAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  accountCardText: { flex: 1 },
+  accountEmailLabel: {
+    fontSize: 9,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  accountEmail: { fontSize: 15, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
   accountRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 10,
     marginTop: 12,
     paddingHorizontal: 16,
