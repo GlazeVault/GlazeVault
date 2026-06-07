@@ -23,8 +23,9 @@ export default function AuthStartScreen() {
           A lifelong archive{"\n"}for your ceramic work
         </Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-          Quietly record each piece — its glazes, firings, and notes — and share
-          collections as private exhibitions when you’re ready.
+          Create a private studio archive for your ceramic work. Your archive,
+          collections, and portfolio are saved privately to your account — share
+          collections as exhibitions only when you’re ready.
         </Text>
       </View>
 

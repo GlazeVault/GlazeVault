@@ -28,6 +28,13 @@ Grants: anon SELECT only; authenticated full. Storage: authenticated write, publ
 Public cross-account viewing relies on these public-SELECT policies (see
 `glazevault-public-web.md`).
 
+## Signup is email + password only (zero friction)
+Signup deliberately collects ONLY email + password; `SignUpInput.name` is optional and
+defaults to `""`. Name/website/instagram/avatar are NOT asked at signup — the artist adds
+them later in the Profile tab. Empty name renders gracefully (`ArtistHero` → "Your Studio";
+`ensureProfile` writes `name: ""`). **Why:** alpha onboarding must have no long forms /
+usernames / questionnaire. Do not reintroduce profile fields into the signup screen.
+
 ## Testing gotcha
 Contexts that call `useAuth()` (e.g. SavedContext) break RTL tests that render the provider
 bare. Mock `@/context/AuthContext` to `{ useAuth: () => ({ userId: "test-user", authReady: true }) }`

@@ -32,9 +32,14 @@ import { isSupabaseConfigured, supabase } from "@/services/supabase";
 const LOCAL_OFFLINE_USER_ID = "local-offline";
 
 export type SignUpInput = {
-  name: string;
   email: string;
   password: string;
+  /**
+   * Optional. Signup is deliberately email + password only (zero friction for
+   * alpha); the artist fills in their display name and other profile details
+   * later from the Profile tab. An empty name renders gracefully ("Your Studio").
+   */
+  name?: string;
   website?: string;
   instagram?: string;
   avatarUri?: string;
@@ -157,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (input: SignUpInput): Promise<SignUpResult> => {
       if (!supabase) throw new Error("Supabase is not configured.");
       pendingSeedRef.current = {
-        name: input.name,
+        name: input.name ?? "",
         website: input.website,
         instagram: input.instagram,
         avatarUri: input.avatarUri,
@@ -167,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password: input.password,
         options: {
           data: {
-            name: input.name,
+            name: input.name ?? "",
             website: input.website ?? "",
             instagram: input.instagram ?? "",
           },
