@@ -23,6 +23,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { notice } from "@/lib/notice";
+
 /** Warm near-black backdrop — the same calm gallery tone as the fullscreen viewer. */
 const BACKDROP = "#13100D";
 const PAPER = "#F5F0E8";
@@ -33,6 +35,25 @@ const MAX_ZOOM = 4;
 const MAX_OUTPUT_WIDTH = 1080;
 
 type Natural = { width: number; height: number };
+
+/**
+ * Reads an image's true pixel size by decoding it through the manipulator. This
+ * is the fallback for sources `RNImage.getSize` can't measure — Android
+ * `content://` URIs and some HEIC files — because the manipulator decodes
+ * formats getSize on its own cannot. Returns null when the image genuinely
+ * can't be decoded (e.g. a HEIC in a browser that has no HEIC support).
+ */
+async function measureViaManipulator(uri: string): Promise<Natural | null> {
+  try {
+    const ref = await ImageManipulator.manipulate(uri).renderAsync();
+    if (ref.width && ref.height) {
+      return { width: ref.width, height: ref.height };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 type Props = {
   visible: boolean;
@@ -120,12 +141,29 @@ export function ImageCropper({
         if (!cancelled) setNatural({ width: w, height: h });
       },
       () => {
-        // Without true pixel dimensions we cannot guarantee the saved crop
-        // matches the preview, so bail rather than export a mismatched image.
-        if (!cancelled) {
+        // RNImage.getSize can't measure every source (Android `content://`
+        // URIs, some HEIC files), so fall back to decoding the real pixel size
+        // through the manipulator before giving up — this is what lets
+        // non-iPhone / HEIC photos open instead of aborting the add flow.
+        console.log("ImageCropper getSize failed, trying manipulator", uri);
+        measureViaManipulator(uri).then((dims) => {
+          if (cancelled) return;
+          if (dims) {
+            setNatural(dims);
+            return;
+          }
+          // The image genuinely can't be decoded on this platform (e.g. a HEIC
+          // in a browser with no HEIC support). Surface a clear notice instead
+          // of silently closing the cropper, then cancel.
           console.log("ImageCropper could not read image size", uri);
+          notice({
+            title: "Couldn’t open this photo",
+            message:
+              "This image format isn’t supported here. Try a JPG or PNG, or pick the photo again.",
+            variant: "error",
+          });
           onCancel();
-        }
+        });
       },
     );
     return () => {

@@ -333,21 +333,14 @@ export default function PieceDetailScreen() {
     router.back();
   };
 
-  // Toggle membership of a single collection. Collections are public-facing, so
-  // adding a PRIVATE piece prompts to make it public first (no silent publish);
-  // declining aborts the add. Removing is always immediate.
+  // Toggle membership of a single collection. Collection membership is pure
+  // organization — fully INDEPENDENT of a piece's Public / Featured / Archived
+  // state. A private or retired piece can belong to a collection as a draft
+  // member without being forced public: public surfaces gate their own display
+  // (getPublicCollectionPieces / isPubliclyVisiblePiece), so a private member
+  // simply stays hidden from the public collection until the owner publishes it.
   const handleToggleCollection = async (collectionId: string) => {
     const isMember = piece.collectionIds.includes(collectionId);
-    if (!isMember && !piece.isPublic) {
-      const makePublic = await confirm({
-        title: "Make this piece public?",
-        message:
-          "Collections are public-facing. Adding this piece will make it public so it can appear in your shared collections.",
-        confirmText: "Make Public",
-      });
-      if (!makePublic) return;
-      await updatePiece(piece.id, { isPublic: true });
-    }
     setUpdatingCollection(true);
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
