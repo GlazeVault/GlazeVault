@@ -37,6 +37,7 @@ import { collectionShareUrl, useProfile } from "@/context/ProfileContext";
 import { useColors } from "@/hooks/useColors";
 import { confirm } from "@/lib/confirm";
 import { notice } from "@/lib/notice";
+import { offerRetry } from "@/lib/saveError";
 import {
   buildOrientationRows,
   isLandscapeRatio,
@@ -303,14 +304,29 @@ export default function CollectionDetailScreen() {
     setSaving(true);
     // Collections organize pieces. A public collection becomes part of the
     // broader public archive; it is independent of per-piece Portfolio curation.
-    await updateCollection(id, {
+    const payload = {
       title: title.trim(),
       intro: intro.trim(),
-      visibility: isPublic ? "public" : "private",
+      visibility: (isPublic ? "public" : "private") as "public" | "private",
       coverImageUri: coverImageUri || undefined,
-    });
-    setSaving(false);
-    setIsEditing(false);
+    };
+    // try/finally guarantees the Save button is re-enabled on every path, so the
+    // UI can never get stranded on "Saving…". The edit is already in the local
+    // cache, so a failed cloud sync never loses it — diagnose, offer a retry,
+    // and only close the editor once it lands.
+    try {
+      let outcome = await updateCollection(id, payload);
+      while (!outcome.ok && outcome.error) {
+        const again = await offerRetry(outcome.error);
+        if (!again) break;
+        outcome = await updateCollection(id, payload);
+      }
+      if (outcome.ok) {
+        setIsEditing(false);
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async () => {

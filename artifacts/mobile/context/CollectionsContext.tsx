@@ -8,6 +8,12 @@ import {
   loadCollections as loadCollectionsRemote,
   saveCollection as saveCollectionRemote,
 } from "@/services/dataService";
+import {
+  classifySaveError,
+  SAVE_OK,
+  withTimeout,
+  type SaveOutcome,
+} from "@/lib/saveError";
 
 export interface Collection {
   id: string;
@@ -30,8 +36,11 @@ interface CollectionsContextType {
     c: Omit<Collection, "id" | "createdAt" | "visibility"> & {
       visibility?: "public" | "private";
     }
-  ) => Promise<Collection>;
-  updateCollection: (id: string, updates: Partial<Collection>) => Promise<void>;
+  ) => Promise<{ collection: Collection; outcome: SaveOutcome }>;
+  // Resolves to a SaveOutcome: `ok` once safely on Supabase (or no server),
+  // otherwise `error` carries the diagnosed reason; the change is always kept in
+  // the local cache first so nothing is lost.
+  updateCollection: (id: string, updates: Partial<Collection>) => Promise<SaveOutcome>;
   deleteCollection: (id: string) => Promise<void>;
   getCollection: (id: string) => Collection | undefined;
 }
@@ -76,11 +85,16 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
   // Pushes a single collection to Supabase, folding any uploaded cover-image URL
   // back into the cache. Failures stay in the cache and are logged.
   const pushCollectionRemote = useCallback(
-    async (col: Collection) => {
+    async (col: Collection): Promise<SaveOutcome> => {
       const uid = userIdRef.current;
-      if (!isSupabaseConfigured || !uid) return;
+      if (!isSupabaseConfigured || !uid) return SAVE_OK;
       try {
-        const saved = await saveCollectionRemote(col, uid);
+        // Timeout-wrapped so a stalled cover upload can never hang a Save.
+        const saved = await withTimeout(
+          saveCollectionRemote(col, uid),
+          undefined,
+          "Saving collection",
+        );
         if (saved.coverImageUri !== col.coverImageUri) {
           await persist(
             collectionsRef.current.map((c) =>
@@ -88,8 +102,10 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
             )
           );
         }
+        return SAVE_OK;
       } catch (e) {
         console.warn("[supabase] saveCollection failed (kept in local cache)", e);
+        return { ok: false, error: classifySaveError(e) };
       }
     },
     [persist]
@@ -186,7 +202,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
       c: Omit<Collection, "id" | "createdAt" | "visibility"> & {
         visibility?: "public" | "private";
       }
-    ): Promise<Collection> => {
+    ): Promise<{ collection: Collection; outcome: SaveOutcome }> => {
       const newCol: Collection = {
         ...c,
         visibility: c.visibility ?? "private",
@@ -194,14 +210,14 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
         createdAt: new Date().toISOString(),
       };
       await persist([...collectionsRef.current, newCol]);
-      await pushCollectionRemote(newCol);
-      return newCol;
+      const outcome = await pushCollectionRemote(newCol);
+      return { collection: newCol, outcome };
     },
     [persist, pushCollectionRemote]
   );
 
   const updateCollection = useCallback(
-    async (id: string, updates: Partial<Collection>) => {
+    async (id: string, updates: Partial<Collection>): Promise<SaveOutcome> => {
       let changed: Collection | undefined;
       await persist(
         collectionsRef.current.map((c) => {
@@ -210,7 +226,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
           return changed;
         })
       );
-      if (changed) await pushCollectionRemote(changed);
+      return changed ? await pushCollectionRemote(changed) : SAVE_OK;
     },
     [persist, pushCollectionRemote]
   );

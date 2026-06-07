@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AdvancedPublicVisibility } from "@/components/AdvancedPublicVisibility";
 import { DraggablePhotoStrip } from "@/components/DraggablePhotoStrip";
 import { confirm } from "@/lib/confirm";
+import { notifySaveError } from "@/lib/saveError";
 import { ImageViewer, type ViewerItem } from "@/components/ImageViewer";
 import { SaveButton } from "@/components/SaveButton";
 import { ShareSheet } from "@/components/ShareSheet";
@@ -381,14 +382,15 @@ export default function PieceDetailScreen() {
     // Featuring publishes the piece, so it must reach Supabase — otherwise the
     // public link 404s. Surface a failed remote write instead of silently
     // featuring a piece that lives only in the local cache.
-    const ok = await updatePiece(piece.id, { featuredInPortfolio: true, isPublic: true });
-    if (!ok) {
-      notice({
-        title: "Couldn’t publish",
-        message:
-          "This piece was saved on this device but couldn’t reach the cloud, so its public link won’t work yet. Check your connection and try again.",
-        variant: "error",
-      });
+    const { ok, error } = await updatePiece(piece.id, {
+      featuredInPortfolio: true,
+      isPublic: true,
+    });
+    if (!ok && error) {
+      // The change is safe in the local cache; the failure is only that it
+      // hasn't reached the cloud yet, so the public link would 404. Surface the
+      // diagnosed reason rather than a generic "try again".
+      notifySaveError(error);
     }
   };
 
@@ -419,14 +421,11 @@ export default function PieceDetailScreen() {
       // Publishing must reach Supabase — the public site reads the server, not
       // the local cache. If the remote write fails the change is cache-only and
       // the public link would 404, so surface it instead of silently "publishing".
-      const ok = await updatePiece(piece.id, { isPublic: true });
-      if (!ok) {
-        notice({
-          title: "Couldn’t publish",
-          message:
-            "This piece was saved on this device but couldn’t reach the cloud, so its public link won’t work yet. Check your connection and try again.",
-          variant: "error",
-        });
+      const { ok, error } = await updatePiece(piece.id, { isPublic: true });
+      if (!ok && error) {
+        // Cache-only publish would 404 on the public site; surface the
+        // diagnosed reason so the owner knows it isn't live yet.
+        notifySaveError(error);
       }
     }
   };
@@ -436,16 +435,13 @@ export default function PieceDetailScreen() {
   // remote write failed) so the owner is never handed a public link that the
   // public site cannot read. Returns whether sharing may proceed.
   const ensureShareable = async (): Promise<boolean> => {
-    const live = await ensurePieceRemote(piece.id);
-    if (!live) {
-      notice({
-        title: "Couldn’t share yet",
-        message:
-          "This piece couldn’t be saved to the cloud, so its public link won’t work yet. Check your connection and try again.",
-        variant: "error",
-      });
+    const { ok, error } = await ensurePieceRemote(piece.id);
+    if (!ok && error) {
+      // A public link is only safe once the row is live on the server. Explain
+      // the diagnosed reason instead of a blind "try again".
+      notifySaveError(error);
     }
-    return live;
+    return ok;
   };
 
   // Owner Share button: gate on a live remote row, then open the sheet.

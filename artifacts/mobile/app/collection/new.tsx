@@ -21,6 +21,7 @@ import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 import { notice } from "@/lib/notice";
+import { offerRetry, type SaveOutcome } from "@/lib/saveError";
 
 export default function NewCollectionScreen() {
   const colors = useColors();
@@ -85,32 +86,52 @@ export default function NewCollectionScreen() {
     // Collections carry their own public/private state, independent of the
     // per-piece Portfolio/Public curation.
     const visibility: "public" | "private" = isPublic ? "public" : "private";
-    if (existing && editId) {
-      await updateCollection(editId, {
-        title: title.trim(),
-        intro: intro.trim(),
-        visibility,
-        coverImageUri: coverImageUri || undefined,
-      });
-    } else {
-      const created = await addCollection({
-        title: title.trim(),
-        intro: intro.trim(),
-        visibility,
-        coverImageUri: coverImageUri || undefined,
-      });
-      // When opened with a piece to attach, file it into this freshly created
-      // collection. Membership is pure organization — fully INDEPENDENT of the
-      // piece's Public / Private / Archived state — so a private or retired piece
-      // can be filed as a draft member without being forced public. Public
-      // surfaces gate their own display, so it stays hidden until published.
-      if (attachPieceId) {
-        await addPieceToCollection(created.id, attachPieceId);
+    const payload = {
+      title: title.trim(),
+      intro: intro.trim(),
+      visibility,
+      coverImageUri: coverImageUri || undefined,
+    };
+    // try/finally guarantees the Save button is re-enabled on every path, so the
+    // UI can never get stranded on "Saving…". The collection is already in the
+    // local cache, so a failed cloud sync never loses it — diagnose, offer a
+    // retry, and only navigate away once it lands.
+    try {
+      // Create (or locate) the collection exactly ONCE, then retry against that
+      // same id. addCollection mints a new id every call, so retrying it would
+      // spawn duplicate collections — retries must re-sync the existing row.
+      let targetId = existing && editId ? editId : null;
+      let outcome: SaveOutcome;
+      if (targetId) {
+        outcome = await updateCollection(targetId, payload);
+      } else {
+        const { collection: created, outcome: createOutcome } =
+          await addCollection(payload);
+        targetId = created.id;
+        // When opened with a piece to attach, file it into this freshly created
+        // collection. Membership is pure organization — fully INDEPENDENT of the
+        // piece's Public / Private / Archived state — so a private or retired
+        // piece can be filed as a draft member without being forced public.
+        // Public surfaces gate their own display, so it stays hidden until
+        // published.
+        if (attachPieceId) {
+          await addPieceToCollection(targetId, attachPieceId);
+        }
+        outcome = createOutcome;
       }
+      while (!outcome.ok && outcome.error) {
+        const again = await offerRetry(outcome.error);
+        if (!again) break;
+        // Re-sync the SAME collection rather than creating another one.
+        outcome = await updateCollection(targetId, payload);
+      }
+      if (outcome.ok) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.back();
+      }
+    } finally {
+      setSaving(false);
     }
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setSaving(false);
-    router.back();
   };
 
   return (

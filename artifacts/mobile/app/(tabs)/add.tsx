@@ -24,6 +24,7 @@ import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 import { notice } from "@/lib/notice";
+import { notifySaveError } from "@/lib/saveError";
 
 function ChipSelector({
   options,
@@ -161,36 +162,47 @@ export default function AddScreen() {
     // gate is re-applied here so featuredInPortfolio can never be saved true for a
     // piece that isn't both public and collected.
     const canFeature = isPublic && collectionIds.length > 0;
-    const created = await addPiece({
-      title: title.trim(),
-      notes: notes.trim(),
-      clay,
-      glaze: glaze.trim(),
-      firing: firingEnvironment,
-      cone: cone.trim(),
-      firingEnvironment,
-      dimensions: dimensions.trim(),
-      year: year.trim(),
-      imageUri: storedCover,
-      images: storedImages,
-      isPublic,
-      collectionIds: isPublic ? collectionIds : [],
-      featuredInPortfolio: canFeature && featured,
-      // Field-exposure flags only apply to a public piece; force off otherwise
-      // so a private piece can never carry an opted-in flag.
-      showGlazeDetails: isPublic ? showGlazeDetails : false,
-      showStudioNotes: isPublic ? showStudioNotes : false,
-    });
-    console.log("[add] piece added; resetting form");
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setImages([]); setCoverIndex(0); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear()));
-    setIsPublic(false); setCollectionIds([]); setFeatured(false);
-    setShowGlazeDetails(false); setShowStudioNotes(false);
-    setSaving(false);
-    // Offer the calm Collection next-step instead of jumping straight to the
-    // archive. The form is already reset; the sheet only needs the new piece id.
-    console.log("[add] state reset complete; opening collection sheet");
-    setSavedPieceId(created.id);
+    // try/finally guarantees the Save button is re-enabled on every path, so the
+    // UI can never get stranded on "Saving…".
+    try {
+      const { piece: created, outcome } = await addPiece({
+        title: title.trim(),
+        notes: notes.trim(),
+        clay,
+        glaze: glaze.trim(),
+        firing: firingEnvironment,
+        cone: cone.trim(),
+        firingEnvironment,
+        dimensions: dimensions.trim(),
+        year: year.trim(),
+        imageUri: storedCover,
+        images: storedImages,
+        isPublic,
+        collectionIds: isPublic ? collectionIds : [],
+        featuredInPortfolio: canFeature && featured,
+        // Field-exposure flags only apply to a public piece; force off otherwise
+        // so a private piece can never carry an opted-in flag.
+        showGlazeDetails: isPublic ? showGlazeDetails : false,
+        showStudioNotes: isPublic ? showStudioNotes : false,
+      });
+      console.log("[add] piece added; resetting form");
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setImages([]); setCoverIndex(0); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear()));
+      setIsPublic(false); setCollectionIds([]); setFeatured(false);
+      setShowGlazeDetails(false); setShowStudioNotes(false);
+      // The piece is safely in the archive (local cache). If the cloud sync
+      // failed, tell the maker plainly why — it stays saved here and will sync
+      // when they next edit or share it.
+      if (!outcome.ok && outcome.error) {
+        notifySaveError(outcome.error);
+      }
+      // Offer the calm Collection next-step instead of jumping straight to the
+      // archive. The form is already reset; the sheet only needs the new piece id.
+      console.log("[add] state reset complete; opening collection sheet");
+      setSavedPieceId(created.id);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // File the just-saved piece into an existing collection. Membership is pure
