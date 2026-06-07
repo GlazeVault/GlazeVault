@@ -15,11 +15,15 @@ Real Supabase email/password auth replaced the old single-artist/no-user model.
   empty on sign-out / account switch — otherwise one account's cache bleeds into another.
 - `dataService` load/save/delete take `userId`, stamp `user_id`, and filter `eq user_id`.
 
-## First-account legacy claim
-First authenticated caller runs SECURITY DEFINER `claim_legacy_archive()`: it assigns all
-null-`user_id` rows (incl. the old `'default'` archive) to that user, copies the `'default'`
-profile, deletes it, and sets an `app_meta(legacy_claimed)` flag so later accounts start empty.
-**Why:** the existing archive must survive the migration and belong to whoever signs up first.
+## No legacy/anonymous claim — every account starts EMPTY (removed)
+The old SECURITY DEFINER `claim_legacy_archive()` + `app_meta` latch (handed all null-`user_id`
+rows to whoever signed up first) was REMOVED — function call gone from bootstrap, function/table
+dropped from `schema.sql` AND the live DB. New accounts now start completely empty; no
+anonymous/demo/pre-auth data is ever inherited.
+**Why:** for multi-account (alpha) use, auto-migrating unowned rows is a privacy/trust hazard —
+a new account must never see another session's data. **Do not reintroduce any automatic
+claim/migration of unowned rows.** (If a genuine pre-auth single-artist archive ever needs
+recovering, do it as an explicit, one-off, owner-confirmed assignment — never automatic.)
 
 ## RLS (the security boundary — do not weaken)
 Owner-all (`auth.uid() = user_id`) PLUS public SELECT for anon+authenticated:

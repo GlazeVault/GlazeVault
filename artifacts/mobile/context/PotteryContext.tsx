@@ -275,9 +275,9 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Hydrate (and re-hydrate) whenever the signed-in user changes. Gated on
-  // `authReady` so the one-time legacy claim has already run for the first
-  // account before we read pieces — otherwise the inherited archive wouldn't
-  // appear until a later reload.
+  // `authReady` so the signed-in user's profile bootstrap has settled before we
+  // read pieces. Every account starts empty — no anonymous / legacy data is
+  // inherited — and reads are scoped strictly by `user_id`.
   useEffect(() => {
     let cancelled = false;
     if (!userId || !authReady) {
