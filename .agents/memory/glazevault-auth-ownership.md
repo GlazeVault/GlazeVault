@@ -1,6 +1,6 @@
 ---
 name: GlazeVault auth & per-user ownership
-description: How real email/password accounts, per-user data scoping, and first-account legacy claiming work.
+description: How real email/password accounts, per-user data scoping, and the fail-closed route gate work (legacy/anonymous claiming was REMOVED).
 ---
 
 # GlazeVault auth & per-user ownership
@@ -43,11 +43,15 @@ usernames / questionnaire. Do not reintroduce profile fields into the signup scr
 `app/_layout.tsx` is the single gate, now built on expo-router `Stack.Protected` (the real
 access boundary — private studio screens are NOT MOUNTED when signed out, so no flash/cover
 hack is needed; `RouteGuardCover`/`GlobalAccountAccess` were deleted). `RootNavigator` shows a
-themed blank view while `isConfigured && loading`, then `studioUnlocked = !isConfigured ||
+themed blank view while `isConfigured && loading`, then `studioUnlocked = isConfigured &&
 !!userId` selects which `Stack.Protected` group mounts. `[slug]/*` lives OUTSIDE both guards.
 **Public `[slug]` exhibition links intentionally stay open without login (user-confirmed) — do
-NOT gate them.** `AuthGate` is kept only for deterministic landing redirects, not security.
-Offline mode (Supabase unconfigured) = studio always unlocked (single local user).
+NOT gate them.** `AuthGate` (same `isConfigured && !!userId` predicate) handles landing redirects.
+**The gate FAILS CLOSED — do not revert to `!isConfigured || !!userId`.** That old form unlocked
+the studio whenever Supabase was unconfigured; a misbuilt deploy (public env not inlined → see
+`glazevault-deploy-env-inlining.md`) then exposed the whole studio to anonymous web visitors.
+The "offline single local user" mode is never a legitimate runtime state (dev always has the
+Secrets), so unconfigured must mean signed-out (welcome/auth only), never owner.
 **Why namespacing, not a hard cache wipe, is the isolation mechanism:** logout (Profile tab
 ONLY — do not scatter logout buttons) = `signOut()` → in-memory context state resets on
 `userId→null` → studio unmounts. AsyncStorage is per-user namespaced, so a different account

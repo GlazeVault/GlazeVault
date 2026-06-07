@@ -81,9 +81,11 @@ function AuthGate() {
 
   useEffect(() => {
     if (loading) return;
-    // Offline mode: single local user, never gate.
-    if (!isConfigured) return;
-    const signedIn = !!userId;
+    // Fail closed: the studio requires a real authenticated session. If Supabase
+    // is unconfigured (e.g. a misbuilt deploy missing the public env), we treat
+    // the visitor as signed-out and send them to the welcome/auth screen — a
+    // deployed web build must NEVER expose the studio to an anonymous visitor.
+    const signedIn = isConfigured && !!userId;
     if (!signedIn && !publicRoute) {
       router.replace("/auth");
     } else if (signedIn && inAuthGroup) {
@@ -109,8 +111,9 @@ function AuthGate() {
  *  3. Public `[slug]` exhibition routes sit outside both guards — they stay
  *     viewable by anyone with the link, signed in or not.
  *
- * Offline mode (Supabase unconfigured) runs as a single local user, so the
- * studio is always unlocked.
+ * The gate fails CLOSED: the studio is unlocked only for a real authenticated
+ * session (`isConfigured && userId`). A misbuilt deploy missing the public
+ * Supabase env therefore shows the welcome/auth screen, never the studio.
  */
 function RootNavigator() {
   const { loading, userId, isConfigured } = useAuth();
@@ -120,7 +123,7 @@ function RootNavigator() {
     return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   }
 
-  const studioUnlocked = !isConfigured || !!userId;
+  const studioUnlocked = isConfigured && !!userId;
 
   return (
     <>
