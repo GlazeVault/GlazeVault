@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AccountButton } from "@/components/AccountButton";
 import { AddMenu } from "@/components/AddMenu";
 import { useColors } from "@/hooks/useColors";
 
@@ -113,20 +114,25 @@ function GlazeTabBar({ state, navigation }: TabBarProps) {
 
 export default function TabLayout() {
   return (
-    <Tabs
-      tabBar={(props) => <GlazeTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="collections" />
-      <Tabs.Screen name="add" options={{ href: null }} />
-      <Tabs.Screen name="saved" />
-      <Tabs.Screen name="profile" />
-    </Tabs>
+    <View style={styles.root}>
+      <Tabs
+        tabBar={(props) => <GlazeTabBar {...props} />}
+        screenOptions={{ headerShown: false }}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="collections" />
+        <Tabs.Screen name="add" options={{ href: null }} />
+        <Tabs.Screen name="saved" />
+        <Tabs.Screen name="profile" />
+      </Tabs>
+      {/* Always-visible entry to Account / Settings (log out) on every tab. */}
+      <AccountButton />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   wrap: {
     position: "absolute",
     left: 0,
