@@ -58,6 +58,7 @@ function AuthGate() {
     "collection",
     "public-site",
     "archive",
+    "settings",
     "auth",
     "+not-found",
   ]);
@@ -138,6 +139,10 @@ export default function RootLayout() {
                         />
                         <Stack.Screen
                           name="archive"
+                          options={{ presentation: "card" }}
+                        />
+                        <Stack.Screen
+                          name="settings"
                           options={{ presentation: "card" }}
                         />
                         {/* Live public web exhibition routes (served by the expo

@@ -48,7 +48,7 @@ import { notice } from "@/lib/notice";
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { isConfigured, signOut } = useAuth();
+  const { isConfigured } = useAuth();
   const { profile, updateProfile, updatePublicSite } = useProfile();
   const { pieces } = usePottery();
   const { collections } = useCollections();
@@ -225,23 +225,6 @@ export default function ProfileScreen() {
           ? { title: "Link copied", message: "Sharing wasn’t available, so the link is on your clipboard.", variant: "success" }
           : { title: "Couldn’t share", message: publicSiteUrl, variant: "info" },
       );
-    }
-  };
-
-  const handleLogout = async () => {
-    const ok = await confirm({
-      title: "Log out?",
-      message: "Your archive stays safe in the cloud. You can log back in anytime.",
-      confirmText: "Log out",
-      cancelText: "Stay",
-    });
-    if (!ok) return;
-    try {
-      await signOut();
-      // The auth gate redirects to the sign-in flow once the session clears.
-    } catch (e) {
-      console.warn("Failed to log out", e);
-      notice({ title: "Couldn’t log out", message: "Please try again.", variant: "error" });
     }
   };
 
@@ -1048,15 +1031,16 @@ export default function ProfileScreen() {
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Account</Text>
             <Pressable
               style={[
-                styles.logoutBtn,
+                styles.accountRow,
                 { borderColor: "rgba(120,110,100,0.2)" },
               ]}
-              onPress={handleLogout}
+              onPress={() => router.push("/settings")}
               accessibilityRole="button"
-              accessibilityLabel="Log out"
+              accessibilityLabel="Account and settings"
             >
-              <Feather name="log-out" size={14} color={colors.mutedForeground} />
-              <Text style={[styles.logoutText, { color: colors.foreground }]}>Log out</Text>
+              <Feather name="settings" size={15} color={colors.mutedForeground} />
+              <Text style={[styles.logoutText, { color: colors.foreground }]}>Account & Settings</Text>
+              <Feather name="chevron-right" size={18} color={colors.mutedForeground} style={{ marginLeft: "auto" }} />
             </Pressable>
           </View>
         ) : null}
@@ -1521,6 +1505,16 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
     height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  accountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 12,
+    paddingHorizontal: 16,
+    height: 52,
     borderRadius: 12,
     borderWidth: 1,
   },
