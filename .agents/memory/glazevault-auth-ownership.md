@@ -39,6 +39,15 @@ them later in the Profile tab. Empty name renders gracefully (`ArtistHero` → "
 `ensureProfile` writes `name: ""`). **Why:** alpha onboarding must have no long forms /
 usernames / questionnaire. Do not reintroduce profile fields into the signup screen.
 
+## Route gating (signed-out users never enter the studio)
+`app/_layout.tsx` is the single gate. `isPublicRoute(first)` = the auth flow OR a dynamic
+`[slug]` exhibition route; everything else is the private studio and requires a session.
+**Public `[slug]` exhibition links intentionally stay open without login (user-confirmed) — do
+NOT gate them.** AuthGate's `router.replace('/auth')` runs in an effect (post-mount), so a
+`RouteGuardCover` (opaque absoluteFill, themed bg) covers private routes whenever
+`isConfigured && (loading || !userId)` to kill the flash of studio content before redirect.
+Offline mode (Supabase unconfigured) = both are no-ops (single local user).
+
 ## Testing gotcha
 Contexts that call `useAuth()` (e.g. SavedContext) break RTL tests that render the provider
 bare. Mock `@/context/AuthContext` to `{ useAuth: () => ({ userId: "test-user", authReady: true }) }`

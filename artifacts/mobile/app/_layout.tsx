@@ -15,6 +15,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, usePathname, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -28,10 +29,38 @@ import { CollectionsProvider } from "@/context/CollectionsContext";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { PotteryProvider } from "@/context/PotteryContext";
 import { SavedProvider } from "@/context/SavedContext";
+import { useColors } from "@/hooks/useColors";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+/**
+ * The private studio app's route roots. Everything here requires a signed-in
+ * owner. Any other first segment is treated as a live public exhibition page
+ * (the dynamic `[slug]` routes), which is intentionally viewable by link without
+ * a session.
+ */
+const PRIVATE_ROOTS = new Set([
+  "(tabs)",
+  "piece",
+  "collection",
+  "public-site",
+  "archive",
+  "settings",
+  "auth",
+  "+not-found",
+]);
+
+/**
+ * A route reachable WITHOUT a session: the auth flow itself, or a live public
+ * exhibition page (the dynamic `[slug]` root — anything not in PRIVATE_ROOTS).
+ * Everything else is the private studio and requires a signed-in user.
+ */
+function isPublicRoute(first: string | undefined): boolean {
+  if (first === "auth") return true;
+  return !!first && !PRIVATE_ROOTS.has(first);
+}
 
 /**
  * Redirects based on auth state. Two route groups are always public and never
@@ -50,36 +79,55 @@ function AuthGate() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const inAuthGroup = segments[0] === "auth";
-  // Public exhibition routes live at the artist slug, i.e. the first segment is
-  // a dynamic `[slug]` (anything that isn't one of our known private groups).
-  const PRIVATE_ROOTS = new Set([
-    "(tabs)",
-    "piece",
-    "collection",
-    "public-site",
-    "archive",
-    "settings",
-    "auth",
-    "+not-found",
-  ]);
   const first = segments[0];
-  const isPublicSlugRoute = !!first && !PRIVATE_ROOTS.has(first);
+  const inAuthGroup = first === "auth";
+  const publicRoute = isPublicRoute(first);
 
   useEffect(() => {
     if (loading) return;
     // Offline mode: never gate.
     if (!isConfigured) return;
     const signedIn = !!userId;
-    if (!signedIn && !inAuthGroup && !isPublicSlugRoute) {
+    if (!signedIn && !publicRoute) {
       router.replace("/auth");
     } else if (signedIn && inAuthGroup) {
       router.replace("/(tabs)");
     }
     // pathname is included so the guard re-evaluates on every navigation.
-  }, [loading, userId, isConfigured, inAuthGroup, isPublicSlugRoute, pathname, router]);
+  }, [loading, userId, isConfigured, inAuthGroup, publicRoute, pathname, router]);
 
   return null;
+}
+
+/**
+ * Anti-flash gate. The AuthGate redirect above runs in an effect, i.e. AFTER the
+ * target screen has already mounted and painted — so a signed-out (or still-
+ * resolving) visitor would briefly SEE a private studio screen before being
+ * bounced to /auth. This opaque cover sits on top of the Stack and blanks the
+ * private screen during that window, so an unauthenticated user never visibly
+ * enters the app: they only ever see the calm welcome/auth screen.
+ *
+ * It only covers private routes; the auth flow and live public exhibition
+ * (`[slug]`) pages are never covered. In offline mode (Supabase unconfigured)
+ * it's a no-op, matching AuthGate.
+ */
+function RouteGuardCover() {
+  const { loading, userId, isConfigured } = useAuth();
+  const segments = useSegments();
+  const colors = useColors();
+  if (!isConfigured) return null;
+  if (isPublicRoute(segments[0])) return null;
+  const blocked = loading || !userId;
+  if (!blocked) return null;
+  return (
+    <View
+      pointerEvents="auto"
+      style={[
+        StyleSheet.absoluteFill,
+        { backgroundColor: colors.background, zIndex: 50 },
+      ]}
+    />
+  );
 }
 
 /**
@@ -180,6 +228,7 @@ export default function RootLayout() {
                         <Stack.Screen name="[slug]/piece/[id]" />
                         <Stack.Screen name="[slug]/collection/[id]" />
                       </Stack>
+                      <RouteGuardCover />
                       <GlobalAccountAccess />
                       <ToastHost />
                       <ActionSheetHost />
