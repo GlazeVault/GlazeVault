@@ -181,32 +181,42 @@ export default function AddScreen() {
     // gate is re-applied here so featuredInPortfolio can never be saved true for a
     // piece that isn't both public and collected.
     const canFeature = isPublic && collectionIds.length > 0;
-    await addPiece({
-      title: title.trim(),
-      notes: notes.trim(),
-      clay,
-      glaze: glaze.trim(),
-      firing: firingEnvironment,
-      cone: cone.trim(),
-      firingEnvironment,
-      dimensions: dimensions.trim(),
-      year: year.trim(),
-      imageUri: storedCover,
-      images: storedImages,
-      isPublic,
-      collectionIds: isPublic ? collectionIds : [],
-      featuredInPortfolio: canFeature && featured,
-      // Field-exposure flags only apply to a public piece; force off otherwise
-      // so a private piece can never carry an opted-in flag.
-      showGlazeDetails: isPublic ? showGlazeDetails : false,
-      showStudioNotes: isPublic ? showStudioNotes : false,
-    });
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setImages([]); setCoverIndex(0); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear()));
-    setIsPublic(false); setCollectionIds([]); setFeatured(false);
-    setShowGlazeDetails(false); setShowStudioNotes(false);
-    setSaving(false);
-    router.replace("/archive");
+    try {
+      await addPiece({
+        title: title.trim(),
+        notes: notes.trim(),
+        clay,
+        glaze: glaze.trim(),
+        firing: firingEnvironment,
+        cone: cone.trim(),
+        firingEnvironment,
+        dimensions: dimensions.trim(),
+        year: year.trim(),
+        imageUri: storedCover,
+        images: storedImages,
+        isPublic,
+        collectionIds: isPublic ? collectionIds : [],
+        featuredInPortfolio: canFeature && featured,
+        // Field-exposure flags only apply to a public piece; force off otherwise
+        // so a private piece can never carry an opted-in flag.
+        showGlazeDetails: isPublic ? showGlazeDetails : false,
+        showStudioNotes: isPublic ? showStudioNotes : false,
+      });
+      // Fire-and-forget: haptics must never block (or, on web, reject and abort)
+      // the post-save reset + navigation.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setImages([]); setCoverIndex(0); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear()));
+      setIsPublic(false); setCollectionIds([]); setFeatured(false);
+      setShowGlazeDetails(false); setShowStudioNotes(false);
+      router.replace("/archive");
+    } catch (e) {
+      console.warn("[glazevault] save piece failed", e);
+      notice({ title: "Couldn’t save", message: "We couldn’t save this piece. Please try again.", variant: "error" });
+    } finally {
+      // Always reset the loading state — even if the cache write failed — so the
+      // Save button can never get stuck on "Saving…".
+      setSaving(false);
+    }
   };
 
   return (

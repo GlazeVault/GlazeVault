@@ -27,6 +27,14 @@ All three contexts (Pottery/Collections/Profile) persist full snapshots to Async
 
 **Why:** updating in-memory state then awaiting an unserialized setItem allowed two rapid saves to commit in reverse order and persist stale data.
 
-# Web localStorage quota
+# Web localStorage quota — cache is METADATA-ONLY + FAIL-SOFT
 
-Base64 data URIs live in the single AsyncStorage/localStorage blob, so large photos can blow the quota. Image-picker `quality` is capped (~0.7–0.9) to mitigate. If quota becomes a problem, add resize/compression + a max-bytes guard before calling the `update*`/`addPiece` methods (state is updated before the write, so a failed write currently desyncs UI from storage).
+On web `AsyncStorage` IS `localStorage` (~5MB/origin). Earlier `persist()` serialized the WHOLE pieces array including base64 `data:` images into that one blob, so after a couple photos `setItem` threw `QuotaExceededError`. Because every mutation did `await persist()` BEFORE its Supabase call, a rejected cache write meant the remote write never ran, and handlers without try/finally stranded loading state → the "Save/Delete/Remove work once or twice then hang/do nothing" prod bug. (Native is immune: it caches tiny `pieces/` relative paths, not base64.)
+
+**The rule (do not regress):**
+- `persist()` writes a **metadata-only** snapshot: `toCacheSafePieces` (PotteryContext) drops any `data:` URI from `imageUri`/`images`; CollectionsContext drops a `data:` `coverImageUri`. Only https Supabase URLs + native `pieces/` paths are cached. The full-res `data:` URI stays in MEMORY for instant paint; the uploaded Supabase URL is folded back into cache after `pushPieceRemote`.
+- `persist()` is **fail-soft**: the `setItem` is wrapped in `.catch` (logs, never rejects). The cache write must NEVER gate the remote Supabase write or a UI loading state.
+- Mutation handlers (Save add/edit, Delete, Remove-from-collection) use try/catch/finally with the loading reset in `finally`; haptics are fire-and-forget (`.catch(()=>{})`, never awaited) so a web haptics rejection can't abort navigation.
+
+**Why:** Supabase is the source of truth; the cache is only for instant paint/offline. A cache-only piece whose remote upload never succeeded WILL lose its image on reload (metadata-only strips it) — accepted tradeoff.
+**How to apply:** never write base64 to the cache; never make a remote write or a `setSaving`/loading reset depend on the cache `setItem` resolving. Other piece toggles (feature/public/archive, remove-from-portfolio) still `await Haptics.*` before mutating — same fire-and-forget guard should be applied if they ever show the same web-abort symptom.

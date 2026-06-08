@@ -65,12 +65,31 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
     const uid = userIdRef.current;
     if (!uid) return;
     const key = cacheKey(uid);
+    // METADATA-ONLY: never persist a base64 `data:` cover (it overflows
+    // localStorage on web); the uploaded Supabase URL is folded back in after the
+    // remote save. FAIL-SOFT: a cache write error is logged, never thrown, so it
+    // cannot block the remote write or strand a loading state.
+    const snapshot = JSON.stringify(
+      updated.map((c) =>
+        c.coverImageUri && c.coverImageUri.startsWith("data:")
+          ? { ...c, coverImageUri: undefined }
+          : c
+      )
+    );
     const write = writeChain.current
       .catch(() => {})
-      .then(() => AsyncStorage.setItem(key, JSON.stringify(updated)));
+      .then(() => AsyncStorage.setItem(key, snapshot))
+      .then(() => {
+        console.log("Saved collections", updated.length);
+      })
+      .catch((e) => {
+        console.warn(
+          "[glazevault] collections cache write failed (kept in memory + Supabase)",
+          e
+        );
+      });
     writeChain.current = write;
     await write;
-    console.log("Saved collections", updated.length);
   }, []);
 
   // Pushes a single collection to Supabase, folding any uploaded cover-image URL

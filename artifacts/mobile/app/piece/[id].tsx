@@ -283,8 +283,14 @@ export default function PieceDetailScreen() {
       destructive: true,
     });
     if (!confirmed) return;
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    await deletePiece(piece.id);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    try {
+      await deletePiece(piece.id);
+    } catch (e) {
+      console.warn("[glazevault] delete piece failed", e);
+      notice({ title: "Couldn’t delete", message: "We couldn’t delete this piece. Please try again.", variant: "error" });
+      return;
+    }
     router.back();
   };
 
@@ -301,8 +307,14 @@ export default function PieceDetailScreen() {
       confirmText: "Remove",
     });
     if (!confirmed) return;
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await removePieceFromCollection(fromCollectionId, piece.id);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      await removePieceFromCollection(fromCollectionId, piece.id);
+    } catch (e) {
+      console.warn("[glazevault] remove from collection failed", e);
+      notice({ title: "Couldn’t remove", message: "We couldn’t remove this piece from the collection. Please try again.", variant: "error" });
+      return;
+    }
     router.back();
   };
 

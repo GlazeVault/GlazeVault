@@ -178,23 +178,31 @@ function EditPieceForm({ piece }: { piece: PotteryPiece }) {
       return;
     }
     const storedCover = storedImages[coverIndex] ?? storedImages[0];
-    await updatePiece(id, {
-      title: title.trim(),
-      notes: notes.trim(),
-      clay,
-      glaze: glaze.trim(),
-      firing: firingEnvironment,
-      cone: cone.trim(),
-      firingEnvironment,
-      dimensions: dimensions.trim(),
-      year: year.trim(),
-      imageUri: storedCover,
-      images: storedImages,
-      collectionIds,
-    });
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setSaving(false);
-    router.back();
+    try {
+      await updatePiece(id, {
+        title: title.trim(),
+        notes: notes.trim(),
+        clay,
+        glaze: glaze.trim(),
+        firing: firingEnvironment,
+        cone: cone.trim(),
+        firingEnvironment,
+        dimensions: dimensions.trim(),
+        year: year.trim(),
+        imageUri: storedCover,
+        images: storedImages,
+        collectionIds,
+      });
+      // Fire-and-forget so haptics can never block (or reject on web) the nav.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      router.back();
+    } catch (e) {
+      console.warn("[glazevault] update piece failed", e);
+      notice({ title: "Couldn’t save", message: "We couldn’t save your changes. Please try again.", variant: "error" });
+    } finally {
+      // Always reset loading so the Save button can never get stuck on "Saving…".
+      setSaving(false);
+    }
   };
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;

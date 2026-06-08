@@ -167,6 +167,25 @@ function normalizePiece(
   return enforceVisibilityInvariant(base);
 }
 
+// The AsyncStorage cache is METADATA-ONLY. On web AsyncStorage is localStorage
+// (~5MB per origin); inlining base64 `data:` image payloads there overflows the
+// quota, which made every cache write throw — and because each mutation awaited
+// the cache write before its Supabase call, that silently blocked saves/deletes
+// and stranded loading states. We never persist `data:` URIs: Supabase https
+// URLs and native `pieces/...` relative paths are small and kept, and Supabase
+// is the source of truth on reload. The full-res `data:` URI still lives in
+// memory for instant paint until the uploaded URL is folded back in.
+function isCacheableUri(uri: string): boolean {
+  return !!uri && !uri.startsWith("data:");
+}
+function toCacheSafePieces(pieces: PotteryPiece[]): PotteryPiece[] {
+  return pieces.map((p) => {
+    const images = p.images.filter(isCacheableUri);
+    const imageUri = isCacheableUri(p.imageUri) ? p.imageUri : (images[0] ?? "");
+    return { ...p, imageUri, images };
+  });
+}
+
 export function PotteryProvider({ children }: { children: React.ReactNode }) {
   const { userId, authReady } = useAuth();
   const [pieces, setPieces] = useState<PotteryPiece[]>([]);
@@ -189,12 +208,25 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
     const uid = userIdRef.current;
     if (!uid) return;
     const key = cacheKey(uid);
+    // METADATA-ONLY (toCacheSafePieces strips base64) + FAIL-SOFT: a cache write
+    // error (e.g. localStorage quota) is logged but NEVER thrown, so it can never
+    // block the remote Supabase write that follows in the caller, nor strand a
+    // loading state.
+    const snapshot = JSON.stringify(toCacheSafePieces(updated));
     const write = writeChain.current
       .catch(() => {})
-      .then(() => AsyncStorage.setItem(key, JSON.stringify(updated)));
+      .then(() => AsyncStorage.setItem(key, snapshot))
+      .then(() => {
+        console.log("Saved pieces", updated.length);
+      })
+      .catch((e) => {
+        console.warn(
+          "[glazevault] pieces cache write failed (kept in memory + Supabase)",
+          e
+        );
+      });
     writeChain.current = write;
     await write;
-    console.log("Saved pieces", updated.length);
   }, []);
 
   // Pushes a single piece to Supabase. On success the returned record carries
