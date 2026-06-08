@@ -65,6 +65,45 @@ function ChipSelector({
   );
 }
 
+// Defined at module scope (NOT inside the screen component) so its identity is
+// stable across re-renders. A component declared inside render gets a new
+// identity each keystroke, which makes React unmount + remount the underlying
+// <TextInput> every render — on web that drops DOM focus, so you can only type
+// one letter at a time.
+function Field({
+  value,
+  onChange,
+  placeholder,
+  multiline = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  multiline?: boolean;
+}) {
+  const colors = useColors();
+  return (
+    <TextInput
+      style={[
+        styles.input,
+        multiline && styles.inputMulti,
+        { color: colors.foreground, backgroundColor: "transparent", borderBottomColor: colors.border },
+      ]}
+      value={value}
+      onChangeText={onChange}
+      placeholder={placeholder}
+      placeholderTextColor={colors.mutedForeground}
+      multiline={multiline}
+      textAlignVertical={multiline ? "top" : "center"}
+    />
+  );
+}
+
+function Label({ text }: { text: string }) {
+  const colors = useColors();
+  return <Text style={[styles.label, { color: colors.mutedForeground }]}>{text}</Text>;
+}
+
 export default function EditPieceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { pieces } = usePottery();
@@ -157,36 +196,6 @@ function EditPieceForm({ piece }: { piece: PotteryPiece }) {
     setSaving(false);
     router.back();
   };
-
-  const Field = ({
-    value,
-    onChange,
-    placeholder,
-    multiline = false,
-  }: {
-    value: string;
-    onChange: (v: string) => void;
-    placeholder: string;
-    multiline?: boolean;
-  }) => (
-    <TextInput
-      style={[
-        styles.input,
-        multiline && styles.inputMulti,
-        { color: colors.foreground, backgroundColor: "transparent", borderBottomColor: colors.border },
-      ]}
-      value={value}
-      onChangeText={onChange}
-      placeholder={placeholder}
-      placeholderTextColor={colors.mutedForeground}
-      multiline={multiline}
-      textAlignVertical={multiline ? "top" : "center"}
-    />
-  );
-
-  const Label = ({ text }: { text: string }) => (
-    <Text style={[styles.label, { color: colors.mutedForeground }]}>{text}</Text>
-  );
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
