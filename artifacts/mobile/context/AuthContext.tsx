@@ -8,7 +8,11 @@ import React, {
   useState,
 } from "react";
 
-import { ensureProfile, type ProfileSeed } from "@/services/dataService";
+import {
+  claimLegacyArchive,
+  ensureProfile,
+  type ProfileSeed,
+} from "@/services/dataService";
 import { isSupabaseConfigured, supabase } from "@/services/supabase";
 
 /**
@@ -16,10 +20,10 @@ import { isSupabaseConfigured, supabase } from "@/services/supabase";
  * the current `userId` that every data context scopes its storage + queries by.
  *
  * `authReady` is the gate the data contexts wait on: it flips true only AFTER
- * the signed-in user's profile row is ensured. Every account — including the
- * very first — starts with a completely empty archive: no anonymous / demo /
- * pre-auth data is ever inherited. Owner data is read strictly by `user_id`
- * (see dataService), so one account can never see another's private archive.
+ * the signed-in user's profile row is ensured and the one-time legacy-archive
+ * claim has been attempted. Hydrating data only once `authReady` is true
+ * guarantees the very first account sees the inherited pre-auth archive
+ * immediately (the claim has already reassigned those rows to them).
  *
  * When Supabase is not configured the app degrades to a single local offline
  * user so the on-device cache still works without any sign-in.
@@ -28,14 +32,9 @@ import { isSupabaseConfigured, supabase } from "@/services/supabase";
 const LOCAL_OFFLINE_USER_ID = "local-offline";
 
 export type SignUpInput = {
+  name: string;
   email: string;
   password: string;
-  /**
-   * Optional. Signup is deliberately email + password only (zero friction for
-   * alpha); the artist fills in their display name and other profile details
-   * later from the Profile tab. An empty name renders gracefully ("Your Studio").
-   */
-  name?: string;
   website?: string;
   instagram?: string;
   avatarUri?: string;
@@ -60,7 +59,7 @@ interface AuthContextType {
   user: User | null;
   /** The owner id every data context scopes by, or null when signed out. */
   userId: string | null;
-  /** True once the signed-in user's profile bootstrap has settled. */
+  /** True once the signed-in user's profile + legacy claim are settled. */
   authReady: boolean;
   signUp: (input: SignUpInput) => Promise<SignUpResult>;
   signIn: (email: string, password: string) => Promise<void>;
@@ -112,9 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Bootstrap: once a user is present, ensure their profile row exists.
-  // authReady gates data hydration on this. No anonymous / legacy data is ever
-  // claimed — every account starts empty.
+  // Bootstrap: once a user is present, ensure their profile row exists, then
+  // attempt the one-time legacy claim. authReady gates data hydration on this.
   useEffect(() => {
     if (!isSupabaseConfigured) {
       // Offline single-user mode: nothing to bootstrap, always ready.
@@ -137,6 +135,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           instagram: metaString(meta, "instagram"),
         };
         await ensureProfile(userId, seed);
+        await claimLegacyArchive().catch((e) =>
+          console.warn("[auth] legacy claim failed", e),
+        );
       } catch (e) {
         console.warn("[auth] bootstrap failed", e);
       } finally {
@@ -156,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (input: SignUpInput): Promise<SignUpResult> => {
       if (!supabase) throw new Error("Supabase is not configured.");
       pendingSeedRef.current = {
-        name: input.name ?? "",
+        name: input.name,
         website: input.website,
         instagram: input.instagram,
         avatarUri: input.avatarUri,
@@ -166,7 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password: input.password,
         options: {
           data: {
-            name: input.name ?? "",
+            name: input.name,
             website: input.website ?? "",
             instagram: input.instagram ?? "",
           },

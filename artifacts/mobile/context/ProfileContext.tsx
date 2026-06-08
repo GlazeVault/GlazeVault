@@ -9,12 +9,6 @@ import {
   saveProfile as saveProfileRemote,
 } from "@/services/dataService";
 import { publicSiteSlug } from "@/constants/slug";
-import {
-  classifySaveError,
-  SAVE_OK,
-  withTimeout,
-  type SaveOutcome,
-} from "@/lib/saveError";
 
 export interface PublicSiteSettings {
   enabled: boolean;
@@ -85,12 +79,8 @@ interface ProfileContextType {
   profile: ArtistProfile;
   /** True once the initial cache + Supabase load has settled. */
   hydrated: boolean;
-  // Resolve to a SaveOutcome: `ok` once the change is safely on Supabase (or
-  // there is no server configured), otherwise `error` carries the diagnosed
-  // reason. The local cache is always written first, so a failure never loses
-  // work — callers surface the reason and may offer a retry.
-  updateProfile: (updates: Partial<ArtistProfile>) => Promise<SaveOutcome>;
-  updatePublicSite: (updates: Partial<PublicSiteSettings>) => Promise<SaveOutcome>;
+  updateProfile: (updates: Partial<ArtistProfile>) => Promise<void>;
+  updatePublicSite: (updates: Partial<PublicSiteSettings>) => Promise<void>;
 }
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
@@ -210,46 +200,36 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, [userId, authReady, hasContent]);
 
   const updateProfile = useCallback(
-    async (updates: Partial<ArtistProfile>): Promise<SaveOutcome> => {
+    async (updates: Partial<ArtistProfile>) => {
       const updated = { ...profileRef.current, ...updates };
-      // Local-first: the cache is written before any network call, so the
-      // artist's edit is preserved even if the cloud sync below fails.
       await persistCache(updated);
       const uid = userIdRef.current;
-      if (!isSupabaseConfigured || !uid) return SAVE_OK;
-      try {
-        // Timeout-wrapped so a stalled upload can never hang the Save button.
-        const saved = await withTimeout(
-          saveProfileRemote(updated, uid),
-          undefined,
-          "Saving profile",
-        );
-        // Fold any uploaded avatar/hero URLs back into the cache so the local
-        // copy matches the post-upload remote URLs (both upload separately).
-        if (
-          saved.avatarUri !== updated.avatarUri ||
-          saved.heroImageUri !== updated.heroImageUri
-        ) {
-          await persistCache({
-            ...profileRef.current,
-            avatarUri: saved.avatarUri,
-            heroImageUri: saved.heroImageUri,
-          });
+      if (isSupabaseConfigured && uid) {
+        try {
+          const saved = await saveProfileRemote(updated, uid);
+          // Fold any uploaded avatar/hero URLs back into the cache so the local
+          // copy matches the post-upload remote URLs (both upload separately).
+          if (
+            saved.avatarUri !== updated.avatarUri ||
+            saved.heroImageUri !== updated.heroImageUri
+          ) {
+            await persistCache({
+              ...profileRef.current,
+              avatarUri: saved.avatarUri,
+              heroImageUri: saved.heroImageUri,
+            });
+          }
+        } catch (e) {
+          console.warn("[supabase] saveProfile failed (kept in local cache)", e);
         }
-        return SAVE_OK;
-      } catch (e) {
-        console.warn("[supabase] saveProfile failed (kept in local cache)", e);
-        return { ok: false, error: classifySaveError(e) };
       }
     },
     [persistCache]
   );
 
   const updatePublicSite = useCallback(
-    async (updates: Partial<PublicSiteSettings>): Promise<SaveOutcome> => {
-      return updateProfile({
-        publicSite: { ...profileRef.current.publicSite, ...updates },
-      });
+    async (updates: Partial<PublicSiteSettings>) => {
+      await updateProfile({ publicSite: { ...profileRef.current.publicSite, ...updates } });
     },
     [updateProfile]
   );

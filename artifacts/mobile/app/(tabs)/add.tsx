@@ -15,7 +15,6 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AdvancedPublicVisibility } from "@/components/AdvancedPublicVisibility";
-import { CollectionOnboardingSheet } from "@/components/CollectionOnboardingSheet";
 import { PhotoSetEditor } from "@/components/PhotoSetEditor";
 import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
@@ -24,7 +23,6 @@ import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 import { notice } from "@/lib/notice";
-import { notifySaveError } from "@/lib/saveError";
 
 function ChipSelector({
   options,
@@ -72,7 +70,7 @@ function ChipSelector({
 
 export default function AddScreen() {
   const colors = useColors();
-  const { addPiece, addPieceToCollection } = usePottery();
+  const { addPiece } = usePottery();
   const { collections } = useCollections();
   const insets = useSafeAreaInsets();
   const [images, setImages] = useState<string[]>([]);
@@ -93,12 +91,6 @@ export default function AddScreen() {
   const [showGlazeDetails, setShowGlazeDetails] = useState(false);
   const [showStudioNotes, setShowStudioNotes] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Post-save Collection discoverability sheet. `savedPieceId` is the freshly
-  // created piece we offer to file; `filingId` is the collection currently being
-  // filed into (drives the inline spinner). The form is already reset by the
-  // time this opens, so the sheet only carries the new piece's id.
-  const [savedPieceId, setSavedPieceId] = useState<string | null>(null);
-  const [filingId, setFilingId] = useState<string | null>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -143,16 +135,12 @@ export default function AddScreen() {
       return;
     }
     setSaving(true);
-    console.log("[add] save start; photos:", images.length);
     let storedImages: string[];
     try {
       // Fail-closed: persist every photo before saving so no temp picker URI is
       // ever stored. The chosen cover keeps its position in the array.
       storedImages = await Promise.all(images.map((uri) => persistPieceImage(uri)));
-      console.log("[add] photos persisted:", storedImages.length);
-    } catch (err) {
-      // Re-enable the form so the maker can retry rather than being stuck.
-      console.log("[add] persist failed", err);
+    } catch {
       setSaving(false);
       notice({ title: "Couldn’t save photo", message: "We couldn’t store those photos. Please try again.", variant: "error" });
       return;
@@ -162,87 +150,31 @@ export default function AddScreen() {
     // gate is re-applied here so featuredInPortfolio can never be saved true for a
     // piece that isn't both public and collected.
     const canFeature = isPublic && collectionIds.length > 0;
-    // try/finally guarantees the Save button is re-enabled on every path, so the
-    // UI can never get stranded on "Saving…".
-    try {
-      const { piece: created, outcome } = await addPiece({
-        title: title.trim(),
-        notes: notes.trim(),
-        clay,
-        glaze: glaze.trim(),
-        firing: firingEnvironment,
-        cone: cone.trim(),
-        firingEnvironment,
-        dimensions: dimensions.trim(),
-        year: year.trim(),
-        imageUri: storedCover,
-        images: storedImages,
-        isPublic,
-        collectionIds: isPublic ? collectionIds : [],
-        featuredInPortfolio: canFeature && featured,
-        // Field-exposure flags only apply to a public piece; force off otherwise
-        // so a private piece can never carry an opted-in flag.
-        showGlazeDetails: isPublic ? showGlazeDetails : false,
-        showStudioNotes: isPublic ? showStudioNotes : false,
-      });
-      console.log("[add] piece added; resetting form");
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setImages([]); setCoverIndex(0); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear()));
-      setIsPublic(false); setCollectionIds([]); setFeatured(false);
-      setShowGlazeDetails(false); setShowStudioNotes(false);
-      // The piece is safely in the archive (local cache). If the cloud sync
-      // failed, tell the maker plainly why — it stays saved here and will sync
-      // when they next edit or share it.
-      if (!outcome.ok && outcome.error) {
-        notifySaveError(outcome.error);
-      }
-      // Offer the calm Collection next-step instead of jumping straight to the
-      // archive. The form is already reset; the sheet only needs the new piece id.
-      console.log("[add] state reset complete; opening collection sheet");
-      setSavedPieceId(created.id);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // File the just-saved piece into an existing collection. Membership is pure
-  // organization — it never changes the piece's public/private/featured state —
-  // so this is safe to offer right after a private save.
-  const handleFileIntoCollection = async (collectionId: string) => {
-    if (!savedPieceId) return;
-    setFilingId(collectionId);
-    try {
-      await addPieceToCollection(collectionId, savedPieceId);
-      if (Platform.OS !== "web") {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      setFilingId(null);
-      setSavedPieceId(null);
-      router.replace("/archive");
-    } catch (err) {
-      // Fail loudly and keep the sheet open so the maker can retry rather than
-      // being silently routed away thinking the piece was filed.
-      console.log("[add] file into collection failed", err);
-      setFilingId(null);
-      notice({ title: "Couldn’t add to collection", message: "Please try again.", variant: "error" });
-    }
-  };
-
-  // "Create New Collection" / "Create Your First Collection": hand off to the
-  // existing creation screen with the new piece attached, so it is filed the
-  // moment the collection exists.
-  const handleCreateCollection = () => {
-    const pieceId = savedPieceId;
-    setSavedPieceId(null);
-    router.push(
-      pieceId
-        ? { pathname: "/collection/new", params: { attachPieceId: pieceId } }
-        : "/collection/new"
-    );
-  };
-
-  const handleSkipCollection = () => {
-    setSavedPieceId(null);
+    await addPiece({
+      title: title.trim(),
+      notes: notes.trim(),
+      clay,
+      glaze: glaze.trim(),
+      firing: firingEnvironment,
+      cone: cone.trim(),
+      firingEnvironment,
+      dimensions: dimensions.trim(),
+      year: year.trim(),
+      imageUri: storedCover,
+      images: storedImages,
+      isPublic,
+      collectionIds: isPublic ? collectionIds : [],
+      featuredInPortfolio: canFeature && featured,
+      // Field-exposure flags only apply to a public piece; force off otherwise
+      // so a private piece can never carry an opted-in flag.
+      showGlazeDetails: isPublic ? showGlazeDetails : false,
+      showStudioNotes: isPublic ? showStudioNotes : false,
+    });
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setImages([]); setCoverIndex(0); setTitle(""); setNotes(""); setClay(""); setGlaze(""); setCone(""); setFiringEnvironment(""); setDimensions(""); setYear(String(new Date().getFullYear()));
+    setIsPublic(false); setCollectionIds([]); setFeatured(false);
+    setShowGlazeDetails(false); setShowStudioNotes(false);
+    setSaving(false);
     router.replace("/archive");
   };
 
@@ -269,7 +201,6 @@ export default function AddScreen() {
   );
 
   return (
-    <>
     <KeyboardAwareScrollView
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[styles.container, { paddingTop: topPad + 28, paddingBottom: insets.bottom + 120 }]}
@@ -474,16 +405,6 @@ export default function AddScreen() {
         </Pressable>
       </View>
     </KeyboardAwareScrollView>
-
-      <CollectionOnboardingSheet
-        visible={savedPieceId !== null}
-        collections={collections.map((c) => ({ id: c.id, title: c.title }))}
-        busyId={filingId}
-        onSelectCollection={handleFileIntoCollection}
-        onCreateNew={handleCreateCollection}
-        onSkip={handleSkipCollection}
-      />
-    </>
   );
 }
 

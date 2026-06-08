@@ -138,8 +138,10 @@ alter table public.collections drop column if exists featured_on_site;
 alter table public.collections add column if not exists user_id uuid references auth.users(id) on delete cascade;
 create index if not exists collections_user_id_idx on public.collections(user_id);
 
--- ── profiles (one row per user) ─────────────────────────────────────────────
+-- ── profiles (one row per user; legacy id = 'default' until claimed) ─────────
 -- New accounts store their profile with id = user_id::text and user_id = uid.
+-- The legacy single-artist row (id = 'default', user_id null) is migrated into
+-- the first account's profile and deleted by claim_legacy_archive().
 create table if not exists public.profiles (
   id          text primary key,
   name        text not null default '',
@@ -171,17 +173,46 @@ update public.profiles set hero_image_url = avatar_url
 alter table public.profiles add column if not exists user_id uuid references auth.users(id) on delete cascade;
 create unique index if not exists profiles_user_id_key on public.profiles(user_id) where user_id is not null;
 
--- ── No legacy/anonymous claim (intentionally removed) ────────────────────────
--- GlazeVault previously shipped a SECURITY DEFINER `claim_legacy_archive()` that
--- handed every unowned (user_id null) row to whoever signed up first. That
--- auto-migration is a privacy/trust hazard for multi-account (alpha) use: a new
--- account must start COMPLETELY EMPTY and never inherit anonymous/demo/another
--- session's data. The function + its `app_meta` latch are dropped here and the
--- app no longer calls anything of the kind. Owner data is reachable ONLY through
--- the per-user RLS policies below (user_id = auth.uid()). Do NOT reintroduce any
--- automatic claim/migration of unowned rows.
-drop function if exists public.claim_legacy_archive();
-drop table if exists public.app_meta;
+-- ── One-time legacy claim ────────────────────────────────────────────────────
+-- The pre-auth archive (pieces/collections/profile with user_id null) belongs to
+-- whoever signs up first. `app_meta.legacy_claimed` is a one-row latch; the
+-- SECURITY DEFINER function assigns all unowned rows to the first authenticated
+-- caller, folds the 'default' profile into theirs, deletes it, and trips the
+-- latch so no later account can claim. Returns true only for that first caller.
+create table if not exists public.app_meta (
+  id             int primary key default 1,
+  legacy_claimed boolean not null default false,
+  constraint app_meta_singleton check (id = 1)
+);
+insert into public.app_meta (id, legacy_claimed) values (1, false) on conflict (id) do nothing;
+
+create or replace function public.claim_legacy_archive()
+returns boolean language plpgsql security definer set search_path = public as $fn$
+declare uid uuid := auth.uid(); already boolean;
+begin
+  if uid is null then raise exception 'not authenticated'; end if;
+  select legacy_claimed into already from public.app_meta where id = 1 for update;
+  if already is null then
+    insert into public.app_meta (id, legacy_claimed) values (1, false) on conflict (id) do nothing;
+    already := false;
+  end if;
+  if already then return false; end if;
+  update public.pieces      set user_id = uid where user_id is null;
+  update public.collections set user_id = uid where user_id is null;
+  update public.profiles p set
+    name = d.name, tagline = d.tagline, bio = d.bio, statement = d.statement,
+    website = d.website, instagram = d.instagram, avatar_url = d.avatar_url,
+    hero_image_url = d.hero_image_url, hero_focal_y = d.hero_focal_y,
+    hero_focal_x = d.hero_focal_x, hero_zoom = d.hero_zoom,
+    public_site = d.public_site
+  from public.profiles d
+  where d.id = 'default' and d.user_id is null and p.user_id = uid;
+  delete from public.profiles where id = 'default' and user_id is null;
+  update public.app_meta set legacy_claimed = true where id = 1;
+  return true;
+end; $fn$;
+revoke all on function public.claim_legacy_archive() from public, anon;
+grant execute on function public.claim_legacy_archive() to authenticated;
 
 -- ── Row Level Security (per-user owner + public read) ────────────────────────
 alter table public.pieces      enable row level security;

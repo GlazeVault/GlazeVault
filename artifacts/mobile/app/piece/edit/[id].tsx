@@ -25,7 +25,6 @@ import { useCollections } from "@/context/CollectionsContext";
 import { PotteryPiece, usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 import { notice } from "@/lib/notice";
-import { offerRetry } from "@/lib/saveError";
 
 function ChipSelector({
   options,
@@ -140,7 +139,7 @@ function EditPieceForm({ piece }: { piece: PotteryPiece }) {
       return;
     }
     const storedCover = storedImages[coverIndex] ?? storedImages[0];
-    const payload = {
+    await updatePiece(id, {
       title: title.trim(),
       notes: notes.trim(),
       clay,
@@ -153,25 +152,10 @@ function EditPieceForm({ piece }: { piece: PotteryPiece }) {
       imageUri: storedCover,
       images: storedImages,
       collectionIds,
-    };
-    // try/finally guarantees the Save button is re-enabled on every path, so the
-    // UI can never get stranded on "Saving…". The edit is already in the local
-    // cache, so a failed cloud sync never loses it — diagnose, offer a retry,
-    // and only navigate away once it lands.
-    try {
-      let outcome = await updatePiece(id, payload);
-      while (!outcome.ok && outcome.error) {
-        const again = await offerRetry(outcome.error);
-        if (!again) break;
-        outcome = await updatePiece(id, payload);
-      }
-      if (outcome.ok) {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.back();
-      }
-    } finally {
-      setSaving(false);
-    }
+    });
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setSaving(false);
+    router.back();
   };
 
   const Field = ({

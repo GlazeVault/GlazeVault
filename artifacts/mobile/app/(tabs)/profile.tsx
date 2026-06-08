@@ -44,12 +44,11 @@ import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 import { confirm } from "@/lib/confirm";
 import { notice } from "@/lib/notice";
-import { notifySaveError, offerRetry } from "@/lib/saveError";
 
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { isConfigured, user, signOut } = useAuth();
+  const { isConfigured, signOut } = useAuth();
   const { profile, updateProfile, updatePublicSite } = useProfile();
   const { pieces } = usePottery();
   const { collections } = useCollections();
@@ -74,7 +73,6 @@ export default function ProfileScreen() {
   const [heroZoom, setHeroZoom] = useState(profile.heroZoom ?? 1);
   const [repositionVisible, setRepositionVisible] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
   // Import-from-file flow: which field we're importing into, the extracted
   // preview awaiting a Replace/Append choice, and an in-flight guard.
   const [importTarget, setImportTarget] = useState<"bio" | "statement" | null>(null);
@@ -113,102 +111,54 @@ export default function ProfileScreen() {
 
   const cancelEditing = () => setIsEditing(false);
 
-  // Log out: end the Supabase session. Signing out flips auth state, the
-  // user-scoped data contexts reset themselves to empty, and the root navigator
-  // (Stack.Protected) tears down the Studio stack and shows the Auth stack — so
-  // there is nothing to manually navigate or clear here.
-  const handleLogout = async () => {
-    if (loggingOut) return;
-    const ok = await confirm({
-      title: "Log out?",
-      message: "Your archive stays safe in the cloud. You can log back in anytime.",
-      confirmText: "Log out",
-      cancelText: "Stay",
-    });
-    if (!ok) return;
-    setLoggingOut(true);
-    try {
-      await signOut();
-    } catch (e) {
-      console.warn("[profile] logout failed", e);
-      setLoggingOut(false);
-      notice({ title: "Couldn’t log out", message: "Please try again.", variant: "error" });
-    }
-  };
-
   const handleSave = async () => {
     setSaving(true);
-    // try/finally guarantees the Save button is re-enabled on every path —
-    // including a thrown error or an early return — so the UI can never get
-    // stranded on "Saving…".
-    try {
-      let storedAvatar = avatarUri;
-      if (avatarUri) {
-        try {
-          storedAvatar = await persistPieceImage(avatarUri);
-        } catch (e) {
-          console.warn("Failed to persist avatar", e);
-          notice({ title: "Couldn’t save photo", message: "We couldn’t store that photo. Please try again.", variant: "error" });
-          return;
-        }
+    let storedAvatar = avatarUri;
+    if (avatarUri) {
+      try {
+        storedAvatar = await persistPieceImage(avatarUri);
+      } catch (e) {
+        console.warn("Failed to persist avatar", e);
+        setSaving(false);
+        notice({ title: "Couldn’t save photo", message: "We couldn’t store that photo. Please try again.", variant: "error" });
+        return;
       }
-      let storedHero = heroImageUri;
-      if (heroImageUri) {
-        try {
-          storedHero = await persistPieceImage(heroImageUri);
-        } catch (e) {
-          console.warn("Failed to persist hero image", e);
-          notice({ title: "Couldn’t save hero image", message: "We couldn’t store that image. Please try again.", variant: "error" });
-          return;
-        }
-      }
-      const profilePayload = {
-        name,
-        tagline,
-        bio,
-        statement,
-        website,
-        instagram,
-        avatarUri: storedAvatar || undefined,
-        heroImageUri: storedHero || undefined,
-        heroFocalY,
-        heroFocalX,
-        heroZoom,
-      };
-      const sitePayload = { contactEmail, etsy, shopify };
-      // The edit is already in the local cache (contexts write it before the
-      // network call), so a failed cloud sync never loses the change. Diagnose
-      // the reason and offer a retry; only close the editor once it lands.
-      const runRemote = async () => {
-        const profileOutcome = await updateProfile(profilePayload);
-        if (!profileOutcome.ok) return profileOutcome;
-        return updatePublicSite(sitePayload);
-      };
-      let outcome = await runRemote();
-      while (!outcome.ok && outcome.error) {
-        const again = await offerRetry(outcome.error);
-        if (!again) break;
-        outcome = await runRemote();
-      }
-      if (outcome.ok) {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setIsEditing(false);
-      }
-    } finally {
-      setSaving(false);
     }
+    let storedHero = heroImageUri;
+    if (heroImageUri) {
+      try {
+        storedHero = await persistPieceImage(heroImageUri);
+      } catch (e) {
+        console.warn("Failed to persist hero image", e);
+        setSaving(false);
+        notice({ title: "Couldn’t save hero image", message: "We couldn’t store that image. Please try again.", variant: "error" });
+        return;
+      }
+    }
+    await updateProfile({
+      name,
+      tagline,
+      bio,
+      statement,
+      website,
+      instagram,
+      avatarUri: storedAvatar || undefined,
+      heroImageUri: storedHero || undefined,
+      heroFocalY,
+      heroFocalX,
+      heroZoom,
+    });
+    await updatePublicSite({ contactEmail, etsy, shopify });
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setSaving(false);
+    setIsEditing(false);
   };
 
   // Immediate-save controls. updatePublicSite merges against fresh store state,
   // so rapid taps and the edit-form save never clobber each other.
   const toggleSite = async () => {
     await Haptics.selectionAsync();
-    // The toggle is already applied to the local cache; if the cloud sync fails
-    // surface the diagnosed reason instead of silently leaving it un-synced.
-    const outcome = await updatePublicSite({ enabled: !site.enabled });
-    if (!outcome.ok && outcome.error) {
-      notifySaveError(outcome.error);
-    }
+    await updatePublicSite({ enabled: !site.enabled });
   };
 
   // Full, well-formed public link (https, no trailing slash) — the single
@@ -275,6 +225,23 @@ export default function ProfileScreen() {
           ? { title: "Link copied", message: "Sharing wasn’t available, so the link is on your clipboard.", variant: "success" }
           : { title: "Couldn’t share", message: publicSiteUrl, variant: "info" },
       );
+    }
+  };
+
+  const handleLogout = async () => {
+    const ok = await confirm({
+      title: "Log out?",
+      message: "Your archive stays safe in the cloud. You can log back in anytime.",
+      confirmText: "Log out",
+      cancelText: "Stay",
+    });
+    if (!ok) return;
+    try {
+      await signOut();
+      // The auth gate redirects to the sign-in flow once the session clears.
+    } catch (e) {
+      console.warn("Failed to log out", e);
+      notice({ title: "Couldn’t log out", message: "Please try again.", variant: "error" });
     }
   };
 
@@ -413,14 +380,13 @@ export default function ProfileScreen() {
     console.log("Avatar copied successfully:", storedAvatar.slice(0, 64));
 
     setAvatarUri(storedAvatar);
-    console.log("Saving profile avatar");
-    // The avatar is already in the local cache; if the cloud sync fails surface
-    // the diagnosed reason rather than a generic "try again".
-    const outcome = await updateProfile({ avatarUri: storedAvatar });
-    if (!outcome.ok && outcome.error) {
-      notifySaveError(outcome.error);
-    } else {
+    try {
+      console.log("Saving profile avatar");
+      await updateProfile({ avatarUri: storedAvatar });
       console.log("Updated profile avatarUri:", storedAvatar.slice(0, 64));
+    } catch (e) {
+      console.warn("Failed to save profile avatar", e);
+      notice({ title: "Couldn’t save photo", message: "Your photo was loaded but couldn’t be saved. Please try again.", variant: "error" });
     }
   };
 
@@ -1076,46 +1042,21 @@ export default function ProfileScreen() {
           ) : null}
         </View>
 
-        {/* Account — signed-in identity + the single place to log out. */}
+        {/* Account */}
         {isConfigured ? (
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Account</Text>
-            <View
-              style={[
-                styles.accountCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}
-            >
-              <View style={[styles.accountAvatar, { backgroundColor: colors.secondary }]}>
-                <Feather name="user" size={17} color={colors.cobalt} />
-              </View>
-              <View style={styles.accountCardText}>
-                <Text style={[styles.accountEmailLabel, { color: colors.mutedForeground }]}>
-                  Signed in as
-                </Text>
-                <Text style={[styles.accountEmail, { color: colors.foreground }]} numberOfLines={1}>
-                  {user?.email ?? "—"}
-                </Text>
-              </View>
-            </View>
             <Pressable
               style={[
-                styles.accountRow,
-                { borderColor: "rgba(120,110,100,0.2)", opacity: loggingOut ? 0.6 : 1 },
+                styles.logoutBtn,
+                { borderColor: "rgba(120,110,100,0.2)" },
               ]}
               onPress={handleLogout}
-              disabled={loggingOut}
               accessibilityRole="button"
               accessibilityLabel="Log out"
             >
-              {loggingOut ? (
-                <ActivityIndicator size="small" color={colors.mutedForeground} />
-              ) : (
-                <Feather name="log-out" size={15} color={colors.destructive} />
-              )}
-              <Text style={[styles.logoutText, { color: colors.foreground }]}>
-                {loggingOut ? "Logging out…" : "Log out"}
-              </Text>
+              <Feather name="log-out" size={14} color={colors.mutedForeground} />
+              <Text style={[styles.logoutText, { color: colors.foreground }]}>Log out</Text>
             </Pressable>
           </View>
         ) : null}
@@ -1580,41 +1521,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
     height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  accountCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  accountAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  accountCardText: { flex: 1 },
-  accountEmailLabel: {
-    fontSize: 9,
-    fontFamily: "Poppins_500Medium",
-    letterSpacing: 1.6,
-    textTransform: "uppercase",
-    marginBottom: 4,
-  },
-  accountEmail: { fontSize: 15, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
-  accountRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    marginTop: 12,
-    paddingHorizontal: 16,
-    height: 52,
     borderRadius: 12,
     borderWidth: 1,
   },

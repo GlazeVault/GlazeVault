@@ -4,7 +4,7 @@ import {
   ImageManipulator,
   SaveFormat,
 } from "expo-image-manipulator";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image as RNImage,
@@ -95,16 +95,6 @@ export function ImageCropper({
   const [natural, setNatural] = useState<Natural | null>(null);
   const [processing, setProcessing] = useState(false);
 
-  // Tracks whether this cropper instance is still mounted so async work
-  // (cropping) never calls setState after the parent has hidden/unmounted it.
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
   // Cover-fit transform state. scale is relative to the cover baseline (1 = cover).
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -140,76 +130,44 @@ export function ImageCropper({
   useEffect(() => {
     if (!visible || !uri) return;
     let cancelled = false;
-
-    // Always start from a clean slate. Without this, reopening this (reused)
-    // cropper instance for a second photo would briefly frame the PREVIOUS
-    // image — the "stuck on the last photo" symptom — until the new size
-    // resolved. Nulling first forces the loading spinner until we have the
-    // real dimensions of THIS image.
-    setNatural(null);
-
-    // Fast path: the picker already reported the real pixel size.
     if (sourceWidth && sourceHeight) {
-      console.log("[cropper] using picker dims", uri, sourceWidth, sourceHeight);
       setNatural({ width: sourceWidth, height: sourceHeight });
       return;
     }
-
-    console.log("[cropper] resolving dims", uri);
-
-    const fallbackToManipulator = async (why: string) => {
-      console.log("[cropper] getSize " + why + ", trying manipulator", uri);
-      const dims = await measureViaManipulator(uri);
-      if (cancelled) return;
-      if (dims) {
-        console.log("[cropper] dims via manipulator", dims.width, dims.height);
-        setNatural(dims);
-        return;
-      }
-      // The image genuinely can't be decoded on this platform (e.g. a HEIC in a
-      // browser with no HEIC support). Surface a clear notice instead of
-      // silently leaving the cropper stuck on a spinner, then cancel.
-      console.log("[cropper] could not read image size", uri);
-      notice({
-        title: "Couldn’t open this photo",
-        message:
-          "This image format isn’t supported here. Try a JPG or PNG, or pick the photo again.",
-        variant: "error",
-      });
-      onCancel();
-    };
-
-    // RNImage.getSize can't measure every source and — critically — on some
-    // Android `content://` URIs it can HANG, never firing either callback. That
-    // left the cropper stuck on a spinner forever ("won't let me add"). Race it
-    // against a timeout that decodes the real size through the manipulator, so
-    // the cropper ALWAYS resolves or exits gracefully.
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled || cancelled) return;
-      settled = true;
-      fallbackToManipulator("timed out");
-    }, 2500);
-
+    setNatural(null);
     RNImage.getSize(
       uri,
       (w, h) => {
-        if (cancelled || settled) return;
-        settled = true;
-        clearTimeout(timer);
-        console.log("[cropper] dims via getSize", w, h);
-        setNatural({ width: w, height: h });
+        if (!cancelled) setNatural({ width: w, height: h });
       },
       () => {
-        if (cancelled || settled) return;
-        settled = true;
-        clearTimeout(timer);
-        fallbackToManipulator("failed");
+        // RNImage.getSize can't measure every source (Android `content://`
+        // URIs, some HEIC files), so fall back to decoding the real pixel size
+        // through the manipulator before giving up — this is what lets
+        // non-iPhone / HEIC photos open instead of aborting the add flow.
+        console.log("ImageCropper getSize failed, trying manipulator", uri);
+        measureViaManipulator(uri).then((dims) => {
+          if (cancelled) return;
+          if (dims) {
+            setNatural(dims);
+            return;
+          }
+          // The image genuinely can't be decoded on this platform (e.g. a HEIC
+          // in a browser with no HEIC support). Surface a clear notice instead
+          // of silently closing the cropper, then cancel.
+          console.log("ImageCropper could not read image size", uri);
+          notice({
+            title: "Couldn’t open this photo",
+            message:
+              "This image format isn’t supported here. Try a JPG or PNG, or pick the photo again.",
+            variant: "error",
+          });
+          onCancel();
+        });
       },
     );
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
   }, [visible, uri, sourceWidth, sourceHeight]);
 
@@ -269,7 +227,6 @@ export function ImageCropper({
 
   const handleConfirm = async () => {
     if (!uri || !geom || processing) return;
-    console.log("[cropper] crop start", uri);
     setProcessing(true);
     try {
       const { iw, ih, coverScale } = geom;
@@ -316,22 +273,10 @@ export function ImageCropper({
         Platform.OS === "web" && result.base64
           ? `data:image/jpeg;base64,${result.base64}`
           : result.uri;
-      console.log("[cropper] crop done", uri);
       onConfirm(outUri);
     } catch (err) {
-      console.log("[cropper] crop failed", err);
-      // Keep the cropper open so the maker can retry or cancel rather than
-      // losing the framing — and tell them why nothing happened.
-      notice({
-        title: "Couldn’t process this photo",
-        message: "Something went wrong adjusting this photo. Please try again.",
-        variant: "error",
-      });
-    } finally {
-      // Always clear the busy lock. If the parent already hid/unmounted the
-      // cropper after a successful confirm, the mounted guard skips the
-      // no-op setState; otherwise this re-enables the buttons for a retry.
-      if (mountedRef.current) setProcessing(false);
+      console.log("ImageCropper crop failed", err);
+      setProcessing(false);
     }
   };
 

@@ -528,6 +528,19 @@ export async function ensureProfile(
   return rowToProfile(row);
 }
 
+/**
+ * One-time claim of the pre-auth archive (rows with `user_id` null + the
+ * legacy 'default' profile) for the first account. Server-side function is
+ * latched, so only the very first authenticated caller actually inherits the
+ * data; everyone else gets `false`. Safe to call on any first session.
+ */
+export async function claimLegacyArchive(): Promise<boolean> {
+  const client = requireClient();
+  const { data, error } = await client.rpc("claim_legacy_archive");
+  if (error) throw error;
+  return data === true;
+}
+
 // ── Public (by slug, cross-account) ─────────────────────────────────────────
 
 // These power the LIVE public exhibition pages, which a visitor (a *different*

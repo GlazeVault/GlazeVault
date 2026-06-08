@@ -15,7 +15,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, usePathname, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -28,46 +27,21 @@ import { CollectionsProvider } from "@/context/CollectionsContext";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { PotteryProvider } from "@/context/PotteryContext";
 import { SavedProvider } from "@/context/SavedContext";
-import { useColors } from "@/hooks/useColors";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
 /**
- * The private studio app's route roots. Everything here requires a signed-in
- * owner. Any other first segment is treated as a live public exhibition page
- * (the dynamic `[slug]` routes), which is intentionally viewable by link without
- * a session.
- */
-const PRIVATE_ROOTS = new Set([
-  "(tabs)",
-  "piece",
-  "collection",
-  "public-site",
-  "archive",
-  "auth",
-  "+not-found",
-]);
-
-/**
- * A route reachable WITHOUT a session: the auth flow itself, or a live public
- * exhibition page (the dynamic `[slug]` root — anything not in PRIVATE_ROOTS).
- * Everything else is the private studio and requires a signed-in user.
- */
-function isPublicRoute(first: string | undefined): boolean {
-  if (first === "auth") return true;
-  return !!first && !PRIVATE_ROOTS.has(first);
-}
-
-/**
- * Deterministic landing redirect. `Stack.Protected` (below) is the real gate —
- * it removes the private studio screens from the navigator entirely whenever the
- * user is not authenticated, so private content is never mounted or reachable by
- * URL. This effect just picks the right destination once auth is known: a
- * signed-out visitor on a private route lands on the welcome/auth screen, and a
- * signed-in user who somehow lands on the auth flow is sent into the studio.
- * Public `[slug]` exhibition routes are never redirected.
+ * Redirects based on auth state. Two route groups are always public and never
+ * require a session:
+ *  - `auth/*`   — the sign-in / sign-up flow itself.
+ *  - `[slug]/*` — live public exhibition pages, viewable by link (incl. anon).
+ * Everything else (the private studio archive) requires a signed-in user.
+ *
+ * When Supabase isn't configured the app runs as a single local offline user
+ * (userId is always set), so the guard is effectively a no-op and the archive
+ * is reachable without any sign-in.
  */
 function AuthGate() {
   const { loading, userId, isConfigured } = useAuth();
@@ -75,92 +49,35 @@ function AuthGate() {
   const pathname = usePathname();
   const router = useRouter();
 
+  const inAuthGroup = segments[0] === "auth";
+  // Public exhibition routes live at the artist slug, i.e. the first segment is
+  // a dynamic `[slug]` (anything that isn't one of our known private groups).
+  const PRIVATE_ROOTS = new Set([
+    "(tabs)",
+    "piece",
+    "collection",
+    "public-site",
+    "archive",
+    "auth",
+    "+not-found",
+  ]);
   const first = segments[0];
-  const inAuthGroup = first === "auth";
-  const publicRoute = isPublicRoute(first);
+  const isPublicSlugRoute = !!first && !PRIVATE_ROOTS.has(first);
 
   useEffect(() => {
     if (loading) return;
-    // Fail closed: the studio requires a real authenticated session. If Supabase
-    // is unconfigured (e.g. a misbuilt deploy missing the public env), we treat
-    // the visitor as signed-out and send them to the welcome/auth screen — a
-    // deployed web build must NEVER expose the studio to an anonymous visitor.
-    const signedIn = isConfigured && !!userId;
-    if (!signedIn && !publicRoute) {
+    // Offline mode: never gate.
+    if (!isConfigured) return;
+    const signedIn = !!userId;
+    if (!signedIn && !inAuthGroup && !isPublicSlugRoute) {
       router.replace("/auth");
     } else if (signedIn && inAuthGroup) {
       router.replace("/(tabs)");
     }
     // pathname is included so the guard re-evaluates on every navigation.
-  }, [loading, userId, isConfigured, inAuthGroup, publicRoute, pathname, router]);
+  }, [loading, userId, isConfigured, inAuthGroup, isPublicSlugRoute, pathname, router]);
 
   return null;
-}
-
-/**
- * The auth-aware root navigator. This is the heart of the entry architecture:
- *
- *  1. On launch it holds a calm blank screen until the Supabase session has been
- *     resolved, so we never flash the wrong stack before we know who the user is.
- *  2. It then renders exactly one of two stacks via `Stack.Protected`:
- *       - signed in  → the private Studio stack (tabs, archive, collections,
- *         portfolio, piece/collection detail + editors).
- *       - signed out → only the Auth stack (welcome / create account / log in).
- *     The locked stack's screens are not part of the navigator at all, so an
- *     unauthenticated visitor can never mount or deep-link into the studio.
- *  3. Public `[slug]` exhibition routes sit outside both guards — they stay
- *     viewable by anyone with the link, signed in or not.
- *
- * The gate fails CLOSED: the studio is unlocked only for a real authenticated
- * session (`isConfigured && userId`). A misbuilt deploy missing the public
- * Supabase env therefore shows the welcome/auth screen, never the studio.
- */
-function RootNavigator() {
-  const { loading, userId, isConfigured } = useAuth();
-  const colors = useColors();
-
-  if (isConfigured && loading) {
-    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
-  }
-
-  const studioUnlocked = isConfigured && !!userId;
-
-  return (
-    <>
-      <AuthGate />
-      <Stack screenOptions={{ headerShown: false }}>
-        {/* Private Studio — only mounted for an authenticated owner. */}
-        <Stack.Protected guard={studioUnlocked}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="piece/[id]" options={{ presentation: "card" }} />
-          <Stack.Screen name="piece/edit/[id]" options={{ presentation: "modal" }} />
-          <Stack.Screen name="collection/[id]" options={{ presentation: "card" }} />
-          <Stack.Screen name="collection/new" options={{ presentation: "modal" }} />
-          <Stack.Screen name="public-site" options={{ presentation: "card" }} />
-          <Stack.Screen name="archive" options={{ presentation: "card" }} />
-        </Stack.Protected>
-
-        {/* Auth stack — the only thing a signed-out visitor can reach (besides
-            the public exhibition routes below). */}
-        <Stack.Protected guard={!studioUnlocked}>
-          <Stack.Screen name="auth" />
-        </Stack.Protected>
-
-        {/* Live public web exhibition routes (served by the expo web build at the
-            artist's slug). Intentionally open to anyone with the link — never
-            gated. The slug root is the public foyer; portfolio/collections/
-            archive are its doorways. */}
-        <Stack.Screen name="[slug]/index" />
-        <Stack.Screen name="[slug]/portfolio" />
-        <Stack.Screen name="[slug]/collections" />
-        <Stack.Screen name="[slug]/archive" />
-        <Stack.Screen name="[slug]/piece/[id]" />
-        <Stack.Screen name="[slug]/collection/[id]" />
-      </Stack>
-      <ToastHost />
-      <ActionSheetHost />
-    </>
-  );
 }
 
 export default function RootLayout() {
@@ -193,11 +110,51 @@ export default function RootLayout() {
               <CollectionsProvider>
                 <ProfileProvider>
                   <SavedProvider>
-                    <GestureHandlerRootView style={{ flex: 1 }}>
-                      <KeyboardProvider>
-                        <RootNavigator />
-                      </KeyboardProvider>
-                    </GestureHandlerRootView>
+                  <GestureHandlerRootView>
+                    <KeyboardProvider>
+                      <AuthGate />
+                      <Stack screenOptions={{ headerShown: false }}>
+                        <Stack.Screen name="(tabs)" />
+                        <Stack.Screen name="auth" />
+                        <Stack.Screen
+                          name="piece/[id]"
+                          options={{ presentation: "card" }}
+                        />
+                        <Stack.Screen
+                          name="piece/edit/[id]"
+                          options={{ presentation: "modal" }}
+                        />
+                        <Stack.Screen
+                          name="collection/[id]"
+                          options={{ presentation: "card" }}
+                        />
+                        <Stack.Screen
+                          name="collection/new"
+                          options={{ presentation: "modal" }}
+                        />
+                        <Stack.Screen
+                          name="public-site"
+                          options={{ presentation: "card" }}
+                        />
+                        <Stack.Screen
+                          name="archive"
+                          options={{ presentation: "card" }}
+                        />
+                        {/* Live public web exhibition routes (served by the expo
+                            web build at the artist's slug). The slug root is the
+                            public foyer; portfolio/collections/archive are its
+                            three doorways. */}
+                        <Stack.Screen name="[slug]/index" />
+                        <Stack.Screen name="[slug]/portfolio" />
+                        <Stack.Screen name="[slug]/collections" />
+                        <Stack.Screen name="[slug]/archive" />
+                        <Stack.Screen name="[slug]/piece/[id]" />
+                        <Stack.Screen name="[slug]/collection/[id]" />
+                      </Stack>
+                      <ToastHost />
+                      <ActionSheetHost />
+                    </KeyboardProvider>
+                  </GestureHandlerRootView>
                   </SavedProvider>
                 </ProfileProvider>
               </CollectionsProvider>

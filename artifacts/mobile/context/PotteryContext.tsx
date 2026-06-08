@@ -10,12 +10,6 @@ import {
   loadPieces as loadPiecesRemote,
   savePiece as savePieceRemote,
 } from "@/services/dataService";
-import {
-  classifySaveError,
-  SAVE_OK,
-  withTimeout,
-  type SaveOutcome,
-} from "@/lib/saveError";
 
 export interface PotteryPiece {
   id: string;
@@ -82,14 +76,13 @@ interface PotteryContextType {
           | "showStudioNotes"
         >
       >
-  ) => Promise<{ piece: PotteryPiece; outcome: SaveOutcome }>;
-  // Resolves to a SaveOutcome: `ok` once the change is safely on Supabase (or
-  // there is no server configured), otherwise `error` carries the diagnosed
-  // reason and the change lives only in the local cache. Sharing-critical
-  // callers await this and surface the reason.
-  updatePiece: (id: string, updates: Partial<PotteryPiece>) => Promise<SaveOutcome>;
-  // Re-pushes a cached piece to Supabase; `ok` once it is live on the server.
-  ensurePieceRemote: (id: string) => Promise<SaveOutcome>;
+  ) => Promise<PotteryPiece>;
+  // Resolves to `true` once the change is safely on Supabase (or there is no
+  // server configured), and `false` when the remote write failed and the change
+  // lives only in the local cache. Sharing-critical callers await this.
+  updatePiece: (id: string, updates: Partial<PotteryPiece>) => Promise<boolean>;
+  // Re-pushes a cached piece to Supabase; `true` once it is live on the server.
+  ensurePieceRemote: (id: string) => Promise<boolean>;
   deletePiece: (id: string) => Promise<void>;
   addPieceToCollection: (collectionId: string, pieceId: string) => Promise<void>;
   removePieceFromCollection: (collectionId: string, pieceId: string) => Promise<void>;
@@ -213,23 +206,17 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   // a live row (publish/feature/share) use this to surface the failure instead
   // of handing out a dead public link.
   const pushPieceRemote = useCallback(
-    async (piece: PotteryPiece): Promise<SaveOutcome> => {
+    async (piece: PotteryPiece): Promise<boolean> => {
       const uid = userIdRef.current;
-      if (!isSupabaseConfigured || !uid) return SAVE_OK;
+      if (!isSupabaseConfigured || !uid) return true;
       // Retry a transient cloud failure once before giving up — a brief network
       // blip should not strand a piece in the local-only cache (which is what
       // makes a freshly-published public link 404). This retries only the
       // in-flight write; it is NOT a background sync queue.
       const MAX_ATTEMPTS = 2;
-      let lastError: unknown;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
-          // Timeout-wrapped so a stalled upload can never hang a Save.
-          const saved = await withTimeout(
-            savePieceRemote(piece, uid),
-            undefined,
-            "Saving piece",
-          );
+          const saved = await savePieceRemote(piece, uid);
           const imagesChanged =
             saved.images.length !== piece.images.length ||
             saved.images.some((uri, i) => uri !== piece.images[i]);
@@ -243,9 +230,8 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
             );
           }
           console.log("[glazevault] savePiece ok", piece.id);
-          return SAVE_OK;
+          return true;
         } catch (e) {
-          lastError = e;
           if (attempt < MAX_ATTEMPTS) {
             console.warn(
               `[glazevault] savePiece attempt ${attempt} failed, retrying`,
@@ -255,9 +241,10 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
             continue;
           }
           console.warn("[supabase] savePiece failed (kept in local cache)", e);
+          return false;
         }
       }
-      return { ok: false, error: classifySaveError(lastError) };
+      return false;
     },
     [persist]
   );
@@ -269,18 +256,9 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   // cannot read. Does NOT introduce a background sync queue — it only runs in
   // direct response to a sharing-critical action.
   const ensurePieceRemote = useCallback(
-    async (id: string): Promise<SaveOutcome> => {
+    async (id: string): Promise<boolean> => {
       const piece = piecesRef.current.find((p) => p.id === id);
-      if (!piece) {
-        return {
-          ok: false,
-          error: {
-            kind: "unknown",
-            title: "Couldn't share yet",
-            message: "This piece is no longer available on this device.",
-          },
-        };
-      }
+      if (!piece) return false;
       return pushPieceRemote(piece);
     },
     [pushPieceRemote]
@@ -297,9 +275,9 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Hydrate (and re-hydrate) whenever the signed-in user changes. Gated on
-  // `authReady` so the signed-in user's profile bootstrap has settled before we
-  // read pieces. Every account starts empty — no anonymous / legacy data is
-  // inherited — and reads are scoped strictly by `user_id`.
+  // `authReady` so the one-time legacy claim has already run for the first
+  // account before we read pieces — otherwise the inherited archive wouldn't
+  // appear until a later reload.
   useEffect(() => {
     let cancelled = false;
     if (!userId || !authReady) {
@@ -430,8 +408,8 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
         isFavorite: false,
       };
       await persist([newPiece, ...current]);
-      const outcome = await pushPieceRemote(newPiece);
-      return { piece: newPiece, outcome };
+      await pushPieceRemote(newPiece);
+      return newPiece;
     },
     [persist, pushPieceRemote]
   );
@@ -462,7 +440,7 @@ export function PotteryProvider({ children }: { children: React.ReactNode }) {
           featuredInPortfolio: merged.featuredInPortfolio,
         });
       }
-      return merged ? await pushPieceRemote(merged) : SAVE_OK;
+      return merged ? await pushPieceRemote(merged) : true;
     },
     [persist, pushPieceRemote]
   );
