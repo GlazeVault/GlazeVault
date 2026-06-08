@@ -48,7 +48,7 @@ import { notice } from "@/lib/notice";
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { isConfigured, signOut } = useAuth();
+  const { isConfigured, signOut, user } = useAuth();
   const { profile, updateProfile, updatePublicSite } = useProfile();
   const { pieces } = usePottery();
   const { collections } = useCollections();
@@ -1046,6 +1046,17 @@ export default function ProfileScreen() {
         {isConfigured ? (
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Account</Text>
+            {user?.email ? (
+              <View style={styles.accountEmailRow}>
+                <Feather name="mail" size={14} color={colors.mutedForeground} />
+                <Text
+                  style={[styles.accountEmailText, { color: colors.foreground }]}
+                  numberOfLines={1}
+                >
+                  {user.email}
+                </Text>
+              </View>
+            ) : null}
             <Pressable
               style={[
                 styles.logoutBtn,
@@ -1525,6 +1536,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   logoutText: { fontSize: 15, fontFamily: "Poppins_500Medium", letterSpacing: 0.3 },
+  accountEmailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+  },
+  accountEmailText: { fontSize: 14, fontFamily: "Poppins_400Regular", flexShrink: 1 },
   importBtn: {
     flexDirection: "row",
     alignItems: "center",
