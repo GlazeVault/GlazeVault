@@ -88,6 +88,22 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 const STORAGE_PREFIX = "@glazevault_profile_v1";
 const cacheKey = (userId: string) => `${STORAGE_PREFIX}:${userId}`;
 
+// The AsyncStorage cache is METADATA-ONLY on web (see PotteryContext). Base64
+// `data:` avatar/hero payloads overflow localStorage (~5MB); only https Supabase
+// URLs and native relative paths are cached. Full-res `data:` URIs stay in memory
+// until upload; the remote URL is folded back in after saveProfileRemote.
+function isCacheableUri(uri: string | undefined): boolean {
+  return !!uri && !uri.startsWith("data:");
+}
+/** Strips base64 `data:` image URIs before writing profile to AsyncStorage. */
+export function toCacheSafeProfile(p: ArtistProfile): ArtistProfile {
+  return {
+    ...p,
+    avatarUri: isCacheableUri(p.avatarUri) ? p.avatarUri : undefined,
+    heroImageUri: isCacheableUri(p.heroImageUri) ? p.heroImageUri : undefined,
+  };
+}
+
 function normalizeProfile(raw: Partial<ArtistProfile>): ArtistProfile {
   // Whitelist publicSite to the current schema so legacy keys (e.g. the old
   // profile-side `featuredCollectionIds`, now replaced by per-collection
@@ -133,12 +149,24 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     const uid = userIdRef.current;
     if (!uid) return;
     const key = cacheKey(uid);
+    // METADATA-ONLY (toCacheSafeProfile strips base64) + FAIL-SOFT: a cache write
+    // error (e.g. localStorage quota) is logged but NEVER thrown, so it can never
+    // block the remote Supabase write that follows in updateProfile.
+    const snapshot = JSON.stringify(toCacheSafeProfile(updated));
     const write = writeChain.current
       .catch(() => {})
-      .then(() => AsyncStorage.setItem(key, JSON.stringify(updated)));
+      .then(() => AsyncStorage.setItem(key, snapshot))
+      .then(() => {
+        console.log("Saved profile", updated.name || "(unnamed)");
+      })
+      .catch((e) => {
+        console.warn(
+          "[glazevault] profile cache write failed (kept in memory + Supabase)",
+          e
+        );
+      });
     writeChain.current = write;
     await write;
-    console.log("Saved profile", updated.name || "(unnamed)");
   }, []);
 
   // Hydrate per signed-in user; gated on authReady (see PotteryContext). The
@@ -178,15 +206,16 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           if (cancelled) return;
           if (remote) {
             const next = normalizeProfile({ ...cached, ...remote });
-            profileRef.current = next;
-            setProfile(next);
-            await AsyncStorage.setItem(key, JSON.stringify(next));
+            await persistCache(next);
             console.log("[supabase] loaded profile", next.name || "(unnamed)");
           } else if (hasContent(cached)) {
             console.log("[supabase] migrating local profile");
-            await saveProfileRemote(cached, userId).catch((e) =>
-              console.warn("[supabase] migrate profile failed", e)
-            );
+            try {
+              const saved = await saveProfileRemote(cached, userId);
+              await persistCache(normalizeProfile({ ...cached, ...saved }));
+            } catch (e) {
+              console.warn("[supabase] migrate profile failed", e);
+            }
           }
         } catch (e) {
           console.warn("[supabase] loadProfile failed, using local cache", e);
@@ -197,7 +226,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [userId, authReady, hasContent]);
+  }, [userId, authReady, hasContent, persistCache]);
 
   const updateProfile = useCallback(
     async (updates: Partial<ArtistProfile>) => {
