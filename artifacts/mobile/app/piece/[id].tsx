@@ -28,6 +28,7 @@ import {
   isCollectionPublic,
   isPortfolioPiece,
   isPubliclyVisiblePiece,
+  MAX_PORTFOLIO_ITEMS,
   toPublicPiece,
 } from "@/constants/privacy";
 import { notice } from "@/lib/notice";
@@ -371,25 +372,26 @@ export default function PieceDetailScreen() {
   //  - Un-publishing a piece also un-features it.
   const isFeatured = isPortfolioPiece(piece);
   const isPublic = isPubliclyVisiblePiece(piece);
+  const portfolioCount = pieces.filter(isPortfolioPiece).length;
+  const portfolioFull = portfolioCount >= MAX_PORTFOLIO_ITEMS && !piece.featuredInPortfolio;
 
   const handleToggleFeature = async () => {
     if (piece.featuredInPortfolio) {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       await updatePiece(piece.id, { featuredInPortfolio: false });
       return;
     }
-    // Gate: a piece can only be featured once it lives in at least one
-    // collection — the portfolio is grouped by public collection. Featuring also
-    // publishes the piece (Portfolio ⊆ Public).
-    if (piece.collectionIds.length === 0) {
+    // Gate: Portfolio is a deliberately small best-of selection. Collections
+    // are optional groups/tags and do not gate portfolio membership.
+    if (portfolioFull) {
       notice({
-        title: "Add to a collection first",
-        message:
-          "Pieces are featured within a collection. Add this piece to a collection, then feature it.",
+        title: "Portfolio is full",
+        message: `Your portfolio can hold up to ${MAX_PORTFOLIO_ITEMS} pieces. Remove one before adding another.`,
+        variant: "error",
       });
       return;
     }
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     // Featuring publishes the piece, so it must reach Supabase — otherwise the
     // public link 404s. Surface a failed remote write instead of silently
     // featuring a piece that lives only in the local cache.
@@ -829,11 +831,9 @@ export default function PieceDetailScreen() {
                   <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
                     {!piece.imageUri
                       ? "Add a photo to feature this piece"
-                      : piece.collectionIds.length === 0
-                        ? "Add this piece to a collection to feature it"
-                        : isFeatured
-                          ? "Hand-picked for your curated portfolio"
-                          : "Show this piece among your selected works"}
+                      : isFeatured
+                        ? "Hand-picked for your best-of portfolio"
+                        : `Choose up to ${MAX_PORTFOLIO_ITEMS} best pieces`}
                   </Text>
                 </View>
                 <View

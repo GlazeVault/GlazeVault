@@ -18,6 +18,7 @@ import {
   buildPublicMetaLine,
   getPortfolioCollectionPieces,
   isCollectionPublic,
+  isPortfolioPiece,
   resolveGatedCover,
   toPublicPiece,
   type PublicPieceView,
@@ -173,13 +174,27 @@ export default function PublicSiteScreen({
     })
     .filter((entry) => entry.pieces.length > 0);
 
-  const hasContent = publicCollections.length > 0;
+  const publicCollectionIds = publicCollections.map((entry) => entry.collection.id);
+  const standalonePortfolioPieces = onlyCollectionId
+    ? []
+    : pieces
+        .filter(
+          (p) =>
+            isPortfolioPiece(p) &&
+            !(p.collectionIds ?? []).some((cid) => publicCollectionIds.includes(cid)),
+        )
+        .map(toPublicPiece);
+
+  const hasContent = publicCollections.length > 0 || standalonePortfolioPieces.length > 0;
 
   // Measure natural ratios for every piece shown in the grids (flattened across
   // all public collections) so landscape work can break out full-width with no
   // crop, just like the Archive and collection views.
   const orientations = useImageOrientations(
-    publicCollections.flatMap((e) => e.gridPieces.map((p) => p.imageUri)),
+    [
+      ...standalonePortfolioPieces.map((p) => p.imageUri),
+      ...publicCollections.flatMap((e) => e.gridPieces.map((p) => p.imageUri)),
+    ],
   );
 
   const links: ProfileLink[] = [];
@@ -450,8 +465,26 @@ export default function PublicSiteScreen({
           </View>
         ) : null}
 
-        {/* Public collections — the portfolio is now collection-driven, each a
-            mini exhibition flowing straight from the artist header. */}
+        {standalonePortfolioPieces.length > 0 ? (
+          <View style={styles.collectionSection}>
+            <View style={styles.collectionHeader}>
+              <Text style={[styles.collectionIndex, { color: colors.emerald }]}>
+                Portfolio
+              </Text>
+              <Text style={[styles.collectionTitle, { color: colors.foreground }]}>
+                Selected Work
+              </Text>
+              <Text style={[styles.collectionMeta, { color: colors.mutedForeground }]}>
+                {`${standalonePortfolioPieces.length} ${
+                  standalonePortfolioPieces.length === 1 ? "piece" : "pieces"
+                }`}
+              </Text>
+            </View>
+            {renderPieces(standalonePortfolioPieces, "portfolio")}
+          </View>
+        ) : null}
+
+        {/* Public collections — optional groups flowing from the artist header. */}
         {publicCollections.length > 0 ? (
           publicCollections.map(({ collection, pieces: cp, coverUri, coverPieceId, gridPieces }, index) => (
             <View key={collection.id} style={styles.collectionSection}>

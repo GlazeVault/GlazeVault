@@ -19,6 +19,7 @@ import { PhotoSetEditor } from "@/components/PhotoSetEditor";
 import { SelectField } from "@/components/SelectField";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { CLAY_OPTIONS, FIRING_ENVIRONMENT_OPTIONS } from "@/constants/pottery";
+import { isPortfolioPiece, MAX_PORTFOLIO_ITEMS } from "@/constants/privacy";
 import { useCollections } from "@/context/CollectionsContext";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
@@ -101,7 +102,7 @@ function Label({ text }: { text: string }) {
 
 export default function AddScreen() {
   const colors = useColors();
-  const { addPiece } = usePottery();
+  const { addPiece, pieces } = usePottery();
   const { collections } = useCollections();
   const insets = useSafeAreaInsets();
   const [images, setImages] = useState<string[]>([]);
@@ -125,14 +126,16 @@ export default function AddScreen() {
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  // Progressive disclosure: a piece is Private by default; only a Public piece
-  // can be filed into collections, and only a collected public piece can be
-  // featured. Backing out of a step clears the steps it gates.
+  const portfolioCount = pieces.filter(isPortfolioPiece).length;
+  const portfolioFull = portfolioCount >= MAX_PORTFOLIO_ITEMS;
+
+  // Progressive disclosure: a piece is Private by default. Collections are
+  // always available for organization; Public unlocks public-field controls and
+  // Portfolio curation. Backing out of Public clears only public-only choices.
   const togglePublic = () => {
     setIsPublic((v) => {
       const next = !v;
       if (!next) {
-        setCollectionIds([]);
         setFeatured(false);
         setShowGlazeDetails(false);
         setShowStudioNotes(false);
@@ -145,15 +148,25 @@ export default function AddScreen() {
       const next = prev.includes(collectionId)
         ? prev.filter((c) => c !== collectionId)
         : [...prev, collectionId];
-      if (next.length === 0) setFeatured(false);
       return next;
     });
   };
-  // "None" is the calm default: a public piece needs no collection. Choosing it
-  // clears any grouping and folds the (collection-gated) Feature step back away.
+  // "None" is the calm default. Choosing it clears any grouping; Portfolio
+  // remains independent.
   const selectNone = () => {
     setCollectionIds([]);
-    setFeatured(false);
+  };
+
+  const toggleFeatured = () => {
+    if (!featured && portfolioFull) {
+      notice({
+        title: "Portfolio is full",
+        message: `Your portfolio can hold up to ${MAX_PORTFOLIO_ITEMS} pieces. Remove one before adding another.`,
+        variant: "error",
+      });
+      return;
+    }
+    setFeatured((v) => !v);
   };
 
   const handleSave = async () => {
@@ -177,10 +190,7 @@ export default function AddScreen() {
       return;
     }
     const storedCover = storedImages[coverIndex] ?? storedImages[0];
-    // The piece carries the choices made through the stepped flow. The portfolio
-    // gate is re-applied here so featuredInPortfolio can never be saved true for a
-    // piece that isn't both public and collected.
-    const canFeature = isPublic && collectionIds.length > 0;
+    const canFeature = isPublic && (!featured || !portfolioFull);
     try {
       await addPiece({
         title: title.trim(),
@@ -195,7 +205,7 @@ export default function AddScreen() {
         imageUri: storedCover,
         images: storedImages,
         isPublic,
-        collectionIds: isPublic ? collectionIds : [],
+        collectionIds,
         featuredInPortfolio: canFeature && featured,
         // Field-exposure flags only apply to a public piece; force off otherwise
         // so a private piece can never carry an opted-in flag.
@@ -272,8 +282,7 @@ export default function AddScreen() {
         <Label text="Notes" />
         <Field value={notes} onChange={setNotes} placeholder="Glaze recipe, firing notes, story…" multiline />
 
-        {/* Stepped disclosure: Private by default → Public unlocks Collections →
-            a collected public piece can be Featured in the Portfolio. */}
+        {/* Archive first, then optional collection, public, and portfolio curation. */}
         <Label text="Visibility" />
         <Pressable
           style={[
@@ -311,70 +320,65 @@ export default function AddScreen() {
           />
         )}
 
-        {isPublic && (
+        <Label text="Collection" />
+        {collections.length === 0 ? (
+          <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>
+            This piece will be saved without a collection. Create one from the Collections tab to group related work.
+          </Text>
+        ) : (
           <>
-            <Label text="Collection" />
-            {collections.length === 0 ? (
-              <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>
-                This piece will be saved as a standalone public piece. Create a collection from the Collections tab to group and feature it.
-              </Text>
-            ) : (
-              <>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.chipRow}>
-                    {/* "None" is the default — a public piece never requires a
-                        collection. It stands first and selected until the artist
-                        chooses to file the piece somewhere. */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.chipRow}>
+                {/* "None" is the default. It stands first and selected until the
+                    artist chooses to file the piece somewhere. */}
+                <Pressable
+                  key="none"
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: collectionIds.length === 0 ? colors.cobalt : "transparent",
+                      borderColor: collectionIds.length === 0 ? colors.cobalt : colors.border,
+                      borderRadius: 24,
+                    },
+                  ]}
+                  onPress={selectNone}
+                >
+                  <Text style={[styles.chipText, { color: collectionIds.length === 0 ? "#FFFFFF" : colors.mutedForeground }]}>
+                    None
+                  </Text>
+                </Pressable>
+                {collections.map((col) => {
+                  const selected = collectionIds.includes(col.id);
+                  return (
                     <Pressable
-                      key="none"
+                      key={col.id}
                       style={[
                         styles.chip,
                         {
-                          backgroundColor: collectionIds.length === 0 ? colors.cobalt : "transparent",
-                          borderColor: collectionIds.length === 0 ? colors.cobalt : colors.border,
+                          backgroundColor: selected ? colors.cobalt : "transparent",
+                          borderColor: selected ? colors.cobalt : colors.border,
                           borderRadius: 24,
                         },
                       ]}
-                      onPress={selectNone}
+                      onPress={() => toggleCollection(col.id)}
                     >
-                      <Text style={[styles.chipText, { color: collectionIds.length === 0 ? "#FFFFFF" : colors.mutedForeground }]}>
-                        None
+                      <Text style={[styles.chipText, { color: selected ? "#FFFFFF" : colors.mutedForeground }]}>
+                        {col.title}
                       </Text>
                     </Pressable>
-                    {collections.map((col) => {
-                      const selected = collectionIds.includes(col.id);
-                      return (
-                        <Pressable
-                          key={col.id}
-                          style={[
-                            styles.chip,
-                            {
-                              backgroundColor: selected ? colors.cobalt : "transparent",
-                              borderColor: selected ? colors.cobalt : colors.border,
-                              borderRadius: 24,
-                            },
-                          ]}
-                          onPress={() => toggleCollection(col.id)}
-                        >
-                          <Text style={[styles.chipText, { color: selected ? "#FFFFFF" : colors.mutedForeground }]}>
-                            {col.title}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-                <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>
-                  {collectionIds.length === 0
-                    ? "Optional — saved as a standalone public piece."
-                    : "Filed into your selected collection."}
-                </Text>
-              </>
-            )}
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>
+              {collectionIds.length === 0
+                ? "Optional — saved without a collection."
+                : "Filed into your selected collection."}
+            </Text>
           </>
         )}
 
-        {isPublic && collectionIds.length > 0 && (
+        {isPublic && (
           <>
             <Label text="Portfolio" />
             <Pressable
@@ -385,7 +389,7 @@ export default function AddScreen() {
                   borderColor: featured ? "rgba(107,139,122,0.3)" : "rgba(120,110,100,0.16)",
                 },
               ]}
-              onPress={() => setFeatured((v) => !v)}
+              onPress={toggleFeatured}
               accessibilityRole="switch"
               accessibilityState={{ checked: featured }}
               accessibilityLabel="Feature in Portfolio"
@@ -396,7 +400,9 @@ export default function AddScreen() {
                   Feature in Portfolio
                 </Text>
                 <Text style={[styles.toggleSub, { color: colors.mutedForeground }]}>
-                  {featured ? "Hand-picked for your curated portfolio" : "Show this piece among your selected works"}
+                  {featured
+                    ? "Hand-picked for your best-of portfolio"
+                    : `Choose up to ${MAX_PORTFOLIO_ITEMS} best pieces`}
                 </Text>
               </View>
               <View style={[styles.visToggle, { backgroundColor: featured ? colors.emerald : "rgba(120,110,100,0.18)" }]}>

@@ -227,6 +227,8 @@ type PieceLike = {
 };
 type CollectionLike = { id: string; visibility?: "public" | "private" };
 
+export const MAX_PORTFOLIO_ITEMS = 12;
+
 /**
  * GlazeVault separates organization (Collections) from curation (Portfolio) and
  * from discovery (Public). Three independent piece states drive every surface:
@@ -244,19 +246,16 @@ type CollectionLike = { id: string; visibility?: "public" | "private" };
 
 /**
  * A piece on the curated Portfolio. Featuring is GATED: a piece can only belong
- * to the portfolio when it is featured AND public AND filed in at least one
- * collection (the portfolio is grouped by public collection), with a photo and
- * not archived. This is the SINGLE source of truth for portfolio membership —
- * every surface (badge, public site, swipe set) reads it, so a piece can never
- * appear featured without meeting every condition.
+ * to the portfolio when it is featured AND public, with a photo and not
+ * archived. Collections are optional organization, closer to tags/groups, so
+ * portfolio membership does not require collection membership.
  */
 export function isPortfolioPiece(piece: PieceLike): boolean {
   return (
     !!piece.featuredInPortfolio &&
     !!piece.isPublic &&
     !piece.archived &&
-    !!piece.imageUri &&
-    (piece.collectionIds?.length ?? 0) > 0
+    !!piece.imageUri
   );
 }
 
@@ -315,9 +314,9 @@ export function getPublicCollectionPieces<P extends PieceLike>(
 
 /**
  * The curated portfolio pieces of a collection: members that pass the full
- * portfolio gate (isPortfolioPiece — featured + public + collected + photo +
- * not archived). A public collection with none of these yields an empty list,
- * and its caller drops it from the portfolio entirely.
+ * portfolio gate (isPortfolioPiece — featured + public + photo + not archived).
+ * A public collection with none of these yields an empty list, and its caller
+ * drops it from the portfolio entirely.
  */
 export function getPortfolioCollectionPieces<P extends PieceLike>(
   collection: { id: string },
@@ -393,9 +392,9 @@ export function resolveGatedCover<P extends PieceLike & { id: string }>(
  * collection section the visitor was browsing, never wandering into another
  * collection's work. Without a valid public `fromId` it falls back to portfolio
  * pieces sharing ANY public collection with the opened piece. Either way the set
- * is gated by `isPortfolioPiece` (featured + public + collected + photo + not
- * archived), so a private/archived/unfeatured piece is never reachable, and a
- * piece outside the curated portfolio always swipes alone.
+ * is gated by `isPortfolioPiece` (featured + public + photo + not archived), so
+ * a private/archived/unfeatured piece is never reachable, and a piece outside
+ * the curated portfolio always swipes alone.
  */
 export function getPublicSwipePieces<P extends PieceLike & { id: string }>(
   piece: P,

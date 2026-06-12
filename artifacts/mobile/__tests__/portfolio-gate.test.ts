@@ -1,10 +1,9 @@
 /**
  * Locks the GATED portfolio rule. A piece may appear on the curated Portfolio
- * only when it is featured AND public AND filed in at least one collection, with
- * a photo and not archived. isPortfolioPiece is the single source of truth read
- * by the badge, the public site, the profile preview, and the swipe set — if any
- * leg of the gate is dropped, every one of those surfaces would over-expose, so
- * this test guards the rule directly rather than per-surface.
+ * only when it is featured AND public, with a photo and not archived.
+ * Collections are optional grouping/tagging and do not gate Portfolio curation.
+ * isPortfolioPiece is the single source of truth read by the badge, the public
+ * site, the profile preview, and the swipe set.
  */
 import {
   enforceVisibilityInvariant,
@@ -29,7 +28,7 @@ function makePiece(overrides: Partial<Piece> = {}): Piece {
 }
 
 describe("isPortfolioPiece gate", () => {
-  it("accepts a featured, public, collected piece with a photo", () => {
+  it("accepts a featured, public piece with a photo", () => {
     expect(isPortfolioPiece(makePiece())).toBe(true);
   });
 
@@ -41,8 +40,8 @@ describe("isPortfolioPiece gate", () => {
     expect(isPortfolioPiece(makePiece({ isPublic: false }))).toBe(false);
   });
 
-  it("rejects a featured public piece with no collection", () => {
-    expect(isPortfolioPiece(makePiece({ collectionIds: [] }))).toBe(false);
+  it("accepts a featured public standalone piece with no collection", () => {
+    expect(isPortfolioPiece(makePiece({ collectionIds: [] }))).toBe(true);
   });
 
   it("rejects an archived piece", () => {

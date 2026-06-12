@@ -832,7 +832,7 @@ describe("the public gate refuses non-visible pieces entirely", () => {
   });
 });
 
-describe("the collection-level gate hides an entire private collection", () => {
+describe("the collection-level gate hides private collection context", () => {
   // The piece-level gate (above) proves a hidden PIECE never surfaces. This
   // proves the COLLECTION-level gate: a collection whose OWN visibility is
   // "private" must never render on the public-site at all — not its title,
@@ -851,7 +851,7 @@ describe("the collection-level gate hides an entire private collection", () => {
     mockPieces = [makePiece("p1"), makePiece("p2")];
   });
 
-  it("renders nothing from a private collection but keeps a sibling public collection", () => {
+  it("hides the private collection shell while allowing its featured piece as selected work", () => {
     // A private collection whose content carries unique sentinels — title,
     // intro, an explicit cover, and a fully-public, photo-bearing piece — none
     // of which may appear anywhere on the rendered public-site.
@@ -913,13 +913,16 @@ describe("the collection-level gate hides an entire private collection", () => {
     // inspected too — covers and tiles carry their photo in a prop, not text.
     const tree = JSON.stringify(toJSON() ?? null);
 
-    // The private collection contributed NOTHING: not its title, not its intro,
-    // not its cover image, and not its (otherwise-public) piece's title or photo.
+    // The private collection contributed no collection-level shell: not its
+    // title, not its intro, and not its cover image.
     expect(tree).not.toContain(PRIVATE.collectionTitle);
     expect(tree).not.toContain("ZZPRIVATECOLLINTRO");
     expect(tree).not.toContain(PRIVATE.cover);
-    expect(tree).not.toContain(PRIVATE.pieceTitle);
-    expect(tree).not.toContain(PRIVATE.photo);
+    // Portfolio curation is independent of Collections. A piece that is itself
+    // public + featured can appear as Selected Work without exposing the private
+    // collection it is filed into.
+    expect(tree).toContain(PRIVATE.pieceTitle);
+    expect(tree).toContain(PRIVATE.photo);
 
     // The sibling PUBLIC collection still rendered in full — proving the filter
     // is selective, not a blanket hide of every collection.
