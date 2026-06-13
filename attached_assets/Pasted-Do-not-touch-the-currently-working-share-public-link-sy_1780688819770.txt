@@ -67,7 +67,7 @@ Use clear wording:
 - Delete Piece
 
 7. Optional confirmation text for Make Private:
-“This piece will become private and be removed from:
+“This piece will become private and be hidden from:
 • Public Portfolio
 • Public Collections
 • Public Links

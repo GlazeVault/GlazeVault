@@ -416,7 +416,7 @@ export default function PieceDetailScreen() {
       const confirmed = await confirm({
         title: "Make Private",
         message:
-          "This piece will become private and be removed from:\n• Public Portfolio\n• Public Collections\n• Public Links\n\nThe piece will remain safely stored in your Archive.",
+          "This piece will become private and be hidden from:\n• Public Portfolio\n• Public Collections\n• Public Links\n\nThe piece will remain safely stored in your Archive.",
         confirmText: "Make Private",
         destructive: true,
       });

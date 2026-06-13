@@ -25,7 +25,6 @@ import {
 } from "@/constants/privacy";
 import { ArtistHero } from "@/components/ArtistHero";
 import { ExpandableText } from "@/components/ExpandableText";
-import { FollowButton } from "@/components/FollowButton";
 import { SaveButton } from "@/components/SaveButton";
 import { ShareSheet } from "@/components/ShareSheet";
 import { resolveImageSource } from "@/constants/seedImages";
@@ -135,27 +134,16 @@ export default function PublicSiteScreen({
       ? `/${slug}/piece/${pid}${extra ? `?${extra}` : ""}`
       : `/piece/${pid}?public=1${extra ? `&${extra}` : ""}`) as Href;
 
-  // Quiet, private viewer-side curation. The artist this page belongs to is
-  // identified by their public slug; saving/following is keyed off it.
+  // Quiet, private viewer-side curation. Artist-level Follow/Save is reserved
+  // for later; for now only single exhibition pages can be saved.
   const {
-    isFollowing,
-    toggleFollowing,
-    isArtistSaved,
-    toggleArtistSaved,
     isCollectionSaved,
     toggleCollectionSaved,
   } = useSaved();
-  const artistRef = { slug: publicSiteSlug(profile.name), name: profile.name || "Studio" };
 
-  // The portfolio is a curated exhibition: public collections ARE the
-  // storytelling structure (context), but inside each one ONLY the pieces the
-  // artist has consciously featured appear (focus). A public collection with no
-  // featured pieces is dropped entirely; with nothing featured the portfolio
-  // reads intentionally empty.
-  // This featured-only rule holds on EVERY public surface, including a single
-  // collection page (`onlyCollectionId`, the target of a shared collection link)
-  // — a focused view of a public collection must never expose unfeatured public
-  // works the artist did not curate into the exhibition.
+  // Portfolio is piece-first: it is the artist's best work as one flat sequence,
+  // independent of whether a piece is filed into a Collection. Single shared
+  // Collection pages (`onlyCollectionId`) keep their collection context.
   const collectionPiecesFor = getPortfolioCollectionPieces;
   const publicCollections = collections
     .filter(isCollectionPublic)
@@ -174,27 +162,17 @@ export default function PublicSiteScreen({
     })
     .filter((entry) => entry.pieces.length > 0);
 
-  const publicCollectionIds = publicCollections.map((entry) => entry.collection.id);
-  const standalonePortfolioPieces = onlyCollectionId
-    ? []
-    : pieces
-        .filter(
-          (p) =>
-            isPortfolioPiece(p) &&
-            !(p.collectionIds ?? []).some((cid) => publicCollectionIds.includes(cid)),
-        )
-        .map(toPublicPiece);
+  const portfolioPieces = onlyCollectionId ? [] : pieces.filter(isPortfolioPiece).map(toPublicPiece);
 
-  const hasContent = publicCollections.length > 0 || standalonePortfolioPieces.length > 0;
+  const hasContent = onlyCollectionId ? publicCollections.length > 0 : portfolioPieces.length > 0;
 
-  // Measure natural ratios for every piece shown in the grids (flattened across
-  // all public collections) so landscape work can break out full-width with no
-  // crop, just like the Archive and collection views.
+  // Measure natural ratios for every piece shown in the grids so landscape work
+  // can break out full-width with no crop, just like the Archive and collection
+  // views.
   const orientations = useImageOrientations(
-    [
-      ...standalonePortfolioPieces.map((p) => p.imageUri),
-      ...publicCollections.flatMap((e) => e.gridPieces.map((p) => p.imageUri)),
-    ],
+    onlyCollectionId
+      ? publicCollections.flatMap((e) => e.gridPieces.map((p) => p.imageUri))
+      : portfolioPieces.map((p) => p.imageUri),
   );
 
   const links: ProfileLink[] = [];
@@ -423,33 +401,17 @@ export default function PublicSiteScreen({
           </View>
         ) : null}
 
-        {/* Quiet network controls — kept deliberately low, after the artist's
-            words, never at the top. On a single exhibition page the visitor can
-            save that exhibition; on the portfolio they can follow the archive and
-            save the artist. No counts, no metrics, no pressure. */}
-        <View style={styles.inspireRow}>
-          {onlyCollectionId ? (
+        {/* Quiet network controls — artist Follow/Save is reserved for later. */}
+        {onlyCollectionId ? (
+          <View style={styles.inspireRow}>
             <SaveButton
               saved={isCollectionSaved(onlyCollectionId)}
               onPress={() => toggleCollectionSaved(onlyCollectionId)}
               label={isCollectionSaved(onlyCollectionId) ? "Saved" : "Save Exhibition"}
               accessibilityLabel="Save this exhibition to your inspiration"
             />
-          ) : (
-            <>
-              <FollowButton
-                following={isFollowing(artistRef.slug)}
-                onPress={() => toggleFollowing(artistRef)}
-              />
-              <SaveButton
-                saved={isArtistSaved(artistRef.slug)}
-                onPress={() => toggleArtistSaved(artistRef)}
-                label={isArtistSaved(artistRef.slug) ? "Saved" : "Save Artist"}
-                accessibilityLabel="Save this artist to your inspiration"
-              />
-            </>
-          )}
-        </View>
+          </View>
+        ) : null}
 
         <View style={[styles.divider, { backgroundColor: "rgba(120,110,100,0.12)" }]} />
 
@@ -458,34 +420,21 @@ export default function PublicSiteScreen({
             <View style={[styles.emptyCircle, { backgroundColor: colors.secondary }]}>
               <Feather name="layers" size={20} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No collections published yet</Text>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+              {onlyCollectionId ? "No pieces published yet" : "No portfolio pieces yet"}
+            </Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              Make a collection public to share a body of work as its own quiet exhibition.
+              {onlyCollectionId
+                ? "Feature public pieces in this collection to share it as an exhibition."
+                : "Feature public pieces to build your portfolio."}
             </Text>
           </View>
         ) : null}
 
-        {standalonePortfolioPieces.length > 0 ? (
-          <View style={styles.collectionSection}>
-            <View style={styles.collectionHeader}>
-              <Text style={[styles.collectionIndex, { color: colors.emerald }]}>
-                Portfolio
-              </Text>
-              <Text style={[styles.collectionTitle, { color: colors.foreground }]}>
-                Selected Work
-              </Text>
-              <Text style={[styles.collectionMeta, { color: colors.mutedForeground }]}>
-                {`${standalonePortfolioPieces.length} ${
-                  standalonePortfolioPieces.length === 1 ? "piece" : "pieces"
-                }`}
-              </Text>
-            </View>
-            {renderPieces(standalonePortfolioPieces, "portfolio")}
-          </View>
-        ) : null}
+        {!onlyCollectionId && portfolioPieces.length > 0 ? renderPieces(portfolioPieces, "portfolio") : null}
 
-        {/* Public collections — optional groups flowing from the artist header. */}
-        {publicCollections.length > 0 ? (
+        {/* Single shared collection pages keep their collection context. */}
+        {onlyCollectionId && publicCollections.length > 0 ? (
           publicCollections.map(({ collection, pieces: cp, coverUri, coverPieceId, gridPieces }, index) => (
             <View key={collection.id} style={styles.collectionSection}>
               {index > 0 ? (

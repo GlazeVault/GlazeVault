@@ -14,8 +14,8 @@ export interface Collection {
   title: string;
   intro: string;
   createdAt: string;
-  // Collections organize work; they may be browsable publicly or kept private.
-  // This is independent of the Portfolio (which is curated at the piece level).
+  // Collections organize work. For now collections are hard-coded public; the
+  // field remains for schema compatibility with older cached/remote rows.
   visibility: "public" | "private";
   // Optional artist-chosen cover image (web: base64 data URI, native: relative
   // pieces/ path). When absent, surfaces fall back to a public piece image.
@@ -41,6 +41,10 @@ const CollectionsContext = createContext<CollectionsContextType | undefined>(und
 const STORAGE_PREFIX = "@glazevault_collections_v1";
 const cacheKey = (userId: string) => `${STORAGE_PREFIX}:${userId}`;
 
+function forcePublicCollection(c: Collection): Collection {
+  return { ...c, visibility: "public" };
+}
+
 export function CollectionsProvider({ children }: { children: React.ReactNode }) {
   const { userId, authReady } = useAuth();
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -60,8 +64,9 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
   // truth when configured; the cache exists for instant first paint and offline
   // use. No-ops when signed out.
   const persist = useCallback(async (updated: Collection[]) => {
-    collectionsRef.current = updated;
-    setCollections(updated);
+    const publicUpdated = updated.map(forcePublicCollection);
+    collectionsRef.current = publicUpdated;
+    setCollections(publicUpdated);
     const uid = userIdRef.current;
     if (!uid) return;
     const key = cacheKey(uid);
@@ -70,7 +75,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
     // remote save. FAIL-SOFT: a cache write error is logged, never thrown, so it
     // cannot block the remote write or strand a loading state.
     const snapshot = JSON.stringify(
-      updated.map((c) =>
+      publicUpdated.map((c) =>
         c.coverImageUri && c.coverImageUri.startsWith("data:")
           ? { ...c, coverImageUri: undefined }
           : c
@@ -80,7 +85,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
       .catch(() => {})
       .then(() => AsyncStorage.setItem(key, snapshot))
       .then(() => {
-        console.log("Saved collections", updated.length);
+        console.log("Saved collections", publicUpdated.length);
       })
       .catch((e) => {
         console.warn(
@@ -143,11 +148,11 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
           const parsed = JSON.parse(data) as (Partial<Collection> & {
             featuredOnSite?: boolean;
           })[];
-          // Backward compat: collections saved before the public/private toggle
-          // default to private. The old `featuredOnSite` flag is dropped.
+          // Private collections are temporarily disabled. Normalize every
+          // cached legacy row to public and drop the old `featuredOnSite` flag.
           cached = parsed.map(({ featuredOnSite: _drop, ...c }) => ({
             ...(c as Collection),
-            visibility: c.visibility ?? "private",
+            visibility: "public",
           }));
           collectionsRef.current = cached;
           setCollections(cached);
@@ -208,7 +213,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
     ): Promise<Collection> => {
       const newCol: Collection = {
         ...c,
-        visibility: c.visibility ?? "private",
+        visibility: "public",
         id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
         createdAt: new Date().toISOString(),
       };
@@ -225,7 +230,7 @@ export function CollectionsProvider({ children }: { children: React.ReactNode })
       await persist(
         collectionsRef.current.map((c) => {
           if (c.id !== id) return c;
-          changed = { ...c, ...updates };
+          changed = { ...c, ...updates, visibility: "public" };
           return changed;
         })
       );

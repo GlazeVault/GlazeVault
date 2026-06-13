@@ -35,9 +35,6 @@ export default function NewCollectionScreen() {
 
   const [title, setTitle] = useState(existing?.title ?? "");
   const [intro, setIntro] = useState(existing?.intro ?? "");
-  const [isPublic, setIsPublic] = useState<boolean>(
-    existing ? existing.visibility === "public" : false
-  );
   const [coverImageUri, setCoverImageUri] = useState(existing?.coverImageUri ?? "");
   const [saving, setSaving] = useState(false);
   // Prevents overlapping picker runs (and duplicate native file copies).
@@ -47,7 +44,6 @@ export default function NewCollectionScreen() {
     if (existing) {
       setTitle(existing.title);
       setIntro(existing.intro);
-      setIsPublic(existing.visibility === "public");
       setCoverImageUri(existing.coverImageUri ?? "");
     }
   }, [existing?.id]);
@@ -82,21 +78,18 @@ export default function NewCollectionScreen() {
       return;
     }
     setSaving(true);
-    // Collections carry their own public/private state, independent of the
-    // per-piece Portfolio/Public curation.
-    const visibility: "public" | "private" = isPublic ? "public" : "private";
     if (existing && editId) {
       await updateCollection(editId, {
         title: title.trim(),
         intro: intro.trim(),
-        visibility,
+        visibility: "public",
         coverImageUri: coverImageUri || undefined,
       });
     } else {
       const created = await addCollection({
         title: title.trim(),
         intro: intro.trim(),
-        visibility,
+        visibility: "public",
         coverImageUri: coverImageUri || undefined,
       });
       // When opened with a piece to attach, file it into this freshly created
@@ -214,61 +207,6 @@ export default function NewCollectionScreen() {
           )}
         </View>
 
-        <View style={styles.fieldGroup}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>Visibility</Text>
-          <Pressable
-            style={[
-              styles.visibilityRow,
-              {
-                backgroundColor: isPublic ? "rgba(107,139,122,0.1)" : colors.secondary,
-                borderColor: isPublic
-                  ? "rgba(107,139,122,0.3)"
-                  : "rgba(120,110,100,0.16)",
-              },
-            ]}
-            onPress={() => setIsPublic((v) => !v)}
-            accessibilityRole="switch"
-            accessibilityState={{ checked: isPublic }}
-            accessibilityLabel="Public collection"
-          >
-            <Feather
-              name={isPublic ? "globe" : "lock"}
-              size={14}
-              color={isPublic ? colors.emerald : colors.mutedForeground}
-            />
-            <View style={styles.visibilityLabels}>
-              <Text
-                style={[
-                  styles.visibilityTitle,
-                  { color: isPublic ? colors.emerald : colors.foreground },
-                ]}
-              >
-                {isPublic ? "Public Collection" : "Private Collection"}
-              </Text>
-              <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
-                {isPublic
-                  ? "Anyone with the link can browse this series"
-                  : "Kept private — only you can see it"}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.visToggle,
-                {
-                  backgroundColor: isPublic ? colors.emerald : "rgba(120,110,100,0.18)",
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.visToggleThumb,
-                  { transform: [{ translateX: isPublic ? 18 : 2 }] },
-                ]}
-              />
-            </View>
-          </Pressable>
-        </View>
-
         <View style={[styles.hint, { backgroundColor: colors.secondary, borderColor: "rgba(120,110,100,0.12)" }]}>
           <Feather name="info" size={13} color={colors.mutedForeground} style={{ marginTop: 1 }} />
           <Text style={[styles.hintText, { color: colors.mutedForeground }]}>
@@ -371,23 +309,4 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   hintText: { flex: 1, fontSize: 12, fontFamily: "Poppins_300Light", lineHeight: 18 },
-  visibilityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 0.75,
-  },
-  visibilityLabels: { flex: 1, gap: 2 },
-  visibilityTitle: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
-  visibilitySub: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
-  visToggle: {
-    width: 42,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-  },
-  visToggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#FFFFFF" },
 });

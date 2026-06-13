@@ -184,9 +184,6 @@ export default function CollectionDetailScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(collection?.title ?? "");
   const [intro, setIntro] = useState(collection?.intro ?? "");
-  const [isPublic, setIsPublic] = useState<boolean>(
-    collection ? isCollectionPublic(collection) : false
-  );
   const [coverImageUri, setCoverImageUri] = useState(collection?.coverImageUri ?? "");
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -283,10 +280,12 @@ export default function CollectionDetailScreen() {
   const headerCover = (collection.coverImageUri || firstPieceImage) || "";
   // The cover image acts as a banner/intro. While editing only the explicit
   // selection is shown (so Remove visibly clears it); otherwise the resolved
-  // fallback is used. If a piece's image is the cover, skip it in the grid so
-  // the same image never appears twice.
+  // fallback is used. Only an explicit collection cover suppresses a duplicate
+  // piece image in the grid; a first-piece fallback should still render as a
+  // normal collection item, especially for one-piece collections.
   const activeCover = isEditing ? coverImageUri || "" : headerCover;
-  const gridPieces = activeCover
+  const explicitCover = isEditing ? coverImageUri || "" : collection.coverImageUri || "";
+  const gridPieces = explicitCover
     ? displayPieces.filter((p) => p.imageUri !== activeCover)
     : displayPieces;
   const galleryRows = buildOrientationRows(
@@ -306,7 +305,7 @@ export default function CollectionDetailScreen() {
     await updateCollection(id, {
       title: title.trim(),
       intro: intro.trim(),
-      visibility: isPublic ? "public" : "private",
+      visibility: "public",
       coverImageUri: coverImageUri || undefined,
     });
     setSaving(false);
@@ -468,60 +467,7 @@ export default function CollectionDetailScreen() {
                 </Text>
               </Pressable>
             ) : null}
-            {isEditing ? (
-              <Pressable
-                style={[
-                  styles.visibilityRow,
-                  {
-                    backgroundColor: isPublic ? "rgba(107,139,122,0.1)" : colors.secondary,
-                    borderColor: isPublic
-                      ? "rgba(107,139,122,0.3)"
-                      : "rgba(120,110,100,0.16)",
-                  },
-                ]}
-                onPress={() => setIsPublic((v) => !v)}
-                accessibilityRole="switch"
-                accessibilityState={{ checked: isPublic }}
-                accessibilityLabel="Public collection"
-              >
-                <Feather
-                  name={isPublic ? "globe" : "lock"}
-                  size={14}
-                  color={isPublic ? colors.emerald : colors.mutedForeground}
-                />
-                <View style={styles.visibilityLabels}>
-                  <Text
-                    style={[
-                      styles.visibilityTitle,
-                      { color: isPublic ? colors.emerald : colors.foreground },
-                    ]}
-                  >
-                    {isPublic ? "Public collection" : "Private collection"}
-                  </Text>
-                  <Text style={[styles.visibilitySub, { color: colors.mutedForeground }]}>
-                    {isPublic
-                      ? "Anyone can browse this collection's public pieces"
-                      : "Kept private — only you can see it"}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.visToggle,
-                    {
-                      backgroundColor:
-                        isPublic ? colors.emerald : "rgba(120,110,100,0.18)",
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.visToggleThumb,
-                      { transform: [{ translateX: isPublic ? 18 : 2 }] },
-                    ]}
-                  />
-                </View>
-              </Pressable>
-            ) : (
+            {!isEditing ? (
               <View style={styles.viewBadgeRow}>
                 <View style={styles.viewBadge}>
                   <Feather
@@ -534,7 +480,7 @@ export default function CollectionDetailScreen() {
                   </Text>
                 </View>
               </View>
-            )}
+            ) : null}
             {isEditing ? (
               <View style={styles.editActions}>
                 <Pressable
@@ -641,7 +587,6 @@ export default function CollectionDetailScreen() {
               onPress={() => {
                 setTitle(collection.title);
                 setIntro(collection.intro);
-                setIsPublic(isCollectionPublic(collection));
                 setCoverImageUri(collection.coverImageUri ?? "");
                 setIsEditing(true);
               }}
@@ -1013,26 +958,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     maxWidth: 240,
   },
-  visibilityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 0.75,
-    marginTop: 18,
-  },
-  visibilityLabels: { flex: 1, gap: 2 },
-  visibilityTitle: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
-  visibilitySub: { fontSize: 11, fontFamily: "Poppins_300Light", letterSpacing: 0.2 },
-  visToggle: {
-    width: 42,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-  },
-  visToggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#FFFFFF" },
   galleryRow: { marginBottom: 40 },
   pairRow: { flexDirection: "row", gap: 16 },
   pairCol: { flex: 1 },

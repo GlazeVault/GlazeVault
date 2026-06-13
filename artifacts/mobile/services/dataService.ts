@@ -329,10 +329,8 @@ type CollectionRow = {
   title: string;
   intro: string;
   created_at: string;
-  // The collection's public/private state maps to the existing `visibility`
-  // text column. The legacy `featured_on_site` column is no longer read or
-  // written — "Show in Portfolio" moved to the piece level. It is left in place
-  // (defaults to false) so omitting it from upserts is safe.
+  // The collection visibility column remains for schema compatibility, but the
+  // product currently treats every collection as public.
   visibility: "public" | "private";
   cover_image_url: string | null;
   user_id: string | null;
@@ -344,7 +342,7 @@ function collectionToRow(c: Collection, userId: string): CollectionRow {
     title: c.title,
     intro: c.intro,
     created_at: c.createdAt,
-    visibility: c.visibility,
+    visibility: "public",
     cover_image_url: c.coverImageUri ?? null,
     user_id: userId,
   };
@@ -356,7 +354,7 @@ function rowToCollection(r: CollectionRow): Collection {
     title: r.title ?? "",
     intro: r.intro ?? "",
     createdAt: r.created_at ?? new Date().toISOString(),
-    visibility: r.visibility === "public" ? "public" : "private",
+    visibility: "public",
     coverImageUri: r.cover_image_url ?? undefined,
   };
 }
@@ -607,7 +605,6 @@ export async function loadPublicCollectionsForUser(
     .from("collections")
     .select("*")
     .eq("user_id", userId)
-    .eq("visibility", "public")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data as CollectionRow[]).map(rowToCollection);

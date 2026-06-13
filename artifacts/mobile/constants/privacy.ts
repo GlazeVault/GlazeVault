@@ -266,7 +266,8 @@ export function isPubliclyVisiblePiece(piece: PieceLike): boolean {
 
 /** Whether a collection itself is browsable publicly. */
 export function isCollectionPublic(collection: CollectionLike): boolean {
-  return collection.visibility === "public";
+  void collection;
+  return true;
 }
 
 /**

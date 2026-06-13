@@ -313,8 +313,8 @@ describe("public surfaces expose only the fixed allowed fields", () => {
   });
 
   it("public-site no longer renders a separate 'Selected Works' feed", () => {
-    // The portfolio is collection-driven: works appear inside their collections,
-    // never duplicated in a standalone curated section.
+    // The portfolio is a flat piece grid: works are not duplicated in a
+    // standalone curated section with its own heading.
     const PublicSiteScreen = require("@/app/public-site").default;
     const { toJSON } = render(<PublicSiteScreen />);
     const text = renderedText(toJSON() as JsonNode);
@@ -336,7 +336,7 @@ describe("public surfaces expose only the fixed allowed fields", () => {
       { ...mockCollection, intro: "ZZINTROPUBLIC a short, public collection note", coverImageUri: undefined },
     ];
     const PublicSiteScreen = require("@/app/public-site").default;
-    const { toJSON } = render(<PublicSiteScreen />);
+    const { toJSON } = render(<PublicSiteScreen onlyCollectionId="c1" />);
     const text = renderedText(toJSON() as JsonNode);
 
     // The collection header (a public surface element) actually rendered...
@@ -715,10 +715,6 @@ describe("the public gate refuses non-visible pieces entirely", () => {
     // The one publicly visible piece IS on the page — its title and its photo...
     expect(tree).toContain("ZZVISIBLETILE");
     expect(tree).toContain("pieces/p1.jpg");
-    // ...and the collection's public piece count reflects only that one piece,
-    // never the three blocked siblings.
-    expect(tree).toContain("1 piece");
-
     // None of the blocked siblings surfaced as a tile: not their title caption...
     for (const blocked of ["ZZPRIVATETILE", "ZZARCHIVEDTILE", "ZZPHOTOLESSTILE"]) {
       expect(tree).not.toContain(blocked);
@@ -745,7 +741,7 @@ describe("the public gate refuses non-visible pieces entirely", () => {
       makePiece("p5", { title: "ZZPHOTOLESSTILE", imageUri: "", images: [] }),
     ];
     const PublicSiteScreen = require("@/app/public-site").default;
-    const { toJSON } = render(<PublicSiteScreen />);
+    const { toJSON } = render(<PublicSiteScreen onlyCollectionId="c1" />);
     const tree = JSON.stringify(toJSON() ?? null);
 
     // The two publicly visible pieces rendered: p1 as the derived cover photo,
@@ -770,7 +766,7 @@ describe("the public gate refuses non-visible pieces entirely", () => {
     // The curated Portfolio is featured-only: a piece that is fully public and
     // photo-bearing but NOT featured must never surface on the portfolio. p1 is
     // featured (default); p2 is public + collected but unfeatured. Only p1's
-    // title and photo may appear, and the count must read "1 piece".
+    // title and photo may appear.
     mockCollections = [mockCollection];
     mockPieces = [
       makePiece("p1", { title: "ZZFEATUREDTILE" }),
@@ -783,7 +779,6 @@ describe("the public gate refuses non-visible pieces entirely", () => {
     // The featured piece is on the page; the unfeatured public sibling is not.
     expect(tree).toContain("ZZFEATUREDTILE");
     expect(tree).toContain("pieces/p1.jpg");
-    expect(tree).toContain("1 piece");
     expect(tree).not.toContain("ZZUNFEATUREDTILE");
     expect(tree).not.toContain("pieces/p2.jpg");
   });
@@ -832,17 +827,10 @@ describe("the public gate refuses non-visible pieces entirely", () => {
   });
 });
 
-describe("the collection-level gate hides private collection context", () => {
-  // The piece-level gate (above) proves a hidden PIECE never surfaces. This
-  // proves the COLLECTION-level gate: a collection whose OWN visibility is
-  // "private" must never render on the public-site at all — not its title,
-  // intro, cover, nor any of its pieces — EVEN when every piece it contains is
-  // fully public and photo-bearing. The gate lives in `isCollectionPublic`,
-  // applied by public-site via `collections.filter(isCollectionPublic)`. A
-  // regression there would publish an entire private collection wholesale, so
-  // this test locks that boundary down. A companion assertion confirms a sibling
-  // PUBLIC collection still renders, proving the filter is selective rather than
-  // a blanket hide.
+describe("collection visibility is temporarily hard-coded public", () => {
+  // The piece-level gate (above) still proves a hidden PIECE never surfaces.
+  // Collection-level privacy is temporarily disabled: even legacy rows marked
+  // `visibility: "private"` are treated as public collections.
   beforeEach(() => {
     mockRouterParams = {};
     mockViewerProps.length = 0;
@@ -851,10 +839,10 @@ describe("the collection-level gate hides private collection context", () => {
     mockPieces = [makePiece("p1"), makePiece("p2")];
   });
 
-  it("hides the private collection shell while allowing its featured piece as selected work", () => {
-    // A private collection whose content carries unique sentinels — title,
-    // intro, an explicit cover, and a fully-public, photo-bearing piece — none
-    // of which may appear anywhere on the rendered public-site.
+  it("renders a legacy private collection as public", () => {
+    // A legacy private collection whose content carries unique sentinels. While
+    // private collections are disabled, its collection shell and public pieces
+    // should render like any other public collection.
     const PRIVATE = {
       collectionTitle: "ZZPRIVATECOLLTITLE",
       collectionIntro: "ZZPRIVATECOLLINTRO a body of work kept off the site",
@@ -862,8 +850,7 @@ describe("the collection-level gate hides private collection context", () => {
       pieceTitle: "ZZPRIVATECOLLPIECE",
       photo: "pieces/private-piece.jpg",
     } as const;
-    // A sibling PUBLIC collection whose content MUST still render, proving the
-    // filter is selective — it hides only the private one, not every collection.
+    // A sibling public collection should still render as usual.
     const PUBLIC = {
       collectionTitle: "ZZPUBLICCOLLTITLE",
       collectionIntro: "ZZPUBLICCOLLINTRO a body of work shown on the site",
@@ -908,28 +895,21 @@ describe("the collection-level gate hides private collection context", () => {
     ];
 
     const PublicSiteScreen = require("@/app/public-site").default;
-    const { toJSON } = render(<PublicSiteScreen />);
+    const { toJSON } = render(<PublicSiteScreen onlyCollectionId="c-private" />);
     // Serialize the WHOLE tree (props included) so cover/piece image sources are
     // inspected too — covers and tiles carry their photo in a prop, not text.
     const tree = JSON.stringify(toJSON() ?? null);
 
-    // The private collection contributed no collection-level shell: not its
-    // title, not its intro, and not its cover image.
-    expect(tree).not.toContain(PRIVATE.collectionTitle);
-    expect(tree).not.toContain("ZZPRIVATECOLLINTRO");
-    expect(tree).not.toContain(PRIVATE.cover);
-    // Portfolio curation is independent of Collections. A piece that is itself
-    // public + featured can appear as Selected Work without exposing the private
-    // collection it is filed into.
+    expect(tree).toContain(PRIVATE.collectionTitle);
+    expect(tree).toContain("ZZPRIVATECOLLINTRO");
+    expect(tree).toContain(PRIVATE.cover);
     expect(tree).toContain(PRIVATE.pieceTitle);
     expect(tree).toContain(PRIVATE.photo);
 
-    // The sibling PUBLIC collection still rendered in full — proving the filter
-    // is selective, not a blanket hide of every collection.
-    expect(tree).toContain(PUBLIC.collectionTitle);
-    expect(tree).toContain("ZZPUBLICCOLLINTRO");
-    expect(tree).toContain(PUBLIC.cover);
-    expect(tree).toContain(PUBLIC.pieceTitle);
-    expect(tree).toContain(PUBLIC.photo);
+    expect(tree).not.toContain(PUBLIC.collectionTitle);
+    expect(tree).not.toContain("ZZPUBLICCOLLINTRO");
+    expect(tree).not.toContain(PUBLIC.cover);
+    expect(tree).not.toContain(PUBLIC.pieceTitle);
+    expect(tree).not.toContain(PUBLIC.photo);
   });
 });

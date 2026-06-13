@@ -103,7 +103,7 @@ function Label({ text }: { text: string }) {
 export default function AddScreen() {
   const colors = useColors();
   const { addPiece, pieces } = usePottery();
-  const { collections } = useCollections();
+  const { collections, addCollection } = useCollections();
   const insets = useSafeAreaInsets();
   const [images, setImages] = useState<string[]>([]);
   const [coverIndex, setCoverIndex] = useState(0);
@@ -122,6 +122,9 @@ export default function AddScreen() {
   // the piece is Public; reset whenever the piece goes back to Private.
   const [showGlazeDetails, setShowGlazeDetails] = useState(false);
   const [showStudioNotes, setShowStudioNotes] = useState(false);
+  const [creatingCollection, setCreatingCollection] = useState(false);
+  const [newCollectionTitle, setNewCollectionTitle] = useState("");
+  const [creatingCollectionBusy, setCreatingCollectionBusy] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -167,6 +170,32 @@ export default function AddScreen() {
       return;
     }
     setFeatured((v) => !v);
+  };
+
+  const handleCreateCollection = async () => {
+    const cleanTitle = newCollectionTitle.trim();
+    if (!cleanTitle) {
+      notice({ title: "Name required", message: "Give this collection a name.", variant: "error" });
+      return;
+    }
+    setCreatingCollectionBusy(true);
+    try {
+      const created = await addCollection({
+        title: cleanTitle,
+        intro: "",
+        visibility: "public",
+      });
+      setCollectionIds((prev) =>
+        prev.includes(created.id) ? prev : [...prev, created.id],
+      );
+      setNewCollectionTitle("");
+      setCreatingCollection(false);
+    } catch (e) {
+      console.warn("[glazevault] create collection from add failed", e);
+      notice({ title: "Couldn’t create collection", message: "Please try again.", variant: "error" });
+    } finally {
+      setCreatingCollectionBusy(false);
+    }
   };
 
   const handleSave = async () => {
@@ -321,13 +350,25 @@ export default function AddScreen() {
         )}
 
         <Label text="Collection" />
-        {collections.length === 0 ? (
-          <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>
-            This piece will be saved without a collection. Create one from the Collections tab to group related work.
-          </Text>
+        {collections.length === 0 && !creatingCollection ? (
+          <>
+            <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>
+              This piece will be saved without a collection.
+            </Text>
+            <Pressable
+              style={[styles.newCollectionBtn, { borderColor: colors.border }]}
+              onPress={() => setCreatingCollection(true)}
+            >
+              <Feather name="plus" size={14} color={colors.cobalt} />
+              <Text style={[styles.newCollectionText, { color: colors.cobalt }]}>
+                New Collection
+              </Text>
+            </Pressable>
+          </>
         ) : (
           <>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {collections.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.chipRow}>
                 {/* "None" is the default. It stands first and selected until the
                     artist chooses to file the piece somewhere. */}
@@ -368,8 +409,72 @@ export default function AddScreen() {
                     </Pressable>
                   );
                 })}
+                <Pressable
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: creatingCollection ? "rgba(107,127,163,0.1)" : "transparent",
+                      borderColor: creatingCollection ? colors.cobalt : colors.border,
+                      borderRadius: 24,
+                    },
+                  ]}
+                  onPress={() => setCreatingCollection((v) => !v)}
+                >
+                  <View style={styles.inlineIconText}>
+                    <Feather name="plus" size={12} color={colors.cobalt} />
+                    <Text style={[styles.chipText, { color: colors.cobalt }]}>
+                      New
+                    </Text>
+                  </View>
+                </Pressable>
               </View>
-            </ScrollView>
+              </ScrollView>
+            ) : null}
+            {creatingCollection ? (
+              <View style={styles.newCollectionForm}>
+                <TextInput
+                  style={[
+                    styles.newCollectionInput,
+                    {
+                      color: colors.foreground,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  value={newCollectionTitle}
+                  onChangeText={setNewCollectionTitle}
+                  placeholder="Collection name"
+                  placeholderTextColor={colors.mutedForeground}
+                  returnKeyType="done"
+                  onSubmitEditing={handleCreateCollection}
+                />
+                <View style={styles.newCollectionActions}>
+                  <Pressable
+                    style={[styles.smallActionBtn, { borderColor: colors.border }]}
+                    onPress={() => {
+                      setCreatingCollection(false);
+                      setNewCollectionTitle("");
+                    }}
+                    disabled={creatingCollectionBusy}
+                  >
+                    <Text style={[styles.smallActionText, { color: colors.mutedForeground }]}>
+                      Cancel
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.smallActionBtn,
+                      { borderColor: colors.cobalt, backgroundColor: colors.cobalt },
+                    ]}
+                    onPress={handleCreateCollection}
+                    disabled={creatingCollectionBusy}
+                  >
+                    <Text style={[styles.smallActionText, { color: "#FFFFFF" }]}>
+                      {creatingCollectionBusy ? "Creating…" : "Create"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
             <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>
               {collectionIds.length === 0
                 ? "Optional — saved without a collection."
@@ -458,6 +563,48 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", gap: 8, paddingVertical: 2, paddingBottom: 4 },
   chip: { paddingHorizontal: 16, paddingVertical: 8, borderWidth: 1 },
   chipText: { fontSize: 12, fontFamily: "Poppins_400Regular", letterSpacing: 0.2 },
+  inlineIconText: { flexDirection: "row", alignItems: "center", gap: 5 },
+  newCollectionBtn: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderRadius: 22,
+    marginTop: 4,
+  },
+  newCollectionText: {
+    fontSize: 12,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.3,
+  },
+  newCollectionForm: { gap: 10, marginTop: 8 },
+  newCollectionInput: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 14,
+    fontFamily: "Poppins_300Light",
+  },
+  newCollectionActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  smallActionBtn: {
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  smallActionText: {
+    fontSize: 12,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.3,
+  },
   saveBtn: { paddingVertical: 18, alignItems: "center", marginTop: 36 },
   saveBtnText: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 1.5, textTransform: "uppercase" },
   toggleRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 0.75, marginBottom: 4 },

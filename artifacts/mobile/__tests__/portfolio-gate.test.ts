@@ -140,7 +140,7 @@ describe("getPublicSwipePieces", () => {
     expect(result.map((p) => p.id).sort()).toEqual(["a", "b", "c"]);
   });
 
-  it("ignores a from that is a private collection and falls back", () => {
+  it("treats a legacy private collection as public while private collections are disabled", () => {
     const opened = makePiece({ id: "a", collectionIds: ["c1", "cp"] });
     const pieces = [
       opened,
@@ -148,7 +148,7 @@ describe("getPublicSwipePieces", () => {
       makePiece({ id: "secret", collectionIds: ["cp"] }),
     ];
     const result = getPublicSwipePieces(opened, pieces, collections, "cp");
-    expect(result.map((p) => p.id).sort()).toEqual(["a", "b"]);
+    expect(result.map((p) => p.id).sort()).toEqual(["a", "secret"]);
   });
 
   it("swipes alone when the opened piece is not itself a portfolio piece", () => {

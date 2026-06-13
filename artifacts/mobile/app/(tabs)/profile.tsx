@@ -26,13 +26,11 @@ import { HeroReposition } from "@/components/HeroReposition";
 import { persistPieceImage } from "@/constants/imageStorage";
 import { ImportedText, pickAndExtractText, UnsupportedFileError } from "@/constants/importText";
 import {
-  getPortfolioCollectionPieces,
-  isCollectionPublic,
-  resolveGatedCover,
+  buildPublicMetaLine,
+  isPortfolioPiece,
 } from "@/constants/privacy";
 import { resolveImageSource } from "@/constants/seedImages";
 import { useAuth } from "@/context/AuthContext";
-import { useCollections } from "@/context/CollectionsContext";
 import {
   portfolioShareUrl,
   PUBLIC_SITE_DOMAIN,
@@ -51,7 +49,6 @@ export default function ProfileScreen() {
   const { isConfigured, signOut, user } = useAuth();
   const { profile, updateProfile, updatePublicSite } = useProfile();
   const { pieces } = usePottery();
-  const { collections } = useCollections();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const [isEditing, setIsEditing] = useState(false);
@@ -83,12 +80,9 @@ export default function ProfileScreen() {
   const pickingAvatar = useRef(false);
   const pickingHero = useRef(false);
 
-  // The Profile previews the public Portfolio, so it must match what visitors
-  // see: public collections that contain at least one FEATURED piece. A public
-  // collection with nothing featured is dropped, exactly like the live site.
-  const featuredCollections = collections.filter(
-    (c) => isCollectionPublic(c) && getPortfolioCollectionPieces(c, pieces).length > 0,
-  );
+  // The Profile previews the public Portfolio, so it matches the live flat
+  // best-of sequence of featured pieces.
+  const portfolioPieces = pieces.filter(isPortfolioPiece);
   const site = profile.publicSite;
 
   const startEditing = () => {
@@ -674,40 +668,37 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Featured Collections */}
+        {/* Portfolio */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
               Portfolio
             </Text>
-            {featuredCollections.length > 0 && (
+            {portfolioPieces.length > 0 && (
               <View style={[styles.countBadge, { backgroundColor: "rgba(107,127,163,0.1)" }]}>
                 <Text style={[styles.countBadgeText, { color: colors.cobalt }]}>
-                  {featuredCollections.length}
+                  {portfolioPieces.length}
                 </Text>
               </View>
             )}
           </View>
-          {featuredCollections.length === 0 ? (
+          {portfolioPieces.length === 0 ? (
             <View style={[styles.publicEmpty, { borderColor: "rgba(120,110,100,0.12)" }]}>
               <Feather name="star" size={16} color={colors.mutedForeground} style={{ opacity: 0.35, marginBottom: 8 }} />
               <Text style={[styles.publicEmptyText, { color: colors.mutedForeground }]}>
                 Nothing featured yet
               </Text>
               <Text style={[styles.publicEmptyHint, { color: colors.mutedForeground }]}>
-                Feature pieces in a public collection to show them here
+                Feature pieces to show them here
               </Text>
             </View>
           ) : (
             <View style={styles.featuredList}>
-              {featuredCollections.map((c) => {
-                const cp = getPortfolioCollectionPieces(c, pieces);
-                // Featured-gated cover: an artist cover set to an unfeatured/
-                // private piece must not represent the portfolio card.
-                const coverUri = resolveGatedCover(c, cp, pieces).coverUri;
+              {portfolioPieces.map((piece) => {
+                const meta = buildPublicMetaLine(piece);
                 return (
                   <Pressable
-                    key={c.id}
+                    key={piece.id}
                     style={({ pressed }) => [
                       styles.featuredCard,
                       {
@@ -718,17 +709,17 @@ export default function ProfileScreen() {
                     ]}
                     onPress={() =>
                       router.push({
-                        pathname: "/collection/[id]",
-                        params: { id: c.id, context: "portfolio" },
+                        pathname: "/piece/[id]",
+                        params: { id: piece.id, from: "portfolio" },
                       })
                     }
                   >
                     <View style={[styles.featuredCover, { backgroundColor: "rgba(120,110,100,0.1)" }]}>
-                      {coverUri ? (
+                      {piece.imageUri ? (
                         <Image
-                          source={resolveImageSource(coverUri)}
+                          source={resolveImageSource(piece.imageUri)}
                           style={StyleSheet.absoluteFill}
-                          contentFit="cover"
+                          contentFit="contain"
                           transition={200}
                         />
                       ) : (
@@ -737,10 +728,10 @@ export default function ProfileScreen() {
                     </View>
                     <View style={styles.featuredInfo}>
                       <Text style={[styles.featuredTitle, { color: colors.foreground }]} numberOfLines={1}>
-                        {c.title}
+                        {piece.title || "Untitled piece"}
                       </Text>
                       <Text style={[styles.featuredCount, { color: colors.mutedForeground }]}>
-                        {cp.length} public {cp.length === 1 ? "piece" : "pieces"}
+                        {meta || "Featured piece"}
                       </Text>
                     </View>
                     <Feather name="chevron-right" size={18} color={colors.mutedForeground} style={{ opacity: 0.5 }} />
@@ -857,7 +848,7 @@ export default function ProfileScreen() {
                 {site.enabled ? "Your site is live" : "Site is off"}
               </Text>
               <Text style={[styles.siteToggleSub, { color: colors.mutedForeground }]}>
-                A gallery built from your public collections
+                A gallery built from your featured pieces
               </Text>
             </View>
             <View
@@ -892,10 +883,10 @@ export default function ProfileScreen() {
               <View style={[styles.siteHintRow, { borderColor: "rgba(120,110,100,0.16)" }]}>
                 <Feather name="star" size={13} color={colors.cobalt} />
                 <Text style={[styles.siteHintText, { color: colors.mutedForeground }]}>
-                  {featuredCollections.length === 0
-                    ? "Feature pieces in a public collection to add them to your portfolio."
-                    : `${featuredCollections.length} ${
-                        featuredCollections.length === 1 ? "collection is" : "collections are"
+                  {portfolioPieces.length === 0
+                    ? "Feature pieces to add them to your portfolio."
+                    : `${portfolioPieces.length} ${
+                        portfolioPieces.length === 1 ? "piece is" : "pieces are"
                       } in your portfolio. Feature pieces to curate what shows.`}
                 </Text>
               </View>
@@ -973,8 +964,7 @@ export default function ProfileScreen() {
 
               <Text style={[styles.siteHint, { color: colors.mutedForeground }]}>
                 Your name, bio, statement, website, and Instagram from above also appear on your
-                site. Only collections you’ve added to your portfolio — and their photographed
-                pieces — are shown.
+                site. Only pieces you’ve featured in your portfolio are shown.
               </Text>
 
               {/* Preview */}
@@ -990,8 +980,8 @@ export default function ProfileScreen() {
             </>
           ) : (
             <Text style={[styles.siteHint, { color: colors.mutedForeground }]}>
-              Turn on your site to feature collections, choose a layout, and share a public
-              gallery of your work.
+              Turn on your site to feature pieces, choose a layout, and share a public gallery
+              of your work.
             </Text>
           )}
 
