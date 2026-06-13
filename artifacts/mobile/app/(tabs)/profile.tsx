@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -33,15 +34,31 @@ import { resolveImageSource } from "@/constants/seedImages";
 import { useAuth } from "@/context/AuthContext";
 import {
   portfolioShareUrl,
-  PUBLIC_SITE_DOMAIN,
   publicSiteLabel,
-  publicSiteSlug,
   useProfile,
 } from "@/context/ProfileContext";
+import { normalizePublicHandle } from "@/constants/slug";
 import { usePottery } from "@/context/PotteryContext";
 import { useColors } from "@/hooks/useColors";
 import { confirm } from "@/lib/confirm";
 import { notice } from "@/lib/notice";
+
+const normalizeWebsiteUrl = (raw: string): string => {
+  const value = raw.trim();
+  if (!value) return "";
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+};
+
+const normalizeInstagramUrl = (raw: string): string => {
+  const handle = raw
+    .trim()
+    .replace(/^@/, "")
+    .replace(/^https?:\/\//i, "")
+    .replace(/^(www\.|m\.)?instagram\.com\//i, "")
+    .replace(/\/+$/, "")
+    .split(/[/?#]/)[0];
+  return handle ? `https://instagram.com/${handle}` : "";
+};
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -58,6 +75,7 @@ export default function ProfileScreen() {
   const [statement, setStatement] = useState(profile.statement);
   const [website, setWebsite] = useState(profile.website);
   const [instagram, setInstagram] = useState(profile.instagram);
+  const [publicHandle, setPublicHandle] = useState(profile.publicSite.handle);
   const [contactEmail, setContactEmail] = useState(profile.publicSite.contactEmail);
   const [etsy, setEtsy] = useState(profile.publicSite.etsy);
   const [shopify, setShopify] = useState(profile.publicSite.shopify);
@@ -92,6 +110,7 @@ export default function ProfileScreen() {
     setStatement(profile.statement);
     setWebsite(profile.website);
     setInstagram(profile.instagram);
+    setPublicHandle(profile.publicSite.handle);
     setContactEmail(profile.publicSite.contactEmail);
     setEtsy(profile.publicSite.etsy);
     setShopify(profile.publicSite.shopify);
@@ -142,7 +161,12 @@ export default function ProfileScreen() {
       heroFocalX,
       heroZoom,
     });
-    await updatePublicSite({ contactEmail, etsy, shopify });
+    await updatePublicSite({
+      handle: normalizePublicHandle(publicHandle || name),
+      contactEmail,
+      etsy,
+      shopify,
+    });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setSaving(false);
     setIsEditing(false);
@@ -152,13 +176,25 @@ export default function ProfileScreen() {
   // so rapid taps and the edit-form save never clobber each other.
   const toggleSite = async () => {
     await Haptics.selectionAsync();
-    await updatePublicSite({ enabled: !site.enabled });
+    await updatePublicSite({
+      enabled: !site.enabled,
+      handle: site.handle || normalizePublicHandle(profile.name),
+    });
   };
 
   // Full, well-formed public link (https, no trailing slash) — the single
   // source for both copy and native share so a shared portfolio link is always
   // tappable.
-  const publicSiteUrl = portfolioShareUrl(profile.name);
+  const draftProfile = {
+    name: isEditing ? name : profile.name,
+    publicSite: {
+      ...profile.publicSite,
+      handle: isEditing
+        ? normalizePublicHandle(publicHandle || name)
+        : profile.publicSite.handle,
+    },
+  };
+  const publicSiteUrl = portfolioShareUrl(profile.publicSite.handle || profile.name);
 
   const handleCopyLink = async () => {
     if (!site.enabled) return;
@@ -219,6 +255,20 @@ export default function ProfileScreen() {
           ? { title: "Link copied", message: "Sharing wasn’t available, so the link is on your clipboard.", variant: "success" }
           : { title: "Couldn’t share", message: publicSiteUrl, variant: "info" },
       );
+    }
+  };
+
+  const openExternalLink = async (rawUrl: string) => {
+    if (!rawUrl) return;
+    try {
+      await Linking.openURL(rawUrl);
+    } catch (e) {
+      console.warn("[glazevault] failed to open external link", rawUrl, e);
+      notice({
+        title: "Couldn’t open link",
+        message: rawUrl,
+        variant: "error",
+      });
     }
   };
 
@@ -774,16 +824,26 @@ export default function ProfileScreen() {
           ) : (
             <View style={styles.links}>
               {profile.website ? (
-                <View style={styles.linkRow}>
+                <Pressable
+                  style={({ pressed }) => [styles.linkRow, { opacity: pressed ? 0.55 : 1 }]}
+                  onPress={() => openExternalLink(normalizeWebsiteUrl(profile.website))}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open ${profile.website}`}
+                >
                   <Feather name="globe" size={13} color={colors.mutedForeground} />
                   <Text style={[styles.linkText, { color: colors.cobalt }]}>{profile.website}</Text>
-                </View>
+                </Pressable>
               ) : null}
               {profile.instagram ? (
-                <View style={styles.linkRow}>
+                <Pressable
+                  style={({ pressed }) => [styles.linkRow, { opacity: pressed ? 0.55 : 1 }]}
+                  onPress={() => openExternalLink(normalizeInstagramUrl(profile.instagram))}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open Instagram ${profile.instagram}`}
+                >
                   <Feather name="instagram" size={13} color={colors.mutedForeground} />
                   <Text style={[styles.linkText, { color: colors.cobalt }]}>{profile.instagram}</Text>
-                </View>
+                </Pressable>
               ) : null}
               {!profile.website && !profile.instagram ? (
                 <Text style={[styles.emptyField, { color: colors.mutedForeground }]}>
@@ -869,10 +929,26 @@ export default function ProfileScreen() {
           </Pressable>
 
           {/* Public URL preview */}
+          {isEditing ? (
+            <View style={[styles.handleEditRow, { borderColor: "rgba(120,110,100,0.16)" }]}>
+              <Text style={[styles.handlePrefix, { color: colors.mutedForeground }]}>
+                {publicSiteLabel("").replace(/\/your-studio$/, "")}/
+              </Text>
+              <TextInput
+                style={[styles.handleInput, { color: colors.foreground }]}
+                value={publicHandle}
+                onChangeText={(next) => setPublicHandle(normalizePublicHandle(next))}
+                placeholder={normalizePublicHandle(name) || "your-studio"}
+                placeholderTextColor={colors.mutedForeground}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          ) : null}
           <View style={[styles.urlRow, { borderColor: "rgba(120,110,100,0.16)" }]}>
             <Feather name="link" size={13} color={colors.mutedForeground} />
             <Text style={[styles.urlText, { color: colors.foreground }]} numberOfLines={1}>
-              {publicSiteLabel(isEditing ? name : profile.name)}
+              {publicSiteLabel(draftProfile.publicSite.handle || draftProfile.name)}
             </Text>
           </View>
 
@@ -1427,6 +1503,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   visToggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#FFFFFF" },
+  handleEditRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 0,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 0.75,
+    marginTop: 12,
+  },
+  handlePrefix: {
+    fontSize: 13,
+    fontFamily: "Poppins_300Light",
+    letterSpacing: 0.2,
+  },
+  handleInput: {
+    flex: 1,
+    minWidth: 80,
+    fontSize: 13,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.2,
+    paddingVertical: 3,
+  },
   urlRow: {
     flexDirection: "row",
     alignItems: "center",

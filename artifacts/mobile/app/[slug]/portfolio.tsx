@@ -21,7 +21,7 @@ function PortfolioInner() {
   if (status === "missing" || !profile.publicSite.enabled) {
     return <PublicMissing />;
   }
-  return <PublicSiteScreen live backHref={`/${publicSiteSlug(profile.name)}`} />;
+  return <PublicSiteScreen live backHref={`/${publicSiteSlug(profile.publicSite.handle || profile.name)}`} />;
 }
 
 export default function PublicPortfolioRoute() {

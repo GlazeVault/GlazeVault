@@ -8,10 +8,11 @@ import {
   loadProfile as loadProfileRemote,
   saveProfile as saveProfileRemote,
 } from "@/services/dataService";
-import { publicSiteSlug } from "@/constants/slug";
+import { normalizePublicHandle, publicSiteSlug } from "@/constants/slug";
 
 export interface PublicSiteSettings {
   enabled: boolean;
+  handle: string;
   contactEmail: string;
   etsy: string;
   shopify: string;
@@ -19,6 +20,7 @@ export interface PublicSiteSettings {
 
 export const DEFAULT_PUBLIC_SITE: PublicSiteSettings = {
   enabled: false,
+  handle: "",
   contactEmail: "",
   etsy: "",
   shopify: "",
@@ -111,6 +113,9 @@ function normalizeProfile(raw: Partial<ArtistProfile>): ArtistProfile {
   const rawSite = (raw.publicSite ?? {}) as Partial<PublicSiteSettings>;
   const publicSite: PublicSiteSettings = {
     enabled: rawSite.enabled ?? DEFAULT_PUBLIC_SITE.enabled,
+    handle:
+      normalizePublicHandle(rawSite.handle ?? "") ||
+      publicSiteSlug(raw.name ?? ""),
     contactEmail: rawSite.contactEmail ?? DEFAULT_PUBLIC_SITE.contactEmail,
     etsy: rawSite.etsy ?? DEFAULT_PUBLIC_SITE.etsy,
     shopify: rawSite.shopify ?? DEFAULT_PUBLIC_SITE.shopify,
@@ -284,6 +289,13 @@ export { publicSiteSlug };
 
 export const PUBLIC_SITE_DOMAIN = "glazevault.art";
 
+type PublicIdentity = string | Pick<ArtistProfile, "name" | "publicSite">;
+
+export function publicSiteHandle(identity: PublicIdentity): string {
+  if (typeof identity === "string") return publicSiteSlug(identity);
+  return normalizePublicHandle(identity.publicSite.handle) || publicSiteSlug(identity.name);
+}
+
 /**
  * Resolves the live origin the public web pages are actually served from, so a
  * shared link RESOLVES today instead of pointing at a domain that isn't wired
@@ -338,23 +350,23 @@ function resolvePublicOrigin(): string {
  * copied or natively-shared link is always well-formed (https, no trailing
  * slash) and points at a host that actually serves the public pages.
  */
-export function publicBaseUrl(name: string): string {
-  return `${resolvePublicOrigin()}/${publicSiteSlug(name)}`;
+export function publicBaseUrl(identity: PublicIdentity): string {
+  return `${resolvePublicOrigin()}/${publicSiteHandle(identity)}`;
 }
 
 /** Public link to the artist's portfolio (the public-site root). */
-export function portfolioShareUrl(name: string): string {
-  return publicBaseUrl(name);
+export function portfolioShareUrl(identity: PublicIdentity): string {
+  return publicBaseUrl(identity);
 }
 
 /** Public link to a single collection (a mini-exhibition). */
-export function collectionShareUrl(name: string, collectionId: string): string {
-  return `${publicBaseUrl(name)}/collection/${collectionId}`;
+export function collectionShareUrl(identity: PublicIdentity, collectionId: string): string {
+  return `${publicBaseUrl(identity)}/collection/${collectionId}`;
 }
 
 /** Public link to a single piece. */
-export function pieceShareUrl(name: string, pieceId: string): string {
-  return `${publicBaseUrl(name)}/piece/${pieceId}`;
+export function pieceShareUrl(identity: PublicIdentity, pieceId: string): string {
+  return `${publicBaseUrl(identity)}/piece/${pieceId}`;
 }
 
 /**
@@ -362,6 +374,6 @@ export function pieceShareUrl(name: string, pieceId: string): string {
  * previews show the SAME host that Share / Copy actually use — never a stale
  * brand domain that wouldn't resolve yet.
  */
-export function publicSiteLabel(name: string): string {
-  return publicBaseUrl(name).replace(/^https?:\/\//, "");
+export function publicSiteLabel(identity: PublicIdentity): string {
+  return publicBaseUrl(identity).replace(/^https?:\/\//, "");
 }

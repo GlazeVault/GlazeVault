@@ -605,7 +605,7 @@ export default function CollectionDetailScreen() {
           onClose={() => setShareVisible(false)}
           content={buildLinkShareContent(
             collection.title,
-            collectionShareUrl(profile.name, collection.id),
+            collectionShareUrl(profile.publicSite.handle || profile.name, collection.id),
             profile.name ? `A collection by ${profile.name}` : "A ceramic collection",
             profile.name,
           )}

@@ -96,6 +96,7 @@ export default function PieceDetailScreen() {
   const pieces = pub ? pub.pieces : ownPieces;
   const collections = pub ? pub.collections : ownCollections;
   const profile = pub ? pub.profile : ownProfile;
+  const publicLinkIdentity = profile.publicSite.handle || profile.name;
   const { isPieceSaved, togglePieceSaved } = useSaved();
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -203,7 +204,7 @@ export default function PieceDetailScreen() {
         title: pub.title,
         materials: buildPublicMetaLine(pub),
         collection: publicCollectionName(p),
-        share: buildShareContent(pub, pieceShareUrl(profile.name, p.id), profile.name),
+        share: buildShareContent(pub, pieceShareUrl(publicLinkIdentity, p.id), profile.name),
       };
     });
     pieceStartIndex = Math.max(
@@ -229,7 +230,7 @@ export default function PieceDetailScreen() {
       // When present, buildShareContent still projects through the public
       // allowlist, so even the owner's share carries no studio field.
       const share = isPubliclyVisiblePiece(p)
-        ? buildShareContent(p, pieceShareUrl(profile.name, p.id), profile.name)
+        ? buildShareContent(p, pieceShareUrl(publicLinkIdentity, p.id), profile.name)
         : undefined;
       ownerImagesOf(p).forEach((uri) => {
         items.push({ uri, title: p.title, materials, collection, share });
@@ -475,7 +476,7 @@ export default function PieceDetailScreen() {
       });
       return;
     }
-    const url = pieceShareUrl(profile.name, piece.id);
+    const url = pieceShareUrl(publicLinkIdentity, piece.id);
     console.log("[glazevault] share link generated", url);
     if (await ensureShareable()) {
       setShareVisible(true);
@@ -485,7 +486,7 @@ export default function PieceDetailScreen() {
   // The exact public URL shown in the detail and used by Share / Copy. Empty
   // only when it genuinely can't be built (no piece id); logged so the reason is
   // visible in the console.
-  const publicUrl = piece.id ? pieceShareUrl(profile.name, piece.id) : "";
+  const publicUrl = piece.id ? pieceShareUrl(publicLinkIdentity, piece.id) : "";
 
   // Tap-to-copy on the displayed link (gesture-safe: the clipboard write fires
   // synchronously inside the tap, no awaited work before it).
@@ -683,7 +684,7 @@ export default function PieceDetailScreen() {
         <ShareSheet
           visible={shareVisible}
           onClose={() => setShareVisible(false)}
-          content={buildShareContent(publicView, pieceShareUrl(profile.name, piece.id), profile.name)}
+          content={buildShareContent(publicView, pieceShareUrl(publicLinkIdentity, piece.id), profile.name)}
         />
 
         <ImageViewer
@@ -1281,7 +1282,7 @@ export default function PieceDetailScreen() {
         <ShareSheet
           visible={shareVisible}
           onClose={() => setShareVisible(false)}
-          content={buildShareContent(piece, pieceShareUrl(profile.name, piece.id), profile.name)}
+          content={buildShareContent(piece, pieceShareUrl(publicLinkIdentity, piece.id), profile.name)}
         />
       ) : null}
 

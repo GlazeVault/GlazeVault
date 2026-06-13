@@ -128,7 +128,7 @@ function ArchiveInner() {
     return <PublicMissing />;
   }
 
-  const slug = publicSiteSlug(profile.name);
+  const slug = publicSiteSlug(profile.publicSite.handle || profile.name);
   const foyerHref = `/${slug}` as Href;
   const halfRatio = (p: PublicPieceView) =>
     Math.min(Math.max(orientations[p.imageUri] ?? 0.82, 0.72), 1.05);

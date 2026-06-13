@@ -128,7 +128,7 @@ export default function PublicSiteScreen({
   // guard treats as public (reachable by anon/other artists). The owner's own
   // in-app preview instead uses the private `/piece/...?public=1` route, which a
   // signed-in owner can reach directly.
-  const slug = publicSiteSlug(profile.name);
+  const slug = publicSiteSlug(profile.publicSite.handle || profile.name);
   const pieceHref = (pid: string, extra = ""): Href =>
     (pub
       ? `/${slug}/piece/${pid}${extra ? `?${extra}` : ""}`
@@ -192,13 +192,13 @@ export default function PublicSiteScreen({
   const shareContent = onlyCollectionId
     ? buildLinkShareContent(
         heroCollectionTitle || "Exhibition",
-        collectionShareUrl(profile.name, onlyCollectionId),
+        collectionShareUrl(profile.publicSite.handle || profile.name, onlyCollectionId),
         "A ceramic exhibition",
         profile.name,
       )
     : buildLinkShareContent(
         profile.name || "Portfolio",
-        portfolioShareUrl(profile.name),
+        portfolioShareUrl(profile.publicSite.handle || profile.name),
         "A ceramic portfolio",
         profile.name,
       );

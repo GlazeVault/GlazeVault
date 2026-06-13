@@ -17,7 +17,7 @@ import {
 
 import { coalesceImages } from "@/constants/imageStorage";
 import { isPubliclyVisiblePiece } from "@/constants/privacy";
-import { publicSiteSlug } from "@/constants/slug";
+import { normalizePublicHandle, publicSiteSlug } from "@/constants/slug";
 import type { Collection } from "@/context/CollectionsContext";
 import type { ArtistProfile } from "@/context/ProfileContext";
 import type { PotteryPiece } from "@/context/PotteryContext";
@@ -518,7 +518,13 @@ export async function ensureProfile(
     hero_focal_y: 0.5,
     hero_focal_x: 0.5,
     hero_zoom: 1,
-    public_site: null,
+    public_site: {
+      enabled: false,
+      handle: normalizePublicHandle(seed.name ?? ""),
+      contactEmail: "",
+      etsy: "",
+      shopify: "",
+    },
     user_id: userId,
   };
   const { error } = await client.from("profiles").upsert(row);
@@ -573,10 +579,11 @@ export async function loadPublicProfileBySlug(
     (a.user_id ?? "").localeCompare(b.user_id ?? ""),
   );
   const match = rows.find(
-    (r) =>
-      !!r.user_id &&
-      !!r.public_site?.enabled &&
-      publicSiteSlug(r.name ?? "") === slug,
+    (r) => {
+      if (!r.user_id || !r.public_site?.enabled) return false;
+      const handle = normalizePublicHandle(r.public_site.handle ?? "");
+      return (handle || publicSiteSlug(r.name ?? "")) === slug || publicSiteSlug(r.name ?? "") === slug;
+    },
   );
   if (!match || !match.user_id) return null;
   return { userId: match.user_id, profile: rowToProfile(match) };

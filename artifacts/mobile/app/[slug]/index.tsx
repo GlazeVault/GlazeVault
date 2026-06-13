@@ -33,7 +33,7 @@ function FoyerInner() {
     return <PublicMissing />;
   }
 
-  const slug = publicSiteSlug(profile.name);
+  const slug = publicSiteSlug(profile.publicSite.handle || profile.name);
   const door = (sub: string): Href => `/${slug}/${sub}` as Href;
 
   return (

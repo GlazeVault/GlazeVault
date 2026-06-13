@@ -48,7 +48,7 @@ export default function SavedScreen() {
     .map((id) => collections.find((c) => c.id === id))
     .filter((c): c is NonNullable<typeof c> => !!c && isCollectionPublic(c));
 
-  const artistSlug = publicSiteSlug(profile.name);
+  const artistSlug = publicSiteSlug(profile.publicSite.handle || profile.name);
   const hasInspiration =
     savedPieces.length > 0 || savedCollections.length > 0 || saved.artists.length > 0;
   const isEmpty = !hasInspiration && saved.following.length === 0;
