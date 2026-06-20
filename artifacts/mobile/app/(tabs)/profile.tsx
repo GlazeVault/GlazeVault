@@ -324,6 +324,40 @@ export default function ProfileScreen() {
     setRepositionVisible(true);
   };
 
+  const handleSelectHeroFromAlbums = async () => {
+    if (Platform.OS !== "web") {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        notice({ title: "Permission needed", message: "Allow access to your photo library." });
+        return;
+      }
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 0.9,
+      base64: Platform.OS === "web",
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+
+    const asset = result.assets[0];
+    const uri =
+      Platform.OS === "web"
+        ? asset.base64
+          ? `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}`
+          : ""
+        : asset.uri;
+    if (!uri) {
+      notice({ title: "Couldn’t load image", message: "Please choose a different image.", variant: "error" });
+      return;
+    }
+
+    setPendingHeroImageUri(uri);
+    setHeroPickerVisible(false);
+    setRepositionVisible(true);
+  };
+
   const handleRemoveHero = async () => {
     const ok = await confirm({
       title: "Remove hero image?",
@@ -605,6 +639,12 @@ export default function ProfileScreen() {
                 <Feather name="archive" size={13} color={colors.foreground} />
                 <Text style={[styles.heroBtnText, { color: colors.foreground }]}>
                   {heroImageUri ? "Change from Archive" : "Choose from Archive"}
+                </Text>
+              </Pressable>
+              <Pressable onPress={handleSelectHeroFromAlbums} style={[styles.heroBtn, { borderColor: "rgba(120,110,100,0.25)" }]}>
+                <Feather name="image" size={13} color={colors.foreground} />
+                <Text style={[styles.heroBtnText, { color: colors.foreground }]}>
+                  {heroImageUri ? "Change from Albums" : "Choose from Albums"}
                 </Text>
               </Pressable>
               <Pressable
@@ -1152,7 +1192,7 @@ export default function ProfileScreen() {
                       Choose hero image
                     </Text>
                     <Text style={[styles.archiveHeroSubtitle, { color: colors.mutedForeground }]}>
-                      Select an image from your Archive, then adjust the crop.
+                      Select an image from your Archive or albums, then adjust the crop.
                     </Text>
                   </View>
                   <Pressable
@@ -1164,6 +1204,18 @@ export default function ProfileScreen() {
                     <Feather name="x" size={20} color={colors.mutedForeground} />
                   </Pressable>
                 </View>
+
+                <Pressable
+                  style={[styles.archiveHeroAlbumBtn, { borderColor: "rgba(120,110,100,0.16)", backgroundColor: colors.secondary }]}
+                  onPress={handleSelectHeroFromAlbums}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose hero image from albums"
+                >
+                  <Feather name="image" size={14} color={colors.foreground} />
+                  <Text style={[styles.archiveHeroAlbumText, { color: colors.foreground }]}>
+                    Choose from Albums
+                  </Text>
+                </Pressable>
 
                 {heroArchiveOptions.length > 0 ? (
                   <ScrollView
@@ -1208,7 +1260,7 @@ export default function ProfileScreen() {
                   <View style={[styles.archiveHeroEmpty, { backgroundColor: colors.secondary }]}>
                     <Feather name="image" size={22} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
                     <Text style={[styles.archiveHeroEmptyText, { color: colors.mutedForeground }]}>
-                      Add images to your Archive first.
+                      No Archive images yet.
                     </Text>
                   </View>
                 )}
@@ -1818,6 +1870,22 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_300Light",
     lineHeight: 19,
     marginTop: 4,
+  },
+  archiveHeroAlbumBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 0.75,
+    marginBottom: 16,
+  },
+  archiveHeroAlbumText: {
+    fontSize: 13,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.2,
   },
   archiveHeroGrid: {
     flexDirection: "row",
