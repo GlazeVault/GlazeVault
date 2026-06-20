@@ -522,6 +522,7 @@ export async function ensureProfile(
       enabled: false,
       handle: normalizePublicHandle(seed.name ?? ""),
       contactEmail: "",
+      showContactEmail: false,
       etsy: "",
       shopify: "",
     },

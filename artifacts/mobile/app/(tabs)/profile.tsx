@@ -76,6 +76,7 @@ export default function ProfileScreen() {
   const [instagram, setInstagram] = useState(profile.instagram);
   const [publicHandle, setPublicHandle] = useState(profile.publicSite.handle);
   const [contactEmail, setContactEmail] = useState(profile.publicSite.contactEmail);
+  const [showContactEmail, setShowContactEmail] = useState(profile.publicSite.showContactEmail);
   const [etsy, setEtsy] = useState(profile.publicSite.etsy);
   const [shopify, setShopify] = useState(profile.publicSite.shopify);
   const [avatarUri, setAvatarUri] = useState(profile.avatarUri ?? "");
@@ -97,6 +98,7 @@ export default function ProfileScreen() {
   // Prevents overlapping picker/save runs (and duplicate native file copies)
   // from rapid taps on the avatar.
   const pickingAvatar = useRef(false);
+  const publicHandleInputRef = useRef<React.ElementRef<typeof TextInput>>(null);
 
   // The Profile previews the public Portfolio, so it matches the live flat
   // best-of sequence of featured pieces.
@@ -129,6 +131,7 @@ export default function ProfileScreen() {
     setInstagram(profile.instagram);
     setPublicHandle(profile.publicSite.handle);
     setContactEmail(profile.publicSite.contactEmail);
+    setShowContactEmail(profile.publicSite.showContactEmail);
     setEtsy(profile.publicSite.etsy);
     setShopify(profile.publicSite.shopify);
     setAvatarUri(profile.avatarUri ?? "");
@@ -181,6 +184,7 @@ export default function ProfileScreen() {
     await updatePublicSite({
       handle: normalizePublicHandle(publicHandle || name),
       contactEmail,
+      showContactEmail: showContactEmail && !!contactEmail.trim(),
       etsy,
       shopify,
     });
@@ -202,15 +206,6 @@ export default function ProfileScreen() {
   // Full, well-formed public link (https, no trailing slash) — the single
   // source for both copy and native share so a shared portfolio link is always
   // tappable.
-  const draftProfile = {
-    name: isEditing ? name : profile.name,
-    publicSite: {
-      ...profile.publicSite,
-      handle: isEditing
-        ? normalizePublicHandle(publicHandle || name)
-        : profile.publicSite.handle,
-    },
-  };
   const publicSiteUrl = portfolioShareUrl(profile.publicSite.handle || profile.name);
 
   const handleCopyLink = async () => {
@@ -786,6 +781,67 @@ export default function ProfileScreen() {
                   autoCapitalize="none"
                 />
               </View>
+              <View style={styles.linkEditRow}>
+                <Feather name="mail" size={14} color={colors.mutedForeground} />
+                <TextInput
+                  style={[styles.linkInput, { color: colors.foreground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
+                  value={contactEmail}
+                  onChangeText={(next) => {
+                    setContactEmail(next);
+                    if (!next.trim()) setShowContactEmail(false);
+                  }}
+                  placeholder="hello@yourstudio.com"
+                  placeholderTextColor={colors.mutedForeground}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+              <Pressable
+                style={styles.publicEmailToggle}
+                onPress={() => setShowContactEmail((value) => !!contactEmail.trim() && !value)}
+                disabled={!contactEmail.trim()}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: showContactEmail, disabled: !contactEmail.trim() }}
+                accessibilityLabel="Show email on public site"
+              >
+                <Feather
+                  name={showContactEmail ? "check-square" : "square"}
+                  size={16}
+                  color={contactEmail.trim() ? colors.emerald : colors.mutedForeground}
+                />
+                <Text
+                  style={[
+                    styles.publicEmailToggleText,
+                    { color: contactEmail.trim() ? colors.foreground : colors.mutedForeground },
+                  ]}
+                >
+                  Show email on public site
+                </Text>
+              </Pressable>
+              <View style={styles.linkEditRow}>
+                <Feather name="shopping-bag" size={14} color={colors.mutedForeground} />
+                <TextInput
+                  style={[styles.linkInput, { color: colors.foreground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
+                  value={etsy}
+                  onChangeText={setEtsy}
+                  placeholder="Etsy shop link"
+                  placeholderTextColor={colors.mutedForeground}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+              </View>
+              <View style={styles.linkEditRow}>
+                <Feather name="shopping-cart" size={14} color={colors.mutedForeground} />
+                <TextInput
+                  style={[styles.linkInput, { color: colors.foreground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
+                  value={shopify}
+                  onChangeText={setShopify}
+                  placeholder="Shopify store link"
+                  placeholderTextColor={colors.mutedForeground}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+              </View>
             </View>
           ) : (
             <View style={styles.links}>
@@ -811,9 +867,44 @@ export default function ProfileScreen() {
                   <Text style={[styles.linkText, { color: colors.cobalt }]}>{profile.instagram}</Text>
                 </Pressable>
               ) : null}
-              {!profile.website && !profile.instagram ? (
+              {site.contactEmail ? (
+                <View style={styles.linkRow}>
+                  <Feather name="mail" size={13} color={colors.mutedForeground} />
+                  <Text style={[styles.linkText, { color: colors.cobalt }]}>{site.contactEmail}</Text>
+                  {site.showContactEmail ? (
+                    <Text style={[styles.publicBadge, { color: colors.emerald }]}>Public</Text>
+                  ) : null}
+                </View>
+              ) : null}
+              {site.etsy ? (
+                <Pressable
+                  style={({ pressed }) => [styles.linkRow, { opacity: pressed ? 0.55 : 1 }]}
+                  onPress={() => openExternalLink(normalizeWebsiteUrl(site.etsy))}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open ${site.etsy}`}
+                >
+                  <Feather name="shopping-bag" size={13} color={colors.mutedForeground} />
+                  <Text style={[styles.linkText, { color: colors.cobalt }]}>{site.etsy}</Text>
+                </Pressable>
+              ) : null}
+              {site.shopify ? (
+                <Pressable
+                  style={({ pressed }) => [styles.linkRow, { opacity: pressed ? 0.55 : 1 }]}
+                  onPress={() => openExternalLink(normalizeWebsiteUrl(site.shopify))}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open ${site.shopify}`}
+                >
+                  <Feather name="shopping-cart" size={13} color={colors.mutedForeground} />
+                  <Text style={[styles.linkText, { color: colors.cobalt }]}>{site.shopify}</Text>
+                </Pressable>
+              ) : null}
+              {!profile.website &&
+              !profile.instagram &&
+              !site.contactEmail &&
+              !site.etsy &&
+              !site.shopify ? (
                 <Text style={[styles.emptyField, { color: colors.mutedForeground }]}>
-                  Add your website and Instagram
+                  Add your website, Instagram, email, and shop links
                 </Text>
               ) : null}
             </View>
@@ -894,29 +985,34 @@ export default function ProfileScreen() {
             </View>
           </Pressable>
 
-          {/* Public URL preview */}
+          {/* Public handle editor */}
           {isEditing ? (
-            <View style={[styles.handleEditRow, { borderColor: "rgba(120,110,100,0.16)" }]}>
-              <Text style={[styles.handlePrefix, { color: colors.mutedForeground }]}>
-                {publicSiteLabel("").replace(/\/your-studio$/, "")}/
+            <View style={styles.handleEditor}>
+              <Text style={[styles.handleLabel, { color: colors.mutedForeground }]}>
+                Public handle
               </Text>
-              <TextInput
-                style={[styles.handleInput, { color: colors.foreground }]}
-                value={publicHandle}
-                onChangeText={(next) => setPublicHandle(normalizePublicHandle(next))}
-                placeholder={normalizePublicHandle(name) || "your-studio"}
-                placeholderTextColor={colors.mutedForeground}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+              <Pressable
+                style={[styles.handleEditRow, { borderColor: "rgba(120,110,100,0.16)" }]}
+                onPress={() => publicHandleInputRef.current?.focus()}
+                accessibilityRole="button"
+                accessibilityLabel="Edit public site handle"
+              >
+                <Text style={[styles.handlePrefix, { color: colors.mutedForeground }]}>
+                  {publicSiteLabel("").replace(/\/your-studio$/, "")}/
+                </Text>
+                <TextInput
+                  ref={publicHandleInputRef}
+                  style={[styles.handleInput, { color: colors.foreground }]}
+                  value={publicHandle}
+                  onChangeText={(next) => setPublicHandle(normalizePublicHandle(next))}
+                  placeholder={normalizePublicHandle(name) || "your-studio"}
+                  placeholderTextColor={colors.mutedForeground}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </Pressable>
             </View>
           ) : null}
-          <View style={[styles.urlRow, { borderColor: "rgba(120,110,100,0.16)" }]}>
-            <Feather name="link" size={13} color={colors.mutedForeground} />
-            <Text style={[styles.urlText, { color: colors.foreground }]} numberOfLines={1}>
-              {publicSiteLabel(draftProfile.publicSite.handle || draftProfile.name)}
-            </Text>
-          </View>
 
           {site.enabled ? (
             <>
@@ -933,80 +1029,8 @@ export default function ProfileScreen() {
                 </Text>
               </View>
 
-              {/* Contact & commerce */}
-              <Text style={[styles.subLabel, { color: colors.mutedForeground, marginTop: 22 }]}>
-                Contact & Shop
-              </Text>
-              {isEditing ? (
-                <View style={styles.linksEdit}>
-                  <View style={styles.linkEditRow}>
-                    <Feather name="mail" size={14} color={colors.mutedForeground} />
-                    <TextInput
-                      style={[styles.linkInput, { color: colors.foreground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
-                      value={contactEmail}
-                      onChangeText={setContactEmail}
-                      placeholder="hello@yourstudio.com"
-                      placeholderTextColor={colors.mutedForeground}
-                      autoCapitalize="none"
-                      keyboardType="email-address"
-                    />
-                  </View>
-                  <View style={styles.linkEditRow}>
-                    <Feather name="shopping-bag" size={14} color={colors.mutedForeground} />
-                    <TextInput
-                      style={[styles.linkInput, { color: colors.foreground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
-                      value={etsy}
-                      onChangeText={setEtsy}
-                      placeholder="Etsy shop link"
-                      placeholderTextColor={colors.mutedForeground}
-                      autoCapitalize="none"
-                      keyboardType="url"
-                    />
-                  </View>
-                  <View style={styles.linkEditRow}>
-                    <Feather name="shopping-cart" size={14} color={colors.mutedForeground} />
-                    <TextInput
-                      style={[styles.linkInput, { color: colors.foreground, borderBottomColor: "rgba(120,110,100,0.2)" }]}
-                      value={shopify}
-                      onChangeText={setShopify}
-                      placeholder="Shopify store link"
-                      placeholderTextColor={colors.mutedForeground}
-                      autoCapitalize="none"
-                      keyboardType="url"
-                    />
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.links}>
-                  {site.contactEmail ? (
-                    <View style={styles.linkRow}>
-                      <Feather name="mail" size={13} color={colors.mutedForeground} />
-                      <Text style={[styles.linkText, { color: colors.cobalt }]}>{site.contactEmail}</Text>
-                    </View>
-                  ) : null}
-                  {site.etsy ? (
-                    <View style={styles.linkRow}>
-                      <Feather name="shopping-bag" size={13} color={colors.mutedForeground} />
-                      <Text style={[styles.linkText, { color: colors.cobalt }]}>{site.etsy}</Text>
-                    </View>
-                  ) : null}
-                  {site.shopify ? (
-                    <View style={styles.linkRow}>
-                      <Feather name="shopping-cart" size={13} color={colors.mutedForeground} />
-                      <Text style={[styles.linkText, { color: colors.cobalt }]}>{site.shopify}</Text>
-                    </View>
-                  ) : null}
-                  {!site.contactEmail && !site.etsy && !site.shopify ? (
-                    <Text style={[styles.emptyField, { color: colors.mutedForeground }]}>
-                      Add a contact email and shop links
-                    </Text>
-                  ) : null}
-                </View>
-              )}
-
               <Text style={[styles.siteHint, { color: colors.mutedForeground }]}>
-                Your name, bio, statement, website, and Instagram from above also appear on your
-                site. Only pieces you’ve featured in your portfolio are shown.
+                Your public gallery is live. Your profile, featured work, and public links are visible.
               </Text>
 
               {/* Preview */}
@@ -1022,8 +1046,7 @@ export default function ProfileScreen() {
             </>
           ) : (
             <Text style={[styles.siteHint, { color: colors.mutedForeground }]}>
-              Turn on your site to feature pieces, choose a layout, and share a public gallery
-              of your work.
+              Your public gallery is currently hidden. Turn it on when you're ready to share your work.
             </Text>
           )}
 
@@ -1515,6 +1538,24 @@ const styles = StyleSheet.create({
   linkText: { fontSize: 14, fontFamily: "Poppins_300Light" },
   linksEdit: { gap: 16 },
   linkEditRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  publicEmailToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    marginLeft: 24,
+    marginTop: -6,
+  },
+  publicEmailToggleText: {
+    fontSize: 12,
+    fontFamily: "Poppins_300Light",
+    letterSpacing: 0.2,
+  },
+  publicBadge: {
+    fontSize: 10,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
   linkInput: {
     flex: 1,
     fontSize: 14,
@@ -1540,6 +1581,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     borderRadius: 14,
     borderWidth: 0.75,
+    marginTop: 18,
   },
   siteToggleLabels: { flex: 1, gap: 2 },
   siteToggleTitle: { fontSize: 14, fontFamily: "Poppins_500Medium", letterSpacing: 0.2 },
@@ -1551,6 +1593,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   visToggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#FFFFFF" },
+  handleEditor: {
+    gap: 8,
+    marginTop: 14,
+  },
+  handleLabel: {
+    fontSize: 9,
+    fontFamily: "Poppins_500Medium",
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
   handleEditRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1559,7 +1611,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 0.75,
-    marginTop: 12,
   },
   handlePrefix: {
     fontSize: 13,
@@ -1574,17 +1625,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     paddingVertical: 3,
   },
-  urlRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    borderRadius: 12,
-    borderWidth: 0.75,
-    marginTop: 12,
-  },
-  urlText: { flex: 1, fontSize: 13, fontFamily: "Poppins_400Regular", letterSpacing: 0.2 },
   subLabel: {
     fontSize: 9,
     fontFamily: "Poppins_500Medium",

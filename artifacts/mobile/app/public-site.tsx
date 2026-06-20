@@ -176,7 +176,9 @@ export default function PublicSiteScreen({
   );
 
   const links: ProfileLink[] = [];
-  if (site.contactEmail.trim()) links.push(buildProfileLink("mail", site.contactEmail.trim()));
+  if (site.showContactEmail && site.contactEmail.trim()) {
+    links.push(buildProfileLink("mail", site.contactEmail.trim()));
+  }
   if (profile.instagram.trim()) links.push(buildProfileLink("instagram", profile.instagram.trim()));
   if (profile.website.trim()) links.push(buildProfileLink("globe", profile.website.trim()));
   if (site.etsy.trim()) links.push(buildProfileLink("shopping-bag", site.etsy.trim()));

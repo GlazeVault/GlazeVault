@@ -14,6 +14,7 @@ export interface PublicSiteSettings {
   enabled: boolean;
   handle: string;
   contactEmail: string;
+  showContactEmail: boolean;
   etsy: string;
   shopify: string;
 }
@@ -22,6 +23,7 @@ export const DEFAULT_PUBLIC_SITE: PublicSiteSettings = {
   enabled: false,
   handle: "",
   contactEmail: "",
+  showContactEmail: false,
   etsy: "",
   shopify: "",
 };
@@ -117,6 +119,7 @@ function normalizeProfile(raw: Partial<ArtistProfile>): ArtistProfile {
       normalizePublicHandle(rawSite.handle ?? "") ||
       publicSiteSlug(raw.name ?? ""),
     contactEmail: rawSite.contactEmail ?? DEFAULT_PUBLIC_SITE.contactEmail,
+    showContactEmail: rawSite.showContactEmail ?? DEFAULT_PUBLIC_SITE.showContactEmail,
     etsy: rawSite.etsy ?? DEFAULT_PUBLIC_SITE.etsy,
     shopify: rawSite.shopify ?? DEFAULT_PUBLIC_SITE.shopify,
   };
