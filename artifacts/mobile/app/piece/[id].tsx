@@ -92,7 +92,7 @@ export default function PieceDetailScreen() {
     removePieceFromCollection,
   } = usePottery();
   const { collections: ownCollections } = useCollections();
-  const { profile: ownProfile } = useProfile();
+  const { profile: ownProfile, updateProfile } = useProfile();
   const pieces = pub ? pub.pieces : ownPieces;
   const collections = pub ? pub.collections : ownCollections;
   const profile = pub ? pub.profile : ownProfile;
@@ -405,6 +405,22 @@ export default function PieceDetailScreen() {
         variant: "error",
       });
     }
+  };
+
+  const handleSetFeaturedImage = async () => {
+    if (!piece.imageUri) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    await updateProfile({
+      heroImageUri: piece.imageUri,
+      heroFocalX: 0.5,
+      heroFocalY: 0.5,
+      heroZoom: 1,
+    });
+    notice({
+      title: "Featured image updated",
+      message: "You can fine-tune the crop from Profile.",
+      variant: "success",
+    });
   };
 
   const handleTogglePublic = async () => {
@@ -902,18 +918,6 @@ export default function PieceDetailScreen() {
           )}
 
           {isPublic && !piece.archived ? (
-            <Pressable
-              style={({ pressed }) => [styles.previewBtn, { opacity: pressed ? 0.6 : 1 }]}
-              onPress={() => router.push(`/piece/${piece.id}?public=1`)}
-            >
-              <Feather name="eye" size={13} color={colors.cobalt} />
-              <Text style={[styles.previewBtnText, { color: colors.cobalt }]}>
-                Preview public view
-              </Text>
-            </Pressable>
-          ) : null}
-
-          {isPublic && !piece.archived ? (
             <AdvancedPublicVisibility
               showGlazeDetails={piece.showGlazeDetails}
               showStudioNotes={piece.showStudioNotes}
@@ -965,7 +969,7 @@ export default function PieceDetailScreen() {
           </Pressable>
 
           {/* Info rows */}
-          <View style={[styles.infoCard, { borderColor: "rgba(120, 110, 100, 0.14)" }]}>
+          <View style={[styles.infoCard, { borderColor: "rgba(120, 110, 100, 0.14)", marginBottom: 12 }]}>
             <InfoRow label="Clay" value={piece.clay} accent={colors.cobalt} />
             <InfoRow label="Glaze" value={piece.glaze} accent={colors.emerald} />
             <InfoRow label="Cone" value={piece.cone} accent={colors.primary} />
@@ -989,6 +993,45 @@ export default function PieceDetailScreen() {
               />
             ) : null}
           </View>
+
+          {(isPublic && !piece.archived) || piece.imageUri ? (
+            <View style={styles.postInfoActions}>
+              {isPublic && !piece.archived ? (
+                <Pressable
+                  style={({ pressed }) => [styles.previewBtn, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => router.push(`/piece/${piece.id}?public=1`)}
+                >
+                  <Feather name="eye" size={13} color={colors.cobalt} />
+                  <Text style={[styles.previewBtnText, { color: colors.cobalt }]}>
+                    Preview public view
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              {piece.imageUri ? (
+                <Pressable
+                  style={({ pressed }) => [styles.previewBtn, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={handleSetFeaturedImage}
+                  accessibilityRole="button"
+                  accessibilityLabel="Set as Featured Image"
+                >
+                <Feather
+                  name="image"
+                  size={13}
+                  color={colors.emerald}
+                />
+                <Text
+                  style={[
+                    styles.previewBtnText,
+                    { color: colors.emerald },
+                  ]}
+                >
+                    Set featured image
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
 
           {/* Notes */}
           {piece.notes ? (
@@ -1470,9 +1513,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 7,
     paddingVertical: 12,
-    marginTop: 6,
   },
   previewBtnText: { fontSize: 13, fontFamily: "Poppins_400Regular", letterSpacing: 0.3 },
+  postInfoActions: {
+    marginBottom: 12,
+  },
   // Public-view private notice
   privateCircle: {
     width: 56,

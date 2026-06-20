@@ -21,7 +21,6 @@ import {
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ArtistHero } from "@/components/ArtistHero";
 import { HeroImage } from "@/components/HeroImage";
 import { HeroReposition } from "@/components/HeroReposition";
 import { persistPieceImage } from "@/constants/imageStorage";
@@ -87,6 +86,8 @@ export default function ProfileScreen() {
   const [heroFocalX, setHeroFocalX] = useState(profile.heroFocalX ?? 0.5);
   const [heroZoom, setHeroZoom] = useState(profile.heroZoom ?? 1);
   const [repositionVisible, setRepositionVisible] = useState(false);
+  const [heroPickerVisible, setHeroPickerVisible] = useState(false);
+  const [pendingHeroImageUri, setPendingHeroImageUri] = useState("");
   const [saving, setSaving] = useState(false);
   // Import-from-file flow: which field we're importing into, the extracted
   // preview awaiting a Replace/Append choice, and an in-flight guard.
@@ -96,11 +97,27 @@ export default function ProfileScreen() {
   // Prevents overlapping picker/save runs (and duplicate native file copies)
   // from rapid taps on the avatar.
   const pickingAvatar = useRef(false);
-  const pickingHero = useRef(false);
 
   // The Profile previews the public Portfolio, so it matches the live flat
   // best-of sequence of featured pieces.
   const portfolioPieces = pieces.filter(isPortfolioPiece);
+  const heroArchiveOptions = React.useMemo(() => {
+    const seen = new Set<string>();
+    return pieces.flatMap((piece) => {
+      const uris = [piece.imageUri, ...(piece.images ?? [])].filter(
+        (uri): uri is string => !!uri,
+      );
+      return uris.flatMap((uri, index) => {
+        if (seen.has(uri)) return [];
+        seen.add(uri);
+        return [{
+          id: `${piece.id}-${index}`,
+          uri,
+          title: piece.title || "Untitled piece",
+        }];
+      });
+    });
+  }, [pieces]);
   const site = profile.publicSite;
 
   const startEditing = () => {
@@ -302,53 +319,14 @@ export default function ProfileScreen() {
     }
   };
 
-  // Hero image flow — kept fully separate from the avatar so changing one never
-  // touches the other. No forced aspect/crop: the hero keeps its true
-  // proportions and is framed by repositioning, not cropping.
-  const runPickHero = async () => {
-    if (Platform.OS !== "web") {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        notice({ title: "Permission needed", message: "Allow access to your photo library." });
-        return;
-      }
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: false,
-      quality: 0.85,
-      base64: Platform.OS === "web",
-    });
-    if (result.canceled || !result.assets?.[0]?.uri) return;
-    const asset = result.assets[0];
-    let stored: string;
-    try {
-      if (Platform.OS === "web") {
-        if (!asset.base64) throw new Error("Picker returned no base64 data on web");
-        stored = `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}`;
-      } else {
-        stored = await persistPieceImage(asset.uri);
-      }
-    } catch (e) {
-      console.warn("Failed to load hero image", e);
-      notice({ title: "Couldn’t load image", message: "We couldn’t use that image. Please try again.", variant: "error" });
-      return;
-    }
-    // A fresh image starts centered, unzoomed; the artist can reposition from there.
-    setHeroImageUri(stored);
-    setHeroFocalY(0.5);
-    setHeroFocalX(0.5);
-    setHeroZoom(1);
+  const pickHero = () => {
+    setHeroPickerVisible(true);
   };
 
-  const pickHero = async () => {
-    if (pickingHero.current) return;
-    pickingHero.current = true;
-    try {
-      await runPickHero();
-    } finally {
-      pickingHero.current = false;
-    }
+  const handleSelectHeroFromArchive = (uri: string) => {
+    setPendingHeroImageUri(uri);
+    setHeroPickerVisible(false);
+    setRepositionVisible(true);
   };
 
   const handleRemoveHero = async () => {
@@ -361,6 +339,7 @@ export default function ProfileScreen() {
     });
     if (!ok) return;
     setHeroImageUri("");
+    setPendingHeroImageUri("");
     setHeroFocalY(0.5);
     setHeroFocalX(0.5);
     setHeroZoom(1);
@@ -609,9 +588,9 @@ export default function ProfileScreen() {
             curated independently of the small round profile photo. Edit-only. */}
         {isEditing ? (
           <View style={styles.heroSection}>
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Hero Image</Text>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Featured Image</Text>
             <Text style={[styles.heroHelp, { color: colors.mutedForeground }]}>
-              The large image at the entrance of your landing page. Separate from your profile photo.
+              Banner at the entrance of your landing page. Separate from the profile photo.
             </Text>
 
             <View style={[styles.heroPreviewFrame, { borderColor: colors.border }]}>
@@ -628,9 +607,9 @@ export default function ProfileScreen() {
 
             <View style={styles.heroButtons}>
               <Pressable onPress={pickHero} style={[styles.heroBtn, { borderColor: "rgba(120,110,100,0.25)" }]}>
-                <Feather name="image" size={13} color={colors.foreground} />
+                <Feather name="archive" size={13} color={colors.foreground} />
                 <Text style={[styles.heroBtnText, { color: colors.foreground }]}>
-                  {heroImageUri ? "Change Hero Image" : "Add Hero Image"}
+                  {heroImageUri ? "Change from Archive" : "Choose from Archive"}
                 </Text>
               </Pressable>
               <Pressable
@@ -647,21 +626,8 @@ export default function ProfileScreen() {
                 style={[styles.heroBtn, { borderColor: "rgba(120,110,100,0.25)", opacity: heroImageUri ? 1 : 0.4 }]}
               >
                 <Feather name="trash-2" size={13} color={colors.mutedForeground} />
-                <Text style={[styles.heroBtnText, { color: colors.mutedForeground }]}>Remove Hero Image</Text>
+                <Text style={[styles.heroBtnText, { color: colors.mutedForeground }]}>Remove Featured Image</Text>
               </Pressable>
-            </View>
-
-            <Text style={[styles.heroPreviewLabel, { color: colors.mutedForeground }]}>How your landing page opens</Text>
-            <View style={[styles.landingPreview, { borderColor: colors.border }]}>
-              <ArtistHero
-                imageUri={heroImageUri || undefined}
-                focalY={heroFocalY}
-                focalX={heroFocalX}
-                zoom={heroZoom}
-                name={name}
-                secondLine={tagline}
-                maxHeight={170}
-              />
             </View>
           </View>
         ) : null}
@@ -1140,6 +1106,96 @@ export default function ProfileScreen() {
       </ScrollView>
 
       <Modal
+        visible={heroPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setHeroPickerVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setHeroPickerVisible(false)}>
+          <View style={styles.importOverlay}>
+            <TouchableWithoutFeedback>
+              <View
+                style={[
+                  styles.archiveHeroSheet,
+                  {
+                    backgroundColor: colors.background,
+                    paddingBottom: Math.max(insets.bottom, 22),
+                  },
+                ]}
+              >
+                <View style={styles.archiveHeroHeader}>
+                  <View>
+                    <Text style={[styles.archiveHeroTitle, { color: colors.foreground }]}>
+                      Choose hero image
+                    </Text>
+                    <Text style={[styles.archiveHeroSubtitle, { color: colors.mutedForeground }]}>
+                      Select an image from your Archive, then adjust the crop.
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => setHeroPickerVisible(false)}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close hero image picker"
+                  >
+                    <Feather name="x" size={20} color={colors.mutedForeground} />
+                  </Pressable>
+                </View>
+
+                {heroArchiveOptions.length > 0 ? (
+                  <ScrollView
+                    contentContainerStyle={styles.archiveHeroGrid}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {heroArchiveOptions.map((option) => (
+                      <Pressable
+                        key={option.id}
+                        style={({ pressed }) => [
+                          styles.archiveHeroTile,
+                          {
+                            backgroundColor: colors.secondary,
+                            borderColor:
+                              option.uri === heroImageUri
+                                ? colors.emerald
+                                : "rgba(120,110,100,0.14)",
+                            opacity: pressed ? 0.75 : 1,
+                          },
+                        ]}
+                        onPress={() => handleSelectHeroFromArchive(option.uri)}
+                      >
+                        <View style={styles.archiveHeroThumb}>
+                          <Image
+                            source={resolveImageSource(option.uri)}
+                            style={StyleSheet.absoluteFill}
+                            contentFit="cover"
+                            transition={160}
+                            cachePolicy="memory-disk"
+                          />
+                        </View>
+                        <Text
+                          style={[styles.archiveHeroPieceTitle, { color: colors.foreground }]}
+                          numberOfLines={1}
+                        >
+                          {option.title}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <View style={[styles.archiveHeroEmpty, { backgroundColor: colors.secondary }]}>
+                    <Feather name="image" size={22} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
+                    <Text style={[styles.archiveHeroEmptyText, { color: colors.mutedForeground }]}>
+                      Add images to your Archive first.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      <Modal
         visible={!!importPreview}
         transparent
         animationType="fade"
@@ -1218,20 +1274,27 @@ export default function ProfileScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {heroImageUri ? (
+      {pendingHeroImageUri || heroImageUri ? (
         <HeroReposition
           visible={repositionVisible}
-          uri={heroImageUri}
-          focalX={heroFocalX}
-          focalY={heroFocalY}
-          zoom={heroZoom}
+          uri={pendingHeroImageUri || heroImageUri}
+          focalX={pendingHeroImageUri ? 0.5 : heroFocalX}
+          focalY={pendingHeroImageUri ? 0.5 : heroFocalY}
+          zoom={pendingHeroImageUri ? 1 : heroZoom}
           onDone={(fx, fy, z) => {
+            if (pendingHeroImageUri) {
+              setHeroImageUri(pendingHeroImageUri);
+              setPendingHeroImageUri("");
+            }
             setHeroFocalX(fx);
             setHeroFocalY(fy);
             setHeroZoom(z);
             setRepositionVisible(false);
           }}
-          onCancel={() => setRepositionVisible(false)}
+          onCancel={() => {
+            setPendingHeroImageUri("");
+            setRepositionVisible(false);
+          }}
         />
       ) : null}
     </View>
@@ -1385,21 +1448,6 @@ const styles = StyleSheet.create({
   heroBtnText: {
     fontSize: 12.5,
     fontFamily: "Poppins_400Regular",
-  },
-  heroPreviewLabel: {
-    fontSize: 9,
-    fontFamily: "Poppins_500Medium",
-    letterSpacing: 1.6,
-    textTransform: "uppercase",
-    marginTop: 26,
-    marginBottom: 10,
-  },
-  landingPreview: {
-    borderWidth: 0.75,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    overflow: "hidden",
   },
   section: { marginTop: 28 },
   sectionLabel: {
@@ -1706,4 +1754,63 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   importSolidText: { fontSize: 13, fontFamily: "Poppins_500Medium", letterSpacing: 0.3 },
+  archiveHeroSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    maxHeight: "82%",
+  },
+  archiveHeroHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
+    marginBottom: 16,
+  },
+  archiveHeroTitle: {
+    fontSize: 22,
+    fontFamily: "PlayfairDisplay_400Regular",
+    letterSpacing: 0.3,
+  },
+  archiveHeroSubtitle: {
+    fontSize: 12.5,
+    fontFamily: "Poppins_300Light",
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  archiveHeroGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    paddingBottom: 8,
+  },
+  archiveHeroTile: {
+    width: "47%",
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  archiveHeroThumb: {
+    width: "100%",
+    aspectRatio: 1,
+    overflow: "hidden",
+  },
+  archiveHeroPieceTitle: {
+    fontSize: 12,
+    fontFamily: "Poppins_400Regular",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  archiveHeroEmpty: {
+    minHeight: 150,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+  },
+  archiveHeroEmptyText: {
+    fontSize: 13,
+    fontFamily: "Poppins_300Light",
+  },
 });
