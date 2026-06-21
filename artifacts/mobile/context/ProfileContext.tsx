@@ -290,7 +290,7 @@ export function useProfile() {
 // that already import it from the profile context.
 export { publicSiteSlug };
 
-export const PUBLIC_SITE_DOMAIN = "glazevault.art";
+export const PUBLIC_SITE_DOMAIN = "www.glazevault.com";
 
 type PublicIdentity = string | Pick<ArtistProfile, "name" | "publicSite">;
 
@@ -304,28 +304,20 @@ export function publicSiteHandle(identity: PublicIdentity): string {
  * shared link RESOLVES today instead of pointing at a domain that isn't wired
  * up yet. The public exhibition pages live as web routes inside this same app,
  * so the running host already serves them. Order of precedence:
- *   1. EXPO_PUBLIC_PUBLIC_SITE_URL — explicit override. Set this to
- *      `https://glazevault.art` once that custom domain is connected at deploy.
- *   2. On web, the live origin the page is currently served from
+ *   1. On web, the live origin the page is currently served from
  *      (`window.location.origin`). This is ALWAYS the host that actually serves
- *      the public pages right now — the current Replit dev domain today, the
- *      published `.replit.app` domain after deploy, or a custom domain once
- *      connected — so a copied/shared link is guaranteed to resolve without any
- *      env wiring. This is the requirement-4 "fall back to the current Replit
- *      public URL" behaviour, derived live instead of hardcoded.
+ *      the public pages right now, so a copied/shared link resolves without
+ *      relying on a hardcoded deployment host. It also keeps localhost links
+ *      testable in dev.
+ *   2. EXPO_PUBLIC_PUBLIC_SITE_URL — explicit override for native/production
+ *      builds, e.g. `https://www.glazevault.com`.
  *   3. EXPO_PUBLIC_DOMAIN — a host injected via env (mainly for native builds,
  *      which have no `window`).
- *   4. A hardcoded dev origin as an absolute last resort.
+ *   4. The canonical GlazeVault public domain as an absolute last resort.
  */
-// Last-resort public origin when nothing else resolves (e.g. a native runtime
-// with no `window` and no EXPO_PUBLIC_* host injected). Stale by nature — the
-// web path above is the reliable source for the dominant share flow.
-const REPLIT_FALLBACK_ORIGIN =
-  "https://5f3a3e03-daa6-4dbc-8c84-41a7d9ee3d10-00-1i7gcdnbgsjs7.spock.replit.dev";
+const FALLBACK_PUBLIC_ORIGIN = `https://${PUBLIC_SITE_DOMAIN}`;
 
 function resolvePublicOrigin(): string {
-  const explicit = process.env.EXPO_PUBLIC_PUBLIC_SITE_URL?.trim();
-  if (explicit) return explicit.replace(/\/+$/, "");
   // On web the app is already being served from the live public host, so the
   // current origin is exactly the host that serves the public pages right now.
   if (
@@ -335,16 +327,18 @@ function resolvePublicOrigin(): string {
   ) {
     return window.location.origin.replace(/\/+$/, "");
   }
+  const explicit = process.env.EXPO_PUBLIC_PUBLIC_SITE_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
   const domain = process.env.EXPO_PUBLIC_DOMAIN?.trim();
   if (domain) {
     const host = domain.replace(/^https?:\/\//, "").replace(/\/+$/, "");
     if (host) return `https://${host}`;
   }
   console.warn(
-    "[glazevault] public origin: no explicit override, web origin, or EXPO_PUBLIC_DOMAIN; using last-resort fallback origin",
-    REPLIT_FALLBACK_ORIGIN,
+    "[glazevault] public origin: no explicit override, web origin, or EXPO_PUBLIC_DOMAIN; using canonical fallback origin",
+    FALLBACK_PUBLIC_ORIGIN,
   );
-  return REPLIT_FALLBACK_ORIGIN;
+  return FALLBACK_PUBLIC_ORIGIN;
 }
 
 /**
